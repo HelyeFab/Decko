@@ -214,6 +214,37 @@ void main() {
     expect(sentenceDeck.items.single.example, '毎日ご飯を食べます。');
   });
 
+  test('real note shape: furigana → reading, back blob → meaning + example, '
+      'junk dropped', () async {
+    // Mirrors the Kuchiguse / Core note format seen in real .apkg files.
+    final Uint8List bytes = _buildApkg(
+      deckName: 'Kuchiguse',
+      cards: <_CardSpec>[
+        _CardSpec(
+          type: 0,
+          queue: 0,
+          front: '[sound:word_101.wav]<br><ruby>会社<rt>かいしゃ</rt></ruby>',
+          back: 'n - company; office<br>'
+              '<ruby>会社<rt>かいしゃ</rt></ruby>どう？<br>'
+              "How's work?<br>[sound:sentence_101.wav]<br>jp500_0101",
+          field2: '',
+        ),
+      ],
+    );
+
+    final Deck deck = await adapter.importDeck(bytes,
+        keepProgress: false, importedAt: DateTime(2026, 6, 12));
+    final item = deck.items.single;
+
+    expect(item.front, '会社[かいしゃ]'); // furigana preserved as bracket notation
+    expect(item.reading, isNull); // furigana is inline now, not a separate field
+    expect(item.back, 'n - company; office'); // first back line only
+    expect(item.example, contains('会社[かいしゃ]どう？'));
+    expect(item.example, contains("How's work?"));
+    expect(item.example, isNot(contains('jp500'))); // id dropped
+    expect(item.example, isNot(contains('sound'))); // audio dropped
+  });
+
   test('imported decks survive a storage round-trip', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     const ImportedDeckStorage storage = ImportedDeckStorage();

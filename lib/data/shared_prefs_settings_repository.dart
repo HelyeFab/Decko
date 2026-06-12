@@ -10,6 +10,7 @@ class SharedPrefsSettingsRepository implements SettingsRepository {
   const SharedPrefsSettingsRepository();
 
   static const String _appThemeKey = 'decko.settings.appThemeId';
+  static const String _furiganaKey = 'decko.settings.showFurigana';
 
   @override
   Future<String?> getSelectedAppThemeId() async {
@@ -21,5 +22,17 @@ class SharedPrefsSettingsRepository implements SettingsRepository {
   Future<void> saveSelectedAppThemeId(String themeId) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString(_appThemeKey, themeId);
+  }
+
+  @override
+  Future<bool> getShowFurigana() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_furiganaKey) ?? true;
+  }
+
+  @override
+  Future<void> saveShowFurigana(bool show) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_furiganaKey, show);
   }
 }

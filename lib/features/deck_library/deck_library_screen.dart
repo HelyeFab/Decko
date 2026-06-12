@@ -6,6 +6,7 @@ import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/constants/decko_strings.dart';
+import '../../core/widgets/decko_snackbar.dart';
 import '../../core/widgets/promise_tile.dart';
 import '../../core/widgets/section_header.dart';
 import '../../domain/deck.dart';
@@ -130,10 +131,7 @@ class _DeckList extends StatelessWidget {
         ),
         const SizedBox(height: DeckoSpacing.lg),
         for (final Deck deck in decks) ...<Widget>[
-          DeckTile(
-            deck: deck,
-            onTap: () => context.push(DeckoRoutes.deck(deck.id)),
-          ),
+          _DeckListItem(deck: deck),
           const SizedBox(height: DeckoSpacing.md),
         ],
         const SizedBox(height: DeckoSpacing.sm),
@@ -149,6 +147,74 @@ class _DeckList extends StatelessWidget {
           label: const Text(DeckoStrings.demoCta),
         ),
       ],
+    );
+  }
+}
+
+/// A deck row in the library. Imported decks can be swiped left to delete
+/// (with confirmation); demo decks are not deletable.
+class _DeckListItem extends StatelessWidget {
+  const _DeckListItem({required this.deck});
+
+  final Deck deck;
+
+  void _open(BuildContext context) => context.push(DeckoRoutes.deck(deck.id));
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: Text('Delete “${deck.name}”?'),
+        content: const Text(
+          'This removes the deck and its review progress from Decko. '
+          'Your original Anki file is untouched.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  void _delete(BuildContext context) {
+    DeckoApp.deckStoreOf(context).removeImportedDeck(deck.id);
+    DeckoApp.reviewStateOf(context).resetDeckStates(deck.id);
+    DeckoSnackbar.showInfo(context, 'Deleted “${deck.name}”.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final DeckTile tile = DeckTile(deck: deck, onTap: () => _open(context));
+    if (!deck.isImported) return tile;
+
+    final scheme = Theme.of(context).colorScheme;
+    return Dismissible(
+      key: ValueKey<String>('deck-${deck.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confirmDelete(context),
+      onDismissed: (_) => _delete(context),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: DeckoSpacing.xl),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        ),
+        child: Icon(Icons.delete_outline_rounded,
+            color: scheme.onErrorContainer),
+      ),
+      child: tile,
     );
   }
 }

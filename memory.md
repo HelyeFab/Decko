@@ -4,9 +4,22 @@
 2026-06-12
 
 ## Current stage
-MVP_005 complete: progress-aware Anki .apkg import (legacy format). Awaiting approval.
+MVP_006 complete: due queue + scheduler write-back. Awaiting approval.
 
-## Last completed (MVP_005)
+## Last completed (MVP_006)
+- `ReviewCardState` (+ ReviewQueueState enum) persistent per-card state; `fromLearningItem` maps imported Anki progress.
+- `ReviewStateRepository` + `SharedPrefsReviewStateRepository` (per-deck JSON blob, key `decko.reviewState.<deckId>`).
+- Pure `DueQueue.build` (due review → due learning → new; suspended/future excluded) and pure, TEMPORARY `ReviewSchedulingPolicy` (Again→now/relearning, Hard→+1d, Good→+3d, Easy→+7d) — NOT FSRS (DEC-011).
+- Review screen rewritten: loads states → builds due queue → walks it; grading applies policy, updates in-memory (due moves live), flushes changed states on session exit (complete/back/dispose). "All caught up." empty-queue state.
+- Import seeds review state on commit (keep vs fresh). Deck detail Due/Reviewed now read from ReviewStateRepository (FutureBuilder) — decrement after review, survive restart.
+- DeckoApp exposes `reviewStateOf`; injectable. 38 tests (new review_state_test.dart: policy, queue ordering, state mapping, repo round-trip; widget tests: due-decrement, all-caught-up, suspended-excluded). analyze clean.
+- Floating bottom-nav requested during testing → ROADMAP Deferred Notes (needs StatefulShellRoute; its own MVP).
+- Real-deck field-mapping fix: parse furigana (`<ruby>`/`漢字[よみ]`) → kanji + separate reading (single-word only); split rich Back blob into meaning + example, drop `[sound:]`/id junk/front-duplicate lines. Verified against real Kuchiguse Tier 2 .apkg. RE-IMPORT to apply.
+- Added swipe-left-to-delete for imported decks (Dismissible + confirm dialog; also resets that deck's review state). DeckStore.removeImportedDeck. Demo decks not deletable.
+- Furigana (DEC-012): importer now PRESERVES furigana as bracket notation `漢字[かな]` (was stripped). `FuriganaText` renders ruby; toggle (translate icon in review app bar) persisted via FuriganaController+settings (default on). Example sentence emphasised (titleLarge) with translation muted. Demo Japanese deck updated to use furigana brackets. SampleItemRow uses FuriganaText (base-only). RE-IMPORT real decks to get furigana.
+- Fix: deck detail now refreshes Due/Reviewed on RETURN from review (was stale unless you went out to the library). Deck detail is StatefulWidget; "Start review" awaits the push then reloads. Review screen flushes state and pops via `_leave` (PopScope intercepts app-bar/system back so mid-session stop also flushes before the detail re-reads). 39 tests (added mid-session-back test).
+
+## Earlier (MVP_005)
 - Added deps: file_picker, archive, sqlite3 + sqlite3_flutter_libs (DEC-010).
 - Import domain (`lib/domain/import/`): DeckImportAdapter + exceptions, DeckImportPreview, ImportedCardProgress + ImportedCardState, DeckImportInfo (provenance + ImportProgressMode). Extended Deck (importInfo) and LearningItem (importedProgress).
 - `AnkiApkgImportAdapter` (`lib/data/import/`): unzip → read collection.anki2/.anki21 via sqlite3 → map notes/cards → counts + per-card progress. Rejects zstd .anki21b with a clear message; ALL failures → DeckImportException (never crashes).
@@ -70,21 +83,23 @@ MVP_005 complete: progress-aware Anki .apkg import (legacy format). Awaiting app
 - Review scheduler seam is `ReviewScheduler`; SimpleReviewScheduler now, FSRS later (DEC-008).
 - Local persistence via shared_preferences behind SettingsRepository/ProgressRepository (DEC-009).
 - Anki import: legacy .apkg only, behind DeckImportAdapter, decks in a DeckStore (DEC-010).
+- Persistent per-card ReviewCardState + temporary scheduling policy; due queue + write-back (DEC-011).
 
 ## What is still placeholder
-- Demo deck data still comes from `MockDecks`; imported decks ARE persisted now.
-- Modern zstd `.anki21b` not supported (legacy export only) — deferred.
-- Imported progress is stored/labelled but does NOT drive scheduling yet.
-- Deck detail "Due today"/"Reviewed" are `—`; no scheduler/due dates.
-- Import handles a practical subset: ignores media, templates, model fidelity; multi-deck packages collapse into one; field mapping is field0/1/2.
+- Scheduling is a FIXED-interval placeholder (Again/Hard/Good/Easy → now/1d/3d/7d), NOT FSRS.
+- Modern zstd `.anki21b` not supported (legacy export only).
+- Import ignores media (image/audio) and templates; multi-deck packages collapse; field mapping heuristic.
+- Demo deck content still from `MockDecks` (but their review state now persists once studied).
+- Review-state storage = per-deck JSON blob in shared_preferences (flush on session exit); large libraries want a DB later.
 
 ## Now persisted
 - Selected app theme; progress snapshot (MVP_004).
-- Imported decks incl. cards + per-card imported progress + provenance (MVP_005).
+- Imported decks incl. cards + provenance (MVP_005).
+- Per-card review state (queueState/dueAt/reps/lapses/interval/ease); due decrements & survives restart (MVP_006).
 
 ## Next action
-Awaiting approval. Per MVP_005 brief, candidates: MVP_006 import field-mapping/compatibility improvements, basic due-queue from imported progress, JSON/CSV adapter, or review history/full progress storage. Pick after testing real personal decks. Do not start without approval.
+Awaiting approval. Strong candidates: FSRS-real scheduler (replace the placeholder policy behind the same seam), import media support, modern .anki21b, or the floating bottom-nav UI MVP (StatefulShellRoute). Do not start without approval.
 
 ## Blockers / open questions
-- Needs manual test with a REAL .apkg (export with "Support older Anki versions"); not doable here (no file, simctl can't drive the picker).
-- Modern .anki21b (zstd) decoding is the likely first compatibility gap users hit.
+- Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).
+- Per-grade write cost on very large decks mitigated by flush-on-exit; revisit with a DB if it bites.

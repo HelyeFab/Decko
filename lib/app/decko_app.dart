@@ -4,12 +4,15 @@ import 'package:go_router/go_router.dart';
 import '../core/constants/decko_strings.dart';
 import '../data/mock_deck_repository.dart';
 import '../data/shared_prefs_progress_repository.dart';
+import '../data/shared_prefs_review_state_repository.dart';
 import '../data/shared_prefs_settings_repository.dart';
 import '../domain/repositories/deck_repository.dart';
 import '../domain/repositories/progress_repository.dart';
+import '../domain/repositories/review_state_repository.dart';
 import '../domain/repositories/settings_repository.dart';
 import 'deck_store.dart';
 import 'decko_router.dart';
+import 'furigana_controller.dart';
 import 'theme/app_theme_config.dart';
 import 'theme/theme_controller.dart';
 
@@ -27,14 +30,19 @@ class DeckoApp extends StatefulWidget {
     this.deckRepository = const MockDeckRepository(),
     this.settingsRepository = const SharedPrefsSettingsRepository(),
     this.progressRepository = const SharedPrefsProgressRepository(),
+    this.reviewStateRepository = const SharedPrefsReviewStateRepository(),
   });
 
   final DeckRepository deckRepository;
   final SettingsRepository settingsRepository;
   final ProgressRepository progressRepository;
+  final ReviewStateRepository reviewStateRepository;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
+
+  static FuriganaController furiganaOf(BuildContext context) =>
+      _scopeOf(context).furiganaController;
 
   static DeckRepository repositoryOf(BuildContext context) =>
       _scopeOf(context).deckStore;
@@ -44,6 +52,9 @@ class DeckoApp extends StatefulWidget {
 
   static ProgressRepository progressOf(BuildContext context) =>
       _scopeOf(context).progressRepository;
+
+  static ReviewStateRepository reviewStateOf(BuildContext context) =>
+      _scopeOf(context).reviewStateRepository;
 
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
@@ -58,6 +69,7 @@ class DeckoApp extends StatefulWidget {
 
 class _DeckoAppState extends State<DeckoApp> {
   late final ThemeController _themeController;
+  late final FuriganaController _furiganaController;
   late final DeckStore _deckStore;
   final GoRouter _router = buildDeckoRouter();
 
@@ -66,6 +78,8 @@ class _DeckoAppState extends State<DeckoApp> {
     super.initState();
     _themeController = ThemeController(widget.settingsRepository);
     _themeController.load();
+    _furiganaController = FuriganaController(widget.settingsRepository);
+    _furiganaController.load();
     _deckStore = DeckStore(demoDecks: widget.deckRepository);
     _deckStore.load();
   }
@@ -73,6 +87,7 @@ class _DeckoAppState extends State<DeckoApp> {
   @override
   void dispose() {
     _themeController.dispose();
+    _furiganaController.dispose();
     _deckStore.dispose();
     super.dispose();
   }
@@ -81,8 +96,10 @@ class _DeckoAppState extends State<DeckoApp> {
   Widget build(BuildContext context) {
     return _DeckoScope(
       controller: _themeController,
+      furiganaController: _furiganaController,
       deckStore: _deckStore,
       progressRepository: widget.progressRepository,
+      reviewStateRepository: widget.reviewStateRepository,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -102,18 +119,24 @@ class _DeckoAppState extends State<DeckoApp> {
 class _DeckoScope extends InheritedWidget {
   const _DeckoScope({
     required this.controller,
+    required this.furiganaController,
     required this.deckStore,
     required this.progressRepository,
+    required this.reviewStateRepository,
     required super.child,
   });
 
   final ThemeController controller;
+  final FuriganaController furiganaController;
   final DeckStore deckStore;
   final ProgressRepository progressRepository;
+  final ReviewStateRepository reviewStateRepository;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
       controller != oldWidget.controller ||
+      furiganaController != oldWidget.furiganaController ||
       deckStore != oldWidget.deckStore ||
-      progressRepository != oldWidget.progressRepository;
+      progressRepository != oldWidget.progressRepository ||
+      reviewStateRepository != oldWidget.reviewStateRepository;
 }

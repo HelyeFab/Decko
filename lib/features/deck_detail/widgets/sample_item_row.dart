@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/decko_spacing.dart';
+import '../../../core/widgets/furigana_text.dart';
 import '../../../domain/learning_item.dart';
 
 /// A single-line preview of a [LearningItem] in the deck detail list.
@@ -21,9 +22,10 @@ class SampleItemRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
+                FuriganaText(
                   item.front,
-                  style: theme.textTheme.titleMedium
+                  showReadings: false, // compact base text in the list
+                  baseStyle: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 if (item.reading != null)

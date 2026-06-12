@@ -3,42 +3,99 @@ import 'package:flutter/material.dart';
 import '../../app/theme/card_theme_config.dart';
 import '../../domain/learning_item.dart';
 import '../constants/decko_spacing.dart';
+import 'furigana_text.dart';
 
 /// Renders a [LearningItem] in one of Decko's card themes.
 ///
-/// This is the reusable surface that both the review screen and the theme
-/// gallery share, so a card looks identical wherever it appears. The visual
-/// treatment is driven entirely by [CardThemeStyle] — no scheduling or domain
-/// logic lives here.
+/// Shared by the review screen and the theme gallery. Japanese text with
+/// furigana (`漢字[かな]`) renders as ruby via [FuriganaText]; [showFurigana]
+/// toggles the readings. The example sentence is given prominence — it's the
+/// most useful part of a vocab card.
 class DeckoCard extends StatelessWidget {
   const DeckoCard({
     super.key,
     required this.item,
     required this.style,
     this.revealed = false,
+    this.showFurigana = true,
   });
 
   final LearningItem item;
   final CardThemeStyle style;
-
-  /// Whether the answer (back/example) is shown.
   final bool revealed;
+  final bool showFurigana;
 
   @override
   Widget build(BuildContext context) {
     return switch (style) {
-      CardThemeStyle.minimal => _MinimalCard(item: item, revealed: revealed),
-      CardThemeStyle.detailed => _DetailedCard(item: item, revealed: revealed),
-      CardThemeStyle.game => _GameCard(item: item, revealed: revealed),
+      CardThemeStyle.minimal =>
+        _MinimalCard(item: item, revealed: revealed, furigana: showFurigana),
+      CardThemeStyle.detailed =>
+        _DetailedCard(item: item, revealed: revealed, furigana: showFurigana),
+      CardThemeStyle.game =>
+        _GameCard(item: item, revealed: revealed, furigana: showFurigana),
     };
   }
 }
 
+/// The example block: the Japanese sentence prominent, translation muted.
+class _ExampleBlock extends StatelessWidget {
+  const _ExampleBlock({
+    required this.example,
+    required this.furigana,
+    this.center = false,
+  });
+
+  final String example;
+  final bool furigana;
+  final bool center;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final List<String> lines = example.split('\n');
+    final String sentence = lines.first;
+    final String translation = lines.skip(1).join(' ').trim();
+    final TextAlign align = center ? TextAlign.center : TextAlign.start;
+
+    return Column(
+      crossAxisAlignment:
+          center ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      children: <Widget>[
+        FuriganaText(
+          sentence,
+          showReadings: furigana,
+          align: align,
+          baseStyle: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            height: 1.3,
+          ),
+        ),
+        if (translation.isNotEmpty) ...<Widget>[
+          const SizedBox(height: DeckoSpacing.sm),
+          Text(
+            translation,
+            textAlign: align,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _MinimalCard extends StatelessWidget {
-  const _MinimalCard({required this.item, required this.revealed});
+  const _MinimalCard({
+    required this.item,
+    required this.revealed,
+    required this.furigana,
+  });
 
   final LearningItem item;
   final bool revealed;
+  final bool furigana;
 
   @override
   Widget build(BuildContext context) {
@@ -52,13 +109,14 @@ class _MinimalCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text(
+            FuriganaText(
               item.front,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.displaySmall
+              showReadings: furigana,
+              align: TextAlign.center,
+              baseStyle: theme.textTheme.displaySmall
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
-            if (item.reading != null) ...<Widget>[
+            if (item.reading != null && furigana) ...<Widget>[
               const SizedBox(height: DeckoSpacing.sm),
               Text(
                 item.reading!,
@@ -74,17 +132,16 @@ class _MinimalCard extends StatelessWidget {
               Text(
                 item.back,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.headlineSmall,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
               if (item.example != null) ...<Widget>[
-                const SizedBox(height: DeckoSpacing.md),
-                Text(
-                  item.example!,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                const SizedBox(height: DeckoSpacing.xl),
+                _ExampleBlock(
+                  example: item.example!,
+                  furigana: furigana,
+                  center: true,
                 ),
               ],
             ],
@@ -96,10 +153,15 @@ class _MinimalCard extends StatelessWidget {
 }
 
 class _DetailedCard extends StatelessWidget {
-  const _DetailedCard({required this.item, required this.revealed});
+  const _DetailedCard({
+    required this.item,
+    required this.revealed,
+    required this.furigana,
+  });
 
   final LearningItem item;
   final bool revealed;
+  final bool furigana;
 
   @override
   Widget build(BuildContext context) {
@@ -115,13 +177,14 @@ class _DetailedCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Expanded(
-                  child: Text(
+                  child: FuriganaText(
                     item.front,
-                    style: theme.textTheme.headlineMedium
+                    showReadings: furigana,
+                    baseStyle: theme.textTheme.headlineMedium
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
-                if (item.reading != null)
+                if (item.reading != null && furigana)
                   Chip(
                     label: Text(item.reading!),
                     visualDensity: VisualDensity.compact,
@@ -140,14 +203,11 @@ class _DetailedCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (item.example != null) ...<Widget>[
-              const SizedBox(height: DeckoSpacing.md),
+            if (item.example != null && revealed) ...<Widget>[
+              const SizedBox(height: DeckoSpacing.lg),
               _LabelledRow(
                 label: 'Example',
-                child: Text(
-                  revealed ? item.example! : '—',
-                  style: theme.textTheme.bodyLarge,
-                ),
+                child: _ExampleBlock(example: item.example!, furigana: furigana),
               ),
             ],
             if (item.tags.isNotEmpty) ...<Widget>[
@@ -197,10 +257,15 @@ class _LabelledRow extends StatelessWidget {
 }
 
 class _GameCard extends StatelessWidget {
-  const _GameCard({required this.item, required this.revealed});
+  const _GameCard({
+    required this.item,
+    required this.revealed,
+    required this.furigana,
+  });
 
   final LearningItem item;
   final bool revealed;
+  final bool furigana;
 
   @override
   Widget build(BuildContext context) {
@@ -236,14 +301,15 @@ class _GameCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: DeckoSpacing.xl),
-          Text(
+          FuriganaText(
             item.front,
-            style: textTheme.displaySmall?.copyWith(
+            showReadings: furigana,
+            baseStyle: textTheme.displaySmall?.copyWith(
               color: scheme.onPrimary,
               fontWeight: FontWeight.w700,
             ),
           ),
-          if (item.reading != null) ...<Widget>[
+          if (item.reading != null && furigana) ...<Widget>[
             const SizedBox(height: DeckoSpacing.xs),
             Text(
               item.reading!,

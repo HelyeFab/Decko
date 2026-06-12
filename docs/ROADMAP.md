@@ -82,6 +82,18 @@ Small, intentionally-postponed improvements captured so they are not lost.
 - **Import: smarter field mapping.** Field→Decko mapping is heuristic
   (front/back positional, kana→reading, sentence→example). Note-type-aware
   mapping would import more decks cleanly. (From MVP_005 testing.)
+- **Floating bottom nav bar (UI direction).** Replace the app-bar-action
+  navigation with a modern floating, rounded bottom nav (Home/Library,
+  Progress, Themes, …; active tab labelled). Needs a GoRouter
+  `StatefulShellRoute.indexedStack` refactor so tabs keep state and the bar
+  persists — its own MVP. (Requested during MVP_006.)
+- **Scheduling realism.** MVP_006's write-back policy is a fixed-interval
+  placeholder (Again/Hard/Good/Easy → now/1d/3d/7d), not FSRS. Replace with a
+  real scheduler (FSRS) behind the same `ReviewScheduler`/`ReviewCardState`
+  seam. (DEC-011.)
+- **Review-state storage at scale.** Per-card review state is a per-deck JSON
+  blob in shared_preferences, flushed on session exit. Very large libraries
+  will want a real DB behind `ReviewStateRepository`. (DEC-011.)
 
 ## I2 — APKG Import Beta
 

@@ -353,34 +353,83 @@ class _Fields {
   final String? example;
 }
 
-/// Maps positional Anki note fields to Decko fields.
+/// Maps an Anki note's raw fields to Decko fields.
 ///
-/// Field order varies wildly across note types, so beyond front/back this uses
-/// content heuristics rather than fixed indices: a short kana-only field becomes
-/// the reading, and a sentence-like field becomes the example. Anything that
-/// doesn't fit is dropped rather than dumped into the wrong slot. This is the
-/// isolated mapping layer flagged for improvement (DEC-010).
+/// Real Japanese note types carry furigana (`<ruby>漢字<rt>かな</rt></ruby>`) and
+/// often pack the back as `meaning<br>sentence<br>translation<br>[sound:…]<br>id`.
+/// So this:
+///  - converts furigana to bracket notation `漢字[かな]` and keeps it, so the app
+///    can render ruby (with a toggle) instead of mashing kanji + reading;
+///  - splits the back into lines, dropping audio refs, id-like tokens, and a
+///    line that just repeats the front; first line = answer, rest = example;
+///  - falls back to content heuristics (kana field → reading, sentence field →
+///    example) for note types that split those out.
+/// Still an isolated, heuristic layer flagged for improvement (DEC-010).
 _Fields _mapFields(List<String> raw) {
-  final List<String> cleaned = raw
-      .map(_clean)
-      .where((String s) => s.isNotEmpty)
-      .toList(growable: false);
+  final String front = _cleanField(raw.isNotEmpty ? raw[0] : '');
+  final String rawBack = raw.length > 1 ? raw[1] : '';
 
-  final String front = cleaned.isNotEmpty ? cleaned[0] : '';
-  final String back = cleaned.length > 1 ? cleaned[1] : '';
+  final List<String> backLines = _splitLines(rawBack)
+      .map(_cleanField)
+      .where((String s) => s.isNotEmpty && s != front && !_isIdLike(s))
+      .toList();
+  final String back = backLines.isNotEmpty ? backLines.first : '';
+  String? example =
+      backLines.length > 1 ? backLines.skip(1).join('\n') : null;
 
+  // Fallbacks for note types that split reading/example into their own fields.
   String? reading;
-  String? example;
-  for (final String field in cleaned.skip(2)) {
-    if (field == front || field == back) continue;
-    if (reading == null && _isKanaReading(field)) {
-      reading = field;
-    } else if (example == null && _isSentence(field)) {
-      example = field;
+  if (!front.contains('[')) {
+    for (final String f in raw.skip(2)) {
+      final String c = _cleanField(f);
+      if (!c.contains('[') && _isKanaReading(c)) {
+        reading = c;
+        break;
+      }
     }
   }
+  if (example == null) {
+    for (final String f in raw.skip(2)) {
+      final String c = _cleanField(f);
+      if (c != back && c != front && _isSentence(c)) {
+        example = c;
+        break;
+      }
+    }
+  }
+
   return _Fields(front: front, back: back, reading: reading, example: example);
 }
+
+final RegExp _rubyTag = RegExp(r'<ruby>(.*?)<rt>(.*?)</rt></ruby>', dotAll: true);
+
+/// Cleans one Anki field to plain text **but preserves furigana** as `漢字[かな]`.
+String _cleanField(String raw) {
+  // <ruby>漢字<rt>かな</rt></ruby> -> 漢字[かな]
+  String s = raw.replaceAllMapped(_rubyTag, (Match m) {
+    final String base = _stripTags(m.group(1) ?? '');
+    final String read = _stripTags(m.group(2) ?? '');
+    return read.isEmpty ? base : '$base[$read]';
+  });
+  s = s
+      .replaceAll(RegExp(r'\[sound:[^\]]*\]'), '') // audio refs
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ');
+  s = _stripTags(s)
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>');
+  s = s.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
+  return _collapseRepeat(s);
+}
+
+String _stripTags(String s) => s.replaceAll(RegExp(r'<[^>]+>'), '');
+
+List<String> _splitLines(String s) =>
+    s.split(RegExp(r'<br\s*/?>|\n', caseSensitive: false));
+
+/// An id-like token such as `jp500_0101` — junk, not content.
+bool _isIdLike(String s) => RegExp(r'^[A-Za-z]+\d+[A-Za-z0-9_]*$').hasMatch(s);
 
 /// A short, kana-only string — i.e. a reading, not a sentence.
 bool _isKanaReading(String s) {
@@ -392,21 +441,6 @@ bool _isKanaReading(String s) {
 /// Looks like an example sentence: long enough, or with sentence punctuation.
 bool _isSentence(String s) =>
     s.length >= 8 || s.contains('。') || s.contains('、') || s.contains('？');
-
-/// Strips Anki HTML/media markup to plain text and collapses a value that is
-/// just one token repeated (e.g. "さん さん" → "さん").
-String _clean(String raw) {
-  String s = raw
-      .replaceAll(RegExp(r'\[sound:[^\]]*\]'), '')
-      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ')
-      .replaceAll(RegExp(r'<[^>]+>'), '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&amp;', '&')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>');
-  s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
-  return _collapseRepeat(s);
-}
 
 /// Collapses a string of identical whitespace-separated tokens to one.
 String _collapseRepeat(String s) {

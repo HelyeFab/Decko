@@ -47,4 +47,13 @@ class DeckStore extends ChangeNotifier implements DeckRepository {
     await _storage.save(_imported);
     notifyListeners();
   }
+
+  /// Removes an imported deck. Notifies immediately (so the list updates before
+  /// persistence) and then saves. Demo decks are not removable.
+  Future<void> removeImportedDeck(String id) async {
+    _imported =
+        _imported.where((Deck d) => d.id != id).toList(growable: false);
+    notifyListeners();
+    await _storage.save(_imported);
+  }
 }

@@ -1,32 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/section_header.dart';
 import '../../domain/deck.dart';
 import '../../domain/import/deck_import_info.dart';
-import '../../domain/import/imported_card_progress.dart';
-import '../../domain/import/imported_card_state.dart';
 import '../../domain/learning_item.dart';
+import '../../domain/review_card_state.dart';
 import 'widgets/sample_item_row.dart';
 
 /// Detail view for a single [Deck].
 ///
-/// Shows the deck's title, description, card count and a sample of its items,
-/// plus a placeholder progress summary. "Start review" opens the review preview
-/// with this deck's first card. All figures are demo/local data for MVP_002 —
-/// there is no scheduler or review history yet.
-class DeckDetailScreen extends StatelessWidget {
+/// Shows the deck's title, description, card count, a sample of its items, and
+/// live Due today / Reviewed counts from persisted review state. "Start review"
+/// opens the due-queue session; on return the counts are reloaded so they
+/// reflect the just-finished review (DEC-011).
+class DeckDetailScreen extends StatefulWidget {
   const DeckDetailScreen({super.key, required this.deck});
 
   final Deck deck;
 
+  @override
+  State<DeckDetailScreen> createState() => _DeckDetailScreenState();
+}
+
+class _DeckDetailScreenState extends State<DeckDetailScreen> {
   /// How many items to preview before "+N more".
   static const int _previewCount = 4;
 
+  Future<List<ReviewCardState>>? _statesFuture;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _statesFuture ??= _loadStates();
+  }
+
+  Future<List<ReviewCardState>> _loadStates() =>
+      DeckoApp.reviewStateOf(context).getStatesForDeck(widget.deck.id);
+
+  void _reload() {
+    setState(() {
+      _statesFuture = _loadStates();
+    });
+  }
+
+  /// Opens the review session and refreshes the counts once it returns.
+  Future<void> _startReview() async {
+    await context.push(DeckoRoutes.deckReview(widget.deck.id));
+    if (mounted) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final Deck deck = widget.deck;
     final theme = Theme.of(context);
     final List<LearningItem> preview = deck.items.take(_previewCount).toList();
     final int remaining = deck.itemCount - preview.length;
@@ -67,7 +96,7 @@ class DeckDetailScreen extends StatelessWidget {
               _ProvenanceCard(info: deck.importInfo!),
             ],
             const SizedBox(height: DeckoSpacing.xl),
-            _ProgressSummary(deck: deck),
+            _ProgressSummary(deck: deck, statesFuture: _statesFuture),
             const SizedBox(height: DeckoSpacing.xl),
             SectionHeader(
               title: 'Cards',
@@ -105,7 +134,7 @@ class DeckDetailScreen extends StatelessWidget {
             ],
             const SizedBox(height: DeckoSpacing.xl),
             FilledButton.icon(
-              onPressed: () => context.push(DeckoRoutes.deckReview(deck.id)),
+              onPressed: _startReview,
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text('Start review'),
             ),
@@ -168,48 +197,44 @@ class _ProvenanceCard extends StatelessWidget {
   }
 }
 
+/// Live Due today / Reviewed counts, read from persisted review state so they
+/// reflect actual study (and decrement after review) rather than fixed numbers.
 class _ProgressSummary extends StatelessWidget {
-  const _ProgressSummary({required this.deck});
+  const _ProgressSummary({required this.deck, required this.statesFuture});
 
   final Deck deck;
-
-  /// Due/Reviewed are derived from imported progress when it was kept; otherwise
-  /// there is no scheduling data to report, so they stay as a dash.
-  bool get _hasImportedProgress =>
-      deck.importInfo?.progressMode == ImportProgressMode.kept;
-
-  int get _reviewed => deck.items.where((LearningItem i) {
-        final ImportedCardProgress? p = i.importedProgress;
-        return p != null &&
-            (p.state == ImportedCardState.review ||
-                p.state == ImportedCardState.relearning ||
-                (p.reps ?? 0) > 0);
-      }).length;
-
-  int get _dueToday {
-    final DateTime now = DateTime.now();
-    final DateTime endOfToday =
-        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
-    return deck.items.where((LearningItem i) {
-      final DateTime? due = i.importedProgress?.dueAt;
-      return due != null && due.isBefore(endOfToday);
-    }).length;
-  }
+  final Future<List<ReviewCardState>>? statesFuture;
 
   @override
   Widget build(BuildContext context) {
-    final String due = _hasImportedProgress ? '$_dueToday' : '—';
-    final String reviewed = _hasImportedProgress ? '$_reviewed' : '—';
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: _StatBox(value: '${deck.itemCount}', label: 'Total cards'),
-        ),
-        const SizedBox(width: DeckoSpacing.md),
-        Expanded(child: _StatBox(value: due, label: 'Due today')),
-        const SizedBox(width: DeckoSpacing.md),
-        Expanded(child: _StatBox(value: reviewed, label: 'Reviewed')),
-      ],
+    return FutureBuilder<List<ReviewCardState>>(
+      future: statesFuture,
+      builder: (BuildContext context,
+          AsyncSnapshot<List<ReviewCardState>> snap) {
+        final String due;
+        final String reviewed;
+        if (!snap.hasData) {
+          due = '…';
+          reviewed = '…';
+        } else {
+          final DateTime now = DateTime.now();
+          final List<ReviewCardState> states = snap.data!;
+          due = '${states.where((s) => s.isDueForReview(now)).length}';
+          reviewed = '${states.where((s) => s.hasBeenReviewed).length}';
+        }
+        return Row(
+          children: <Widget>[
+            Expanded(
+              child:
+                  _StatBox(value: '${deck.itemCount}', label: 'Total cards'),
+            ),
+            const SizedBox(width: DeckoSpacing.md),
+            Expanded(child: _StatBox(value: due, label: 'Due today')),
+            const SizedBox(width: DeckoSpacing.md),
+            Expanded(child: _StatBox(value: reviewed, label: 'Reviewed')),
+          ],
+        );
+      },
     );
   }
 }

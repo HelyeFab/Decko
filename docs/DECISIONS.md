@@ -257,3 +257,60 @@ MVP_005 starts the import system: a real `.apkg` import that honours the progres
 - Decode modern zstd `.anki21b` now: deferred — no mature Dart zstd, would need native FFI with iOS/Android risk; legacy export covers the slice.
 - `sqflite` for reading the collection: rejected — it can't run in host unit tests; `sqlite3` can.
 - A real DB (Drift/Isar) for imported decks now: rejected as premature for a first vertical slice.
+
+## DEC-011: Persistent per-card review state + temporary scheduling policy
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+After MVP_005, reviewing a card changed nothing persistent — imported "Due today" never decremented because there was no per-card scheduling state being written back. We need a real due-queue and write-back without committing to FSRS yet.
+
+### Decision
+
+- **State:** a framework-light `ReviewCardState` (queueState, dueAt, reps, lapses, intervalDays, easeFactor, lastReviewedAt, sourceSystem), persisted behind a `ReviewStateRepository` (a per-deck JSON blob in `shared_preferences`, `SharedPrefsReviewStateRepository`).
+- **Init:** on import, every item gets a `ReviewCardState` — Keep-progress maps imported Anki progress (suspended stays suspended, excluded from the queue); Start-fresh/unavailable start new. Demo decks initialise lazily as new on first review. DEC-005 stays binding (nothing silently reset).
+- **Queue:** pure `DueQueue.build` — non-suspended cards that are due (review/learning) then new cards, deterministic order. Drives the review session.
+- **Write-back:** a pure, explicitly **temporary** `ReviewSchedulingPolicy` (Again→relearning/now, Hard→+1d, Good→+3d, Easy→+7d) advances state on each grade. **NOT FSRS** — it exists so write-back works; a real FSRS scheduler replaces this one class.
+- **Persistence timing:** the review screen updates state in memory per grade (due count moves live) and **flushes the changed states once when leaving the session** (complete / back / dispose), to avoid rewriting a large deck's whole blob on every tap.
+- **Counts:** deck detail Due today / Reviewed read from the repository (live, decrement after review, survive restart).
+
+### Consequences
+
+- Imported decks become usable day-to-day: due decrements and persists.
+- Pure policy + queue + state are unit-testable; FSRS-ready (same fields/seam, DEC-003/008).
+- Per-deck blob rewrite is the known cost; flush-on-exit keeps it off the per-grade path. Very large libraries will eventually want a real DB (the repository seam localises that change).
+
+### Alternatives considered
+
+- Persist per grade: rejected — rewriting a 17k-card blob per tap would jank; flush-on-exit is enough for correctness.
+- Bake scheduling into FSRS now: rejected — out of scope; the temporary policy unblocks write-back without the complexity.
+- One global states blob: rejected — per-deck keys keep reads/writes scoped to the deck in play.
+
+## DEC-012: Furigana preserved as bracket notation, rendered as toggleable ruby
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+Real Japanese decks carry furigana (`<ruby>漢字<rt>かな</rt></ruby>`). The first importer stripped tags, mashing kanji+reading ("会社かいしゃ"). Learners want furigana shown — and the option to hide it.
+
+### Decision
+
+- **Storage format:** the importer converts ruby to Anki **bracket notation** `漢字[かな]` and keeps it inline in `front`/`example`. This is a compact, parseable representation that survives JSON persistence; no model change beyond keeping the markup in the existing strings.
+- **Rendering:** a `FuriganaText` widget parses `漢字[かな]` and renders the reading as ruby above the kanji; with readings off it renders plain base text. Plain (non-Japanese) strings pass through unchanged.
+- **Toggle:** a `showFurigana` preference persisted via `SettingsRepository`, exposed app-wide through a `FuriganaController` (`ValueNotifier`, in the app scope), toggled from the review app bar. Defaults on.
+- **Emphasis:** the example sentence is rendered prominently (large, furigana) with the translation muted beneath — the sentence is the most useful part of a vocab card.
+
+### Consequences
+
+- Real decks render correctly (kanji + ruby), and learners can hide readings to self-test.
+- Field mapping still falls back to a separate kana `reading` field for note types that split it out; that line also respects the toggle.
+- Furigana only renders where the source provided it; decks without ruby show plain text.
+
+### Alternatives considered
+
+- Store kanji and readings as structured pairs on the model: rejected — bracket notation is simpler, human-readable, and round-trips through the existing string fields.
+- Drop readings entirely: rejected — loses the core value of a Japanese deck.

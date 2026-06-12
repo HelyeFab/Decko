@@ -15,6 +15,9 @@ import '../../data/import/anki_apkg_import_adapter.dart';
 import '../../domain/deck.dart';
 import '../../domain/import/deck_import_adapter.dart';
 import '../../domain/import/deck_import_preview.dart';
+import '../../domain/learning_item.dart';
+import '../../domain/repositories/review_state_repository.dart';
+import '../../domain/review_card_state.dart';
 import 'widgets/import_preview_panel.dart';
 
 /// Picks the bytes of an `.apkg` file, or null if cancelled.
@@ -76,6 +79,7 @@ class _ImportScreenState extends State<ImportScreen> {
     setState(() => _phase = _Phase.importing);
 
     final DeckStore store = DeckoApp.deckStoreOf(context);
+    final ReviewStateRepository reviewState = DeckoApp.reviewStateOf(context);
     try {
       final Deck deck = await widget.adapter.importDeck(
         bytes,
@@ -83,6 +87,11 @@ class _ImportScreenState extends State<ImportScreen> {
         importedAt: DateTime.now(),
       );
       await store.addImportedDeck(deck);
+      // Seed per-card review state (keeps imported Anki progress, or starts new).
+      await reviewState.saveStates(<ReviewCardState>[
+        for (final LearningItem item in deck.items)
+          ReviewCardState.fromLearningItem(deck.id, item),
+      ]);
       if (!mounted) return;
       // Shown on the app-level messenger, so it appears once we're on the library.
       DeckoSnackbar.showSuccess(context, 'Imported “${deck.name}”.');

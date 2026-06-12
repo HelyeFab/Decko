@@ -154,6 +154,33 @@ re-inventing equivalents.
 - Honesty rule: no screen claims AnkiWeb sync or full Anki compatibility; copy
   uses "first import support", "some complex decks may not import perfectly".
 
+### Added in MVP_006
+
+- Review is now a **due queue**: the session walks only due + new cards
+  (`Card X of N` reflects the queue, not the whole deck). Grading writes back
+  persistent `ReviewCardState` and the due count moves.
+- **All-caught-up** state (`review_session_screen.dart`): when nothing is due,
+  a check icon + "All caught up." / "No cards are due right now." + Back to deck
+  (distinct from the zero-cards "This deck has no cards yet." state). No sample
+  fallback.
+- Deck detail **Due today / Reviewed are live** (read from `ReviewStateRepository`
+  via a FutureBuilder): they decrement after review and survive restart.
+- `DeckoSnackbar` (added MVP_005) is the standard confirmation toast.
+- **Swipe-left to delete** an imported deck in the library (`Dismissible`, end-to-start,
+  errorContainer background + trash icon, AlertDialog confirm). Demo decks are not
+  deletable. Deleting also clears the deck's review state. Original Anki file untouched.
+- **Furigana** (`core/widgets/furigana_text.dart`) — `FuriganaText` renders
+  `漢字[かな]` bracket notation as ruby (reading above kanji); with readings off it
+  renders plain base text. Used for card front + example and the deck-detail
+  sample rows (base-only there). A furigana on/off **toggle** (translate icon)
+  sits in the review app bar, persisted (`FuriganaController` + settings); default on.
+- **Example emphasis** — `DeckoCard` renders the example sentence large (titleLarge,
+  furigana) with the translation muted beneath; the meaning/answer is secondary.
+  The sentence is the focal point of a vocab card (DEC-012).
+- Reusable-component note: a **floating bottom nav bar** is a proposed future
+  direction (rounded, elevated, active-tab-labelled) — would need a
+  `StatefulShellRoute` refactor; tracked in ROADMAP Deferred Notes, not built.
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for
