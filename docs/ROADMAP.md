@@ -63,8 +63,26 @@ Goal: prove the core promise.
 - Map imported notes to Decko LearningItems
 - Preserve tags and deck names
 - Handle unsupported templates gracefully
+- Detect whether the package contains scheduling/progress data
+- Do not silently reset progress
 
-## I3 — Advanced Practice Modes
+## I3 — Progress-Aware Import
+
+Goal: make Decko safe for existing deck users who already have study progress.
+
+See: `docs/import-progress.md`
+
+- Detect scheduling/progress information in imported decks
+- Show an import summary before confirmation
+- Offer Keep progress and Start fresh when progress exists
+- Warn clearly when progress is missing or unsupported
+- Preserve reviewed/new/learning/relearning state where available
+- Preserve due dates or due positions where available
+- Preserve reps, lapses, intervals, and ease where available
+- Preserve suspended state where available
+- Record whether progress was preserved during import
+
+## I4 — Advanced Practice Modes
 
 - Multiple choice
 - Type answer
@@ -72,14 +90,15 @@ Goal: prove the core promise.
 - Cloze deletion
 - Listening mode
 
-## I4 — FSRS Production Scheduler
+## I5 — FSRS Production Scheduler
 
 - Add FsrsSchedulerService
 - Migration from simple scheduler fields
 - Scheduler tests
 - Review analytics
+- Use imported review history where available to initialise or improve FSRS-compatible state
 
-## I5 — Cloud and Account Layer
+## I6 — Cloud and Account Layer
 
 Not in Iteration 1.
 
