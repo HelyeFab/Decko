@@ -103,7 +103,7 @@ class _PromiseGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: DeckoSpacing.md,
         crossAxisSpacing: DeckoSpacing.md,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.0,
       ),
       itemBuilder: (BuildContext context, int index) {
         final (String title, String blurb) = promises[index];

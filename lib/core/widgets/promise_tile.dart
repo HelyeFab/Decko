@@ -41,14 +41,20 @@ class PromiseTile extends StatelessWidget {
             const SizedBox(height: DeckoSpacing.md),
             Text(
               title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: DeckoSpacing.xs),
-            Text(
-              blurb,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            Flexible(
+              child: Text(
+                blurb,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
