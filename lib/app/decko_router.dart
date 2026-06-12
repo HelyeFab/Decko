@@ -6,7 +6,7 @@ import '../features/deck_detail/deck_detail_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
 import '../features/import/import_placeholder_screen.dart';
 import '../features/progress/progress_placeholder_screen.dart';
-import '../features/review/review_placeholder_screen.dart';
+import '../features/review/review_session_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
 import 'decko_app.dart';
 
@@ -17,13 +17,14 @@ abstract final class DeckoRoutes {
   static const String themes = '/themes';
   static const String progress = '/progress';
 
-  /// Sample review with no deck context (fallback preview).
+  /// Orphan route with no deck context — redirects to the library so the user
+  /// can pick a deck first.
   static const String review = '/review';
 
   /// Deck detail for the deck with [id].
   static String deck(String id) => '/deck/$id';
 
-  /// Review of the first card of the deck with [id].
+  /// Review session for the deck with [id].
   static String deckReview(String id) => '/deck/$id/review';
 }
 
@@ -45,8 +46,9 @@ GoRouter buildDeckoRouter() {
             builder: (_, _) => const ImportPlaceholderScreen(),
           ),
           GoRoute(
+            // No deck context here — send the user to the library to choose.
             path: 'review',
-            builder: (_, _) => const ReviewPlaceholderScreen(),
+            redirect: (_, _) => DeckoRoutes.home,
           ),
           GoRoute(
             path: 'themes',
@@ -68,9 +70,10 @@ GoRouter buildDeckoRouter() {
               GoRoute(
                 path: 'review',
                 builder: (BuildContext context, GoRouterState state) {
-                  return ReviewPlaceholderScreen(
-                    deck: _resolveDeck(context, state),
-                  );
+                  final Deck? deck = _resolveDeck(context, state);
+                  return deck == null
+                      ? const _DeckNotFound()
+                      : ReviewSessionScreen(deck: deck);
                 },
               ),
             ],

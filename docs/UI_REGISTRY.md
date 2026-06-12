@@ -106,6 +106,19 @@ re-inventing equivalents.
 - The empty-state card remains the fallback when the repository returns no
   decks; the populated library leads with a `Your decks` section.
 
+### Added in MVP_003
+
+- Review session screen (`features/review/review_session_screen.dart`) — three
+  states from one screen: **reviewing** (a `Card X of N` progress header + bar,
+  the `DeckoCard`, `Show answer`, then `RatingButtonRow`), **complete**
+  (`SessionSummary`), and **empty** ("This deck has no cards yet." + Back to
+  deck). Keeps the per-card theme switcher in the app bar.
+- `SessionSummary` (`features/review/widgets/session_summary.dart`) — completion
+  view: celebratory header, `Cards reviewed: N`, per-rating counts with the
+  shared rating accent colours, and `Review again` / `Back to deck` actions.
+- Empty-deck pattern: review never falls back to a sample card; an empty deck
+  shows an explicit empty state (resolves the MVP_002 deferred note).
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

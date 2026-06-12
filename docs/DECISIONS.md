@@ -178,3 +178,27 @@ Introduce a small `DeckRepository` interface (`getDecks()`, `getDeckById(id)`) w
 
 - Pass the `Deck` object via GoRouter `extra`: rejected because it breaks on refresh/deep-link and couples navigation to in-memory objects.
 - Constructor-inject the repository into each screen: rejected because GoRouter builders make that awkward; the existing scope pattern is simpler and consistent.
+
+## DEC-008: The review scheduler seam is `ReviewScheduler`
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+DEC-003 said scheduling must be FSRS-ready behind an interface and tentatively named it "SchedulerService". MVP_003 implements the first real review-session layer and needs to fix that name and shape.
+
+### Decision
+
+The seam is `ReviewScheduler` (`lib/domain/repositories/review_scheduler.dart`) with `createSession` / `answerCurrentCard` / `completeSession`. MVP_003 ships `SimpleReviewScheduler` (in-order queue, tally counts, no intervals/due dates/persistence). Implementations are pure: transitions return a new immutable `ReviewSession`, and `answeredAt` is passed in rather than read from the clock, so sessions are deterministic and unit-testable. The review screen depends only on this interface and holds session state in local `State` (no Riverpod). The scheduler is an injectable constructor parameter (defaulting to `const SimpleReviewScheduler()`).
+
+### Consequences
+
+- This is the concrete realisation of the DEC-003 seam; a future `FsrsReviewScheduler` implements the same interface with no review-UI change.
+- Session logic is testable in pure Dart (no widget pumping).
+- Naming supersedes the tentative "SchedulerService" wording in DEC-003.
+
+### Alternatives considered
+
+- Keep the "SchedulerService" name: rejected — `ReviewScheduler` reads better alongside `ReviewSession`/`ReviewAnswer` and matches the MVP_003 brief.
+- Put scheduling state in a Riverpod provider now: rejected as premature; local `State` is enough for a single-screen session.

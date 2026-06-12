@@ -4,11 +4,19 @@
 2026-06-12
 
 ## Current stage
-MVP_002 complete and APPROVED (2026-06-12): local demo deck model + navigation.
+MVP_003 complete: simple review session state built and verified. Awaiting approval.
+
+## Last completed (MVP_003)
+- Domain: `ReviewSession` (immutable, copyWith), `ReviewAnswer`, `ReviewSessionResult` (per-rating counts) — framework-light.
+- Scheduler seam: `ReviewScheduler` interface + `SimpleReviewScheduler` (in-order queue, pure transitions, answeredAt injected). This realises the DEC-003 seam — recorded as DEC-008.
+- Reworked review screen into a real session: renamed `review_placeholder_screen.dart` → `review_session_screen.dart` (`ReviewSessionScreen`, takes required Deck + injectable scheduler). Three states: reviewing (Card X of N + progress bar), complete (`SessionSummary`), empty ("This deck has no cards yet.").
+- Empty deck no longer falls back to a sample card (closes the MVP_002 deferred note).
+- Routing: `/deck/:deckId/review` → `ReviewSessionScreen`; orphan `/review` now redirects to home. "Back to deck" uses `context.go(/deck/:id)`.
+- Tests: 4 pure scheduler unit tests (`test/review_session_test.dart`) + 7 widget tests incl. full loop, review-again, back-to-deck, empty-deck. All pass; analyze clean.
 
 ## Deferred notes (see docs/ROADMAP.md "Deferred Notes")
-- Empty deck (zero items) should later show "This deck has no cards yet." instead of the current sample-card fallback in review.
-- Normalise Japanese readings to kana for real decks (demo data mixes kana/romaji).
+- Empty-deck handling: DONE in MVP_003 (review shows "This deck has no cards yet.").
+- Still open: normalise Japanese readings to kana for real decks (demo data mixes kana/romaji).
 
 ## Last completed (MVP_002)
 - Added `DeckRepository` interface (`lib/domain/repositories/deck_repository.dart`) and `MockDeckRepository` backed by `MockDecks`.
@@ -33,17 +41,18 @@ MVP_002 complete and APPROVED (2026-06-12): local demo deck model + navigation.
 - Never silently reset imported progress; progress-aware import (DEC-005; see docs/import-progress.md).
 - GoRouter now, Riverpod deferred (DEC-006).
 - Decks read via DeckRepository, resolved by id in routes (DEC-007).
+- Review scheduler seam is `ReviewScheduler`; SimpleReviewScheduler now, FSRS later (DEC-008).
 
 ## What is still placeholder
-- All deck data comes from `MockDecks`; no persistence.
+- All deck data comes from `MockDecks`; no persistence (sessions reset on exit).
 - Deck detail "Due today"/"Reviewed" are `—`; no scheduler/history.
-- "Start review" previews the first card only — no real review queue.
-- Ratings show a snackbar; no scheduling/state update.
+- Review ratings only affect the current in-memory session — no due dates/intervals.
+- Session results are not persisted; gamification (XP/streak) is still mock.
 - Import remains "Coming soon" placeholders.
 - Theme selection is in-memory only.
 
 ## Next action
-Awaiting approval for the next MVP. Brief present: none yet beyond MVP_002. Likely next: MVP_003 (JSON deck import) or MVP_004 (simple review session state). Do not start without approval.
+Awaiting approval for the next MVP. Likely next per MVP_003 brief: JSON deck import adapter (DEC-002 path), OR persist local decks + theme, OR FSRS-ready review state. Do not start without approval.
 
 ## Blockers / open questions
 - Persistence library still unchosen (needed around roadmap I1.6).
