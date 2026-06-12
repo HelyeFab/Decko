@@ -1,0 +1,162 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/constants/decko_spacing.dart';
+import '../../../domain/import/deck_import_preview.dart';
+
+/// Shows what an import adapter found and lets the user choose how to import.
+///
+/// When progress data exists, offers "Keep Anki progress" / "Start fresh".
+/// Otherwise it honestly warns that cards will start as new.
+class ImportPreviewPanel extends StatelessWidget {
+  const ImportPreviewPanel({
+    super.key,
+    required this.preview,
+    required this.onKeepProgress,
+    required this.onStartFresh,
+    required this.onCancel,
+  });
+
+  final DeckImportPreview preview;
+  final VoidCallback onKeepProgress;
+  final VoidCallback onStartFresh;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool hasProgress = preview.hasProgressData;
+
+    return ListView(
+      padding: const EdgeInsets.all(DeckoSpacing.pagePadding),
+      children: <Widget>[
+        Text(
+          'Deck found',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            letterSpacing: 0.8,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: DeckoSpacing.xs),
+        Text(
+          preview.deckName,
+          style: theme.textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: DeckoSpacing.lg),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DeckoSpacing.lg,
+              vertical: DeckoSpacing.sm,
+            ),
+            child: Column(
+              children: <Widget>[
+                _Stat(label: 'Cards found', value: '${preview.totalCards}'),
+                _Stat(label: 'New cards', value: '${preview.newCards}'),
+                _Stat(
+                    label: 'Already reviewed',
+                    value: '${preview.reviewedCards}'),
+                if (preview.suspendedCards > 0)
+                  _Stat(
+                      label: 'Suspended', value: '${preview.suspendedCards}'),
+                if (preview.approxDueToday != null)
+                  _Stat(
+                    label: 'Due today (approx.)',
+                    value: '${preview.approxDueToday}',
+                  ),
+                _Stat(
+                  label: 'Progress data',
+                  value: hasProgress ? 'Available' : 'Not found',
+                ),
+              ],
+            ),
+          ),
+        ),
+        for (final String note in preview.notes) ...<Widget>[
+          const SizedBox(height: DeckoSpacing.md),
+          Text(
+            note,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const SizedBox(height: DeckoSpacing.xl),
+        if (hasProgress) ...<Widget>[
+          Text(
+            'Decko found progress in this deck. You can keep it or start fresh.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: DeckoSpacing.lg),
+          FilledButton.icon(
+            onPressed: onKeepProgress,
+            icon: const Icon(Icons.history_rounded),
+            label: const Text('Keep Anki progress'),
+          ),
+          const SizedBox(height: DeckoSpacing.md),
+          OutlinedButton.icon(
+            onPressed: onStartFresh,
+            icon: const Icon(Icons.fiber_new_rounded),
+            label: const Text('Start fresh'),
+          ),
+        ] else ...<Widget>[
+          Container(
+            padding: const EdgeInsets.all(DeckoSpacing.lg),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(DeckoRadii.md),
+            ),
+            child: Text(
+              'Decko could not find scheduling information in this package. '
+              'Your cards can still be imported, but they will start as new.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: DeckoSpacing.lg),
+          FilledButton.icon(
+            onPressed: onStartFresh,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Import as new'),
+          ),
+        ],
+        const SizedBox(height: DeckoSpacing.md),
+        TextButton(onPressed: onCancel, child: const Text('Cancel')),
+      ],
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: DeckoSpacing.sm),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}

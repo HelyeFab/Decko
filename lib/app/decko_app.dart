@@ -8,18 +8,19 @@ import '../data/shared_prefs_settings_repository.dart';
 import '../domain/repositories/deck_repository.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/settings_repository.dart';
+import 'deck_store.dart';
 import 'decko_router.dart';
 import 'theme/app_theme_config.dart';
 import 'theme/theme_controller.dart';
 
 /// Root Decko widget.
 ///
-/// Owns the app-wide dependencies — the [ThemeController], [DeckRepository],
-/// [SettingsRepository] and [ProgressRepository] — and rebuilds the
-/// [MaterialApp.router] when the selected app theme changes. Dependencies are
-/// handed to the tree via a [_DeckoScope] inherited widget; the static
-/// `*Of(context)` helpers read them. All repositories are injectable so tests
-/// can supply in-memory fakes.
+/// Owns the app-wide dependencies — the [ThemeController], the [DeckStore]
+/// (demo + imported decks), [SettingsRepository] and [ProgressRepository] — and
+/// rebuilds the [MaterialApp.router] when the selected theme changes.
+/// Dependencies are handed to the tree via a [_DeckoScope]; the static
+/// `*Of(context)` helpers read them. The injected [deckRepository] provides the
+/// demo decks the store wraps, so tests can supply in-memory fakes.
 class DeckoApp extends StatefulWidget {
   const DeckoApp({
     super.key,
@@ -36,7 +37,10 @@ class DeckoApp extends StatefulWidget {
       _scopeOf(context).controller;
 
   static DeckRepository repositoryOf(BuildContext context) =>
-      _scopeOf(context).deckRepository;
+      _scopeOf(context).deckStore;
+
+  static DeckStore deckStoreOf(BuildContext context) =>
+      _scopeOf(context).deckStore;
 
   static ProgressRepository progressOf(BuildContext context) =>
       _scopeOf(context).progressRepository;
@@ -54,6 +58,7 @@ class DeckoApp extends StatefulWidget {
 
 class _DeckoAppState extends State<DeckoApp> {
   late final ThemeController _themeController;
+  late final DeckStore _deckStore;
   final GoRouter _router = buildDeckoRouter();
 
   @override
@@ -61,11 +66,14 @@ class _DeckoAppState extends State<DeckoApp> {
     super.initState();
     _themeController = ThemeController(widget.settingsRepository);
     _themeController.load();
+    _deckStore = DeckStore(demoDecks: widget.deckRepository);
+    _deckStore.load();
   }
 
   @override
   void dispose() {
     _themeController.dispose();
+    _deckStore.dispose();
     super.dispose();
   }
 
@@ -73,7 +81,7 @@ class _DeckoAppState extends State<DeckoApp> {
   Widget build(BuildContext context) {
     return _DeckoScope(
       controller: _themeController,
-      deckRepository: widget.deckRepository,
+      deckStore: _deckStore,
       progressRepository: widget.progressRepository,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
@@ -94,18 +102,18 @@ class _DeckoAppState extends State<DeckoApp> {
 class _DeckoScope extends InheritedWidget {
   const _DeckoScope({
     required this.controller,
-    required this.deckRepository,
+    required this.deckStore,
     required this.progressRepository,
     required super.child,
   });
 
   final ThemeController controller;
-  final DeckRepository deckRepository;
+  final DeckStore deckStore;
   final ProgressRepository progressRepository;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
       controller != oldWidget.controller ||
-      deckRepository != oldWidget.deckRepository ||
+      deckStore != oldWidget.deckStore ||
       progressRepository != oldWidget.progressRepository;
 }

@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../domain/deck.dart';
 import '../features/deck_detail/deck_detail_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
-import '../features/import/import_placeholder_screen.dart';
+import '../features/import/import_screen.dart';
 import '../features/progress/progress_screen.dart';
 import '../features/review/review_session_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
@@ -43,7 +43,7 @@ GoRouter buildDeckoRouter() {
         routes: <RouteBase>[
           GoRoute(
             path: 'import',
-            builder: (_, _) => const ImportPlaceholderScreen(),
+            builder: (_, _) => const ImportScreen(),
           ),
           GoRoute(
             // No deck context here — send the user to the library to choose.

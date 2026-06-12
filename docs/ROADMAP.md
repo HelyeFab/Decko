@@ -68,6 +68,20 @@ Small, intentionally-postponed improvements captured so they are not lost.
   Japanese Starter Deck uses kana (たべる) while Travel Phrases uses romaji
   (konnichiwa). Fine for demo data, but real Japanese decks should normalise
   readings to kana where possible. (From MVP_002 review.)
+- **Scheduler write-back / due-queue (BLOCKS several things).** Reviewing a card
+  doesn't reschedule it: the session is in-memory and only updates the XP/streak
+  snapshot. So an imported deck's "Due today" count never decrements after
+  review. Needs a scheduler that persists review outcomes back to per-card state
+  (the DEC-003 seam, `ReviewScheduler`, already exists). Strong next-MVP
+  candidate. (From MVP_005 testing.)
+- **Import: media (images/audio).** Import strips `[sound:…]` and `<img>` and
+  doesn't extract media files, so audio is dropped and image-only cards import
+  near-empty. Add media support later. (From MVP_005 testing.)
+- **Import: modern `.anki21b` (zstd).** Only the legacy uncompressed `.apkg` is
+  supported; modern exports are rejected with guidance. Decode zstd later. (DEC-010.)
+- **Import: smarter field mapping.** Field→Decko mapping is heuristic
+  (front/back positional, kana→reading, sentence→example). Note-type-aware
+  mapping would import more decks cleanly. (From MVP_005 testing.)
 
 ## I2 — APKG Import Beta
 

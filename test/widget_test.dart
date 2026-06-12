@@ -14,8 +14,14 @@ import 'package:decko/domain/learning_item.dart';
 import 'package:decko/domain/progress_snapshot.dart';
 import 'package:decko/domain/repositories/deck_repository.dart';
 import 'package:decko/domain/repositories/progress_repository.dart';
+import 'package:decko/domain/import/deck_import_info.dart';
+import 'package:decko/domain/import/deck_import_preview.dart';
+import 'package:decko/domain/import/imported_card_progress.dart';
+import 'package:decko/domain/import/imported_card_state.dart';
 import 'package:decko/domain/repositories/settings_repository.dart';
 import 'package:decko/domain/review_session_result.dart';
+import 'package:decko/features/deck_detail/deck_detail_screen.dart';
+import 'package:decko/features/import/widgets/import_preview_panel.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
   const _EmptyDeckRepository();
@@ -215,6 +221,116 @@ void main() {
 
     await tester.tap(find.text(DeckoStrings.importCta));
     await tester.pumpAndSettle();
-    expect(find.text('Coming soon'), findsWidgets);
+    expect(find.text('Import Anki deck (.apkg)'), findsOneWidget);
+    expect(find.text('Coming soon'), findsWidgets); // CSV/JSON still placeholder
+  });
+
+  testWidgets('Import preview offers keep/start-fresh when progress exists',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(420, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ImportPreviewPanel(
+          preview: const DeckImportPreview(
+            deckName: 'Japanese Core',
+            totalCards: 100,
+            newCards: 60,
+            reviewedCards: 40,
+            suspendedCards: 3,
+            hasProgressData: true,
+          ),
+          onKeepProgress: () {},
+          onStartFresh: () {},
+          onCancel: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Japanese Core'), findsOneWidget);
+    expect(find.text('Cards found'), findsOneWidget);
+    expect(find.text('Keep Anki progress'), findsOneWidget);
+    expect(find.text('Start fresh'), findsOneWidget);
+  });
+
+  testWidgets('Import preview warns honestly when no progress is found',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(420, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ImportPreviewPanel(
+          preview: const DeckImportPreview(
+            deckName: 'Vocab',
+            totalCards: 20,
+            newCards: 20,
+            reviewedCards: 0,
+            suspendedCards: 0,
+            hasProgressData: false,
+          ),
+          onKeepProgress: () {},
+          onStartFresh: () {},
+          onCancel: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Keep Anki progress'), findsNothing);
+    expect(find.textContaining('they will start as new'), findsOneWidget);
+    expect(find.text('Import as new'), findsOneWidget);
+  });
+
+  testWidgets('Imported deck detail computes Due today / Reviewed from progress',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(420, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final DateTime overdue = DateTime(2020, 1, 1);
+    final Deck deck = Deck(
+      id: 'anki-x',
+      name: 'Imported',
+      description: 'desc',
+      importInfo: DeckImportInfo(
+          progressMode: ImportProgressMode.kept, importedAt: DateTime(2026)),
+      items: <LearningItem>[
+        LearningItem(
+          id: 'a',
+          front: 'a',
+          back: 'a',
+          importedProgress: ImportedCardProgress(
+              state: ImportedCardState.review, reps: 3, dueAt: overdue),
+        ),
+        LearningItem(
+          id: 'b',
+          front: 'b',
+          back: 'b',
+          importedProgress: ImportedCardProgress(
+              state: ImportedCardState.review, reps: 1, dueAt: overdue),
+        ),
+        const LearningItem(
+          id: 'c',
+          front: 'c',
+          back: 'c',
+          importedProgress:
+              ImportedCardProgress(state: ImportedCardState.isNew),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(home: DeckDetailScreen(deck: deck)));
+    await tester.pumpAndSettle();
+
+    // Two review cards due/reviewed; total 3. No placeholder dashes.
+    expect(find.text('3'), findsOneWidget); // total cards
+    expect(find.text('2'), findsNWidgets(2)); // due today + reviewed
+    expect(find.text('—'), findsNothing);
+    expect(find.text('Progress: kept from Anki'), findsOneWidget);
   });
 }

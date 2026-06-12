@@ -61,7 +61,8 @@ class DeckTile extends StatelessWidget {
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 2),
-                        _SourceLabel(label: 'Demo deck'),
+                        _SourceLabel(
+                            label: deck.isImported ? 'Imported' : 'Demo deck'),
                       ],
                     ),
                   ),

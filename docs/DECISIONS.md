@@ -228,3 +228,32 @@ Use `shared_preferences` as the storage backend, hidden behind two small async r
 - Drift/Isar/Hive now: rejected as over-engineered for theme + one snapshot; reserved for full deck/review-history persistence (I1.6).
 - Store progress as separate prefs keys: rejected — a single JSON blob keeps the snapshot atomic and easy to evolve.
 - Compute progress inside the repository: rejected — keeping the maths in a pure domain method makes it testable and storage-agnostic.
+
+## DEC-010: Anki import — legacy .apkg only, behind an adapter, decks in a DeckStore
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+MVP_005 starts the import system: a real `.apkg` import that honours the progress-aware product rule (DEC-005 / docs/import-progress.md). `.apkg` is a zip containing an SQLite collection; modern Anki exports it zstd-compressed (`collection.anki21b`), which Dart can't easily decode.
+
+### Decision
+
+- **Format scope:** support the *uncompressed* `collection.anki2` / `collection.anki21` (Anki's "Support older Anki versions" export). Detect zstd `collection.anki21b` and reject it with a clear, actionable message. Modern-format decoding is a future MVP.
+- **Seam:** a `DeckImportAdapter` (`AnkiApkgImportAdapter`) does all parsing — unzip (`archive`) → read the collection (`sqlite3` + `sqlite3_flutter_libs`) → map notes/cards to Decko `Deck`/`LearningItem`s. The UI never parses packages. All failures surface as a `DeckImportException` so the UI can always show a friendly message and never crashes.
+- **Progress:** detect whether scheduling/progress exists; offer Keep / Start-fresh; preserve practical imported state (`ImportedCardProgress`, labelled imported-Anki, not native FSRS) when kept, or import as new otherwise. Provenance (`DeckImportInfo`) is shown on deck detail.
+- **Persistence:** imported decks are stored as a JSON blob in `shared_preferences` (the MVP_004 pattern, "intentionally small"), fronted by an in-memory `DeckStore` (a `ChangeNotifier` implementing `DeckRepository`) so the synchronous repository/router resolution keeps working and the library refreshes on import/hydration. Demo decks remain; imported decks list first.
+
+### Consequences
+
+- A real personal deck can be imported and survives restart, without a database.
+- `sqlite3` (not `sqflite`) makes the parser unit-testable on the host; tests build a synthetic `.apkg` rather than committing a binary.
+- Field mapping (field0→front, field1→back, field2→example) and multi-deck collapsing are intentionally simple and isolated, ready to improve in a follow-up.
+- Many/large imported decks will eventually need a file or DB store; the `ImportedDeckStorage` seam localises that change.
+
+### Alternatives considered
+
+- Decode modern zstd `.anki21b` now: deferred — no mature Dart zstd, would need native FFI with iOS/Android risk; legacy export covers the slice.
+- `sqflite` for reading the collection: rejected — it can't run in host unit tests; `sqlite3` can.
+- A real DB (Drift/Isar) for imported decks now: rejected as premature for a first vertical slice.

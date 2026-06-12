@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/deck_store.dart';
 import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
@@ -29,13 +30,9 @@ class DeckLibraryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final List<Deck> decks = DeckoApp.repositoryOf(context).getDecks();
-    final bool hasDecks = decks.isNotEmpty;
+    final DeckStore store = DeckoApp.deckStoreOf(context);
 
     void openImport() => context.push(DeckoRoutes.import);
-    void openDemo() => context.push(
-          hasDecks ? DeckoRoutes.deck(decks.first.id) : DeckoRoutes.import,
-        );
 
     return Scaffold(
       appBar: AppBar(
@@ -63,34 +60,48 @@ class DeckLibraryScreen extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            DeckoSpacing.pagePadding,
-            DeckoSpacing.sm,
-            DeckoSpacing.pagePadding,
-            DeckoSpacing.xxxl,
-          ),
-          children: <Widget>[
-            Text(
-              DeckoStrings.tagline,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                height: 1.25,
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (BuildContext context, _) {
+            final List<Deck> decks = store.getDecks();
+            final bool hasDecks = decks.isNotEmpty;
+            void openDemo() => context.push(
+                  hasDecks
+                      ? DeckoRoutes.deck(decks.first.id)
+                      : DeckoRoutes.import,
+                );
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(
+                DeckoSpacing.pagePadding,
+                DeckoSpacing.sm,
+                DeckoSpacing.pagePadding,
+                DeckoSpacing.xxxl,
               ),
-            ),
-            const SizedBox(height: DeckoSpacing.xl),
-            if (!hasDecks)
-              EmptyLibraryCard(onImport: openImport, onDemo: openDemo)
-            else
-              _DeckList(decks: decks, onImport: openImport, onDemo: openDemo),
-            const SizedBox(height: DeckoSpacing.xxl),
-            const SectionHeader(
-              title: 'Why you’ll love Decko',
-              subtitle: 'Everything coming to your study sessions.',
-            ),
-            const SizedBox(height: DeckoSpacing.lg),
-            _PromiseGrid(icons: _promiseIcons),
-          ],
+              children: <Widget>[
+                Text(
+                  DeckoStrings.tagline,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: DeckoSpacing.xl),
+                if (!hasDecks)
+                  EmptyLibraryCard(onImport: openImport, onDemo: openDemo)
+                else
+                  _DeckList(
+                      decks: decks, onImport: openImport, onDemo: openDemo),
+                const SizedBox(height: DeckoSpacing.xxl),
+                const SectionHeader(
+                  title: 'Why you’ll love Decko',
+                  subtitle: 'Everything coming to your study sessions.',
+                ),
+                const SizedBox(height: DeckoSpacing.lg),
+                _PromiseGrid(icons: _promiseIcons),
+              ],
+            );
+          },
         ),
       ),
     );

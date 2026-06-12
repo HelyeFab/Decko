@@ -134,6 +134,26 @@ re-inventing equivalents.
   restart; figures come from stored progress, not constants. Storage sits
   behind `SettingsRepository` / `ProgressRepository` (DEC-009).
 
+### Added in MVP_005
+
+- Import screen (`features/import/import_screen.dart`) — a single screen with
+  internal phases (idle → analysing → preview → importing → error). Idle lists a
+  real "Import Anki deck (.apkg)" action plus CSV/JSON "Coming soon"; error
+  shows a friendly "Couldn't import that deck" + Try again. Honest footer:
+  "Decko imports a copy — it doesn't sync with Anki."
+- `ImportPreviewPanel` (`features/import/widgets/`) — deck name, a stat list
+  (cards found / new / reviewed / suspended / approx due / progress available),
+  and the keep/start-fresh choice — or, when no progress exists, an honest
+  warning + "Import as new".
+- Deck detail provenance — imported decks show an `IMPORTED` label and a
+  provenance card ("Imported from Anki · Progress: kept / started fresh / no
+  scheduling data found"). Demo decks unchanged (`DEMO DECK`).
+- Deck tiles label source as `Imported` vs `Demo deck`; imported decks list
+  first. The library now rebuilds via a `ListenableBuilder` over the `DeckStore`
+  so imports appear immediately and after restart hydration.
+- Honesty rule: no screen claims AnkiWeb sync or full Anki compatibility; copy
+  uses "first import support", "some complex decks may not import perfectly".
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

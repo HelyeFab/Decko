@@ -1,3 +1,5 @@
+import 'import/imported_card_progress.dart';
+
 /// A single thing to learn — the format-independent unit Decko studies.
 ///
 /// Imported decks (Anki/CSV/JSON) are translated *into* `LearningItem`s by
@@ -11,6 +13,7 @@ class LearningItem {
     this.reading,
     this.example,
     this.tags = const <String>[],
+    this.importedProgress,
   });
 
   final String id;
@@ -28,4 +31,8 @@ class LearningItem {
   final String? example;
 
   final List<String> tags;
+
+  /// Imported scheduling/progress carried over from the source deck, when the
+  /// user chose to keep progress; null otherwise.
+  final ImportedCardProgress? importedProgress;
 }

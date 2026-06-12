@@ -5,6 +5,9 @@ import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/section_header.dart';
 import '../../domain/deck.dart';
+import '../../domain/import/deck_import_info.dart';
+import '../../domain/import/imported_card_progress.dart';
+import '../../domain/import/imported_card_state.dart';
 import '../../domain/learning_item.dart';
 import 'widgets/sample_item_row.dart';
 
@@ -37,7 +40,7 @@ class DeckDetailScreen extends StatelessWidget {
             Row(
               children: <Widget>[
                 Text(
-                  'DEMO DECK',
+                  deck.isImported ? 'IMPORTED' : 'DEMO DECK',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.primary,
                     letterSpacing: 0.8,
@@ -59,8 +62,12 @@ class DeckDetailScreen extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            if (deck.importInfo != null) ...<Widget>[
+              const SizedBox(height: DeckoSpacing.lg),
+              _ProvenanceCard(info: deck.importInfo!),
+            ],
             const SizedBox(height: DeckoSpacing.xl),
-            _ProgressSummary(itemCount: deck.itemCount),
+            _ProgressSummary(deck: deck),
             const SizedBox(height: DeckoSpacing.xl),
             SectionHeader(
               title: 'Cards',
@@ -118,22 +125,90 @@ class DeckDetailScreen extends StatelessWidget {
   }
 }
 
-class _ProgressSummary extends StatelessWidget {
-  const _ProgressSummary({required this.itemCount});
+class _ProvenanceCard extends StatelessWidget {
+  const _ProvenanceCard({required this.info});
 
-  final int itemCount;
+  final DeckImportInfo info;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(DeckoSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(DeckoRadii.md),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.download_done_rounded,
+              color: theme.colorScheme.primary, size: 20),
+          const SizedBox(width: DeckoSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  info.sourceLine,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  info.progressMode.provenanceLine,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressSummary extends StatelessWidget {
+  const _ProgressSummary({required this.deck});
+
+  final Deck deck;
+
+  /// Due/Reviewed are derived from imported progress when it was kept; otherwise
+  /// there is no scheduling data to report, so they stay as a dash.
+  bool get _hasImportedProgress =>
+      deck.importInfo?.progressMode == ImportProgressMode.kept;
+
+  int get _reviewed => deck.items.where((LearningItem i) {
+        final ImportedCardProgress? p = i.importedProgress;
+        return p != null &&
+            (p.state == ImportedCardState.review ||
+                p.state == ImportedCardState.relearning ||
+                (p.reps ?? 0) > 0);
+      }).length;
+
+  int get _dueToday {
+    final DateTime now = DateTime.now();
+    final DateTime endOfToday =
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    return deck.items.where((LearningItem i) {
+      final DateTime? due = i.importedProgress?.dueAt;
+      return due != null && due.isBefore(endOfToday);
+    }).length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String due = _hasImportedProgress ? '$_dueToday' : '—';
+    final String reviewed = _hasImportedProgress ? '$_reviewed' : '—';
     return Row(
       children: <Widget>[
         Expanded(
-          child: _StatBox(value: '$itemCount', label: 'Total cards'),
+          child: _StatBox(value: '${deck.itemCount}', label: 'Total cards'),
         ),
         const SizedBox(width: DeckoSpacing.md),
-        const Expanded(child: _StatBox(value: '—', label: 'Due today')),
+        Expanded(child: _StatBox(value: due, label: 'Due today')),
         const SizedBox(width: DeckoSpacing.md),
-        const Expanded(child: _StatBox(value: '—', label: 'Reviewed')),
+        Expanded(child: _StatBox(value: reviewed, label: 'Reviewed')),
       ],
     );
   }

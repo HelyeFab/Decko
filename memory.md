@@ -4,9 +4,25 @@
 2026-06-12
 
 ## Current stage
-MVP_004 complete: local persistence + real progress snapshot. Awaiting approval.
+MVP_005 complete: progress-aware Anki .apkg import (legacy format). Awaiting approval.
 
-## Last completed (MVP_004)
+## Last completed (MVP_005)
+- Added deps: file_picker, archive, sqlite3 + sqlite3_flutter_libs (DEC-010).
+- Import domain (`lib/domain/import/`): DeckImportAdapter + exceptions, DeckImportPreview, ImportedCardProgress + ImportedCardState, DeckImportInfo (provenance + ImportProgressMode). Extended Deck (importInfo) and LearningItem (importedProgress).
+- `AnkiApkgImportAdapter` (`lib/data/import/`): unzip → read collection.anki2/.anki21 via sqlite3 → map notes/cards → counts + per-card progress. Rejects zstd .anki21b with a clear message; ALL failures → DeckImportException (never crashes).
+- Persistence: imported decks as JSON in shared_preferences (`ImportedDeckStorage`), fronted by `DeckStore` (ChangeNotifier implements DeckRepository) wrapping the demo repo; hydrates at startup, adds on import. Library uses ListenableBuilder over the store; imported decks list first.
+- Import UI: phase-machine `ImportScreen` (idle→analysing→preview→importing→error) + `ImportPreviewPanel` (keep/start-fresh or honest no-progress warning). Deck detail shows provenance; tiles label Imported vs Demo.
+- DeckoApp now exposes `deckStoreOf`; repositoryOf returns the DeckStore.
+- Tests: import_test.dart builds a SYNTHETIC .apkg (sqlite3+archive) and tests parse/keep/fresh/no-progress/zstd-reject/garbage + storage round-trip; widget_test adds 2 ImportPreviewPanel tests. 25 tests total, analyze clean.
+- Follow-up fixes after real-deck testing (Core 2k/6k, 17987 cards imported OK):
+  - file picker: iOS greyed out .apkg with FileType.custom; switched to FileType.any + validate `.apkg` in code.
+  - reusable `DeckoSnackbar` (core/widgets) replaces the raw import SnackBar.
+  - deck detail Due today / Reviewed now computed from imported progress (were hardcoded `—`).
+  - field mapping made content-aware: kana field → reading, sentence → example, dedupe repeated tokens (fixed "さん さん" doubling). RE-IMPORT needed to apply to already-imported decks.
+- Open from MVP_005 testing (see ROADMAP Deferred Notes): scheduler write-back so Due decrements after review (NEXT MVP candidate); media (image/audio) import; modern .anki21b; note-type-aware field mapping.
+- Real-deck import verified manually on simulator; modern-format/large decks still need broader testing.
+
+## Earlier (MVP_004)
 - Added `shared_preferences` (2nd dep after go_router); justified in DEC-009.
 - `ProgressSnapshot` domain model with pure `recordingSession(result, now)` (XP +10/card, level = xp~/100+1, same-day accumulation, streak +1 consecutive / reset on gap).
 - New seams: `SettingsRepository` + `ProgressRepository` with `SharedPrefs*` impls (progress stored as one JSON blob; clock injectable).
@@ -53,20 +69,22 @@ MVP_004 complete: local persistence + real progress snapshot. Awaiting approval.
 - Decks read via DeckRepository, resolved by id in routes (DEC-007).
 - Review scheduler seam is `ReviewScheduler`; SimpleReviewScheduler now, FSRS later (DEC-008).
 - Local persistence via shared_preferences behind SettingsRepository/ProgressRepository (DEC-009).
+- Anki import: legacy .apkg only, behind DeckImportAdapter, decks in a DeckStore (DEC-010).
 
 ## What is still placeholder
-- Deck data still comes from `MockDecks` — decks themselves are NOT persisted (only theme + progress snapshot are).
-- Deck detail "Due today"/"Reviewed" are `—`; no scheduler/due dates yet.
-- Review ratings feed XP/streak but compute no intervals/scheduling.
-- Progress is a single local snapshot, not full review history.
-- Import remains "Coming soon" placeholders.
+- Demo deck data still comes from `MockDecks`; imported decks ARE persisted now.
+- Modern zstd `.anki21b` not supported (legacy export only) — deferred.
+- Imported progress is stored/labelled but does NOT drive scheduling yet.
+- Deck detail "Due today"/"Reviewed" are `—`; no scheduler/due dates.
+- Import handles a practical subset: ignores media, templates, model fidelity; multi-deck packages collapse into one; field mapping is field0/1/2.
 
-## Now persisted (MVP_004)
-- Selected app theme (survives restart).
-- Progress snapshot: totalXp, streak, cardsReviewedToday, lastReviewedAt, lastSessionResult.
+## Now persisted
+- Selected app theme; progress snapshot (MVP_004).
+- Imported decks incl. cards + per-card imported progress + provenance (MVP_005).
 
 ## Next action
-Awaiting approval for the next MVP. Per MVP_004 brief, candidates: JSON deck import (MVP_005, DEC-002 path), basic due-queue/review state, or first real gamification badges. Do not start without approval.
+Awaiting approval. Per MVP_005 brief, candidates: MVP_006 import field-mapping/compatibility improvements, basic due-queue from imported progress, JSON/CSV adapter, or review history/full progress storage. Pick after testing real personal decks. Do not start without approval.
 
 ## Blockers / open questions
-- Full deck persistence still uses mock data; a real DB (Drift/Isar/Hive) is the I1.6 step when decks/review history need persisting.
+- Needs manual test with a REAL .apkg (export with "Support older Anki versions"); not doable here (no file, simctl can't drive the picker).
+- Modern .anki21b (zstd) decoding is the likely first compatibility gap users hit.
