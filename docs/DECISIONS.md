@@ -202,3 +202,29 @@ The seam is `ReviewScheduler` (`lib/domain/repositories/review_scheduler.dart`) 
 
 - Keep the "SchedulerService" name: rejected — `ReviewScheduler` reads better alongside `ReviewSession`/`ReviewAnswer` and matches the MVP_003 brief.
 - Put scheduling state in a Riverpod provider now: rejected as premature; local `State` is enough for a single-screen session.
+
+## DEC-009: Local persistence uses shared_preferences behind repository seams
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+MVP_004 needs to remember a little state across launches — the selected app theme and a small progress snapshot (XP, streak, today's count, last session result). Full deck persistence and a real database are deferred to roadmap I1.6.
+
+### Decision
+
+Use `shared_preferences` as the storage backend, hidden behind two small async repository interfaces: `SettingsRepository` and `ProgressRepository` (in `lib/domain/repositories/`), with `SharedPrefs*` implementations in `lib/data/`. The progress snapshot is stored as a single JSON blob. The XP/streak/"today" maths lives in a pure `ProgressSnapshot.recordingSession(result, now)` method (time injected), so it is deterministic and unit-testable; the repository just loads → applies → saves. Repositories are injectable via `DeckoApp` (defaulting to the `SharedPrefs*` impls) and exposed through the app scope, matching the DEC-007 pattern.
+
+### Consequences
+
+- Theme choice and progress survive restart with no DB or migrations.
+- UI depends on interfaces, so a Drift/Isar/Hive backend can replace the `SharedPrefs*` impls later without touching screens (the I1.6 step).
+- Progress logic is fully unit-testable without storage or Flutter.
+- `shared_preferences` is the 2nd dependency (after go_router); justified by being the lightest fit for tiny key/value + a small snapshot.
+
+### Alternatives considered
+
+- Drift/Isar/Hive now: rejected as over-engineered for theme + one snapshot; reserved for full deck/review-history persistence (I1.6).
+- Store progress as separate prefs keys: rejected — a single JSON blob keeps the snapshot atomic and easy to evolve.
+- Compute progress inside the repository: rejected — keeping the maths in a pure domain method makes it testable and storage-agnostic.

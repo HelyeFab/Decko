@@ -4,9 +4,19 @@
 2026-06-12
 
 ## Current stage
-MVP_003 complete: simple review session state built and verified. Awaiting approval.
+MVP_004 complete: local persistence + real progress snapshot. Awaiting approval.
 
-## Last completed (MVP_003)
+## Last completed (MVP_004)
+- Added `shared_preferences` (2nd dep after go_router); justified in DEC-009.
+- `ProgressSnapshot` domain model with pure `recordingSession(result, now)` (XP +10/card, level = xp~/100+1, same-day accumulation, streak +1 consecutive / reset on gap).
+- New seams: `SettingsRepository` + `ProgressRepository` with `SharedPrefs*` impls (progress stored as one JSON blob; clock injectable).
+- `ThemeController` now persists the selected theme and hydrates it on startup (`DeckoApp.initState` calls `load()`); theme survives restart.
+- Review screen records the `ReviewSessionResult` once on completion via `DeckoApp.progressOf`.
+- Progress screen rewritten (renamed progress_placeholder_screen.dart → progress_screen.dart, `ProgressScreen`): `FutureBuilder<ProgressSnapshot>`, real XP/level/streak/today, "Your latest review" card, achievements derived from snapshot, warm no-progress empty state.
+- `DeckoApp` now injects deck + settings + progress repositories (defaults to SharedPrefs); exposed via scope (`themeOf`/`repositoryOf`/`progressOf`).
+- Tests: 9 unit (incl. 5 ProgressSnapshot) + 7 widget (incl. theme-persist-across-restart, progress-recorded, empty-progress) = 16 total. analyze clean. Verified empty-progress on simulator; shared_preferences registers on iOS.
+
+## Earlier (MVP_003)
 - Domain: `ReviewSession` (immutable, copyWith), `ReviewAnswer`, `ReviewSessionResult` (per-rating counts) — framework-light.
 - Scheduler seam: `ReviewScheduler` interface + `SimpleReviewScheduler` (in-order queue, pure transitions, answeredAt injected). This realises the DEC-003 seam — recorded as DEC-008.
 - Reworked review screen into a real session: renamed `review_placeholder_screen.dart` → `review_session_screen.dart` (`ReviewSessionScreen`, takes required Deck + injectable scheduler). Three states: reviewing (Card X of N + progress bar), complete (`SessionSummary`), empty ("This deck has no cards yet.").
@@ -42,17 +52,21 @@ MVP_003 complete: simple review session state built and verified. Awaiting appro
 - GoRouter now, Riverpod deferred (DEC-006).
 - Decks read via DeckRepository, resolved by id in routes (DEC-007).
 - Review scheduler seam is `ReviewScheduler`; SimpleReviewScheduler now, FSRS later (DEC-008).
+- Local persistence via shared_preferences behind SettingsRepository/ProgressRepository (DEC-009).
 
 ## What is still placeholder
-- All deck data comes from `MockDecks`; no persistence (sessions reset on exit).
-- Deck detail "Due today"/"Reviewed" are `—`; no scheduler/history.
-- Review ratings only affect the current in-memory session — no due dates/intervals.
-- Session results are not persisted; gamification (XP/streak) is still mock.
+- Deck data still comes from `MockDecks` — decks themselves are NOT persisted (only theme + progress snapshot are).
+- Deck detail "Due today"/"Reviewed" are `—`; no scheduler/due dates yet.
+- Review ratings feed XP/streak but compute no intervals/scheduling.
+- Progress is a single local snapshot, not full review history.
 - Import remains "Coming soon" placeholders.
-- Theme selection is in-memory only.
+
+## Now persisted (MVP_004)
+- Selected app theme (survives restart).
+- Progress snapshot: totalXp, streak, cardsReviewedToday, lastReviewedAt, lastSessionResult.
 
 ## Next action
-Awaiting approval for the next MVP. Likely next per MVP_003 brief: JSON deck import adapter (DEC-002 path), OR persist local decks + theme, OR FSRS-ready review state. Do not start without approval.
+Awaiting approval for the next MVP. Per MVP_004 brief, candidates: JSON deck import (MVP_005, DEC-002 path), basic due-queue/review state, or first real gamification badges. Do not start without approval.
 
 ## Blockers / open questions
-- Persistence library still unchosen (needed around roadmap I1.6).
+- Full deck persistence still uses mock data; a real DB (Drift/Isar/Hive) is the I1.6 step when decks/review history need persisting.

@@ -119,6 +119,21 @@ re-inventing equivalents.
 - Empty-deck pattern: review never falls back to a sample card; an empty deck
   shows an explicit empty state (resolves the MVP_002 deferred note).
 
+### Added in MVP_004
+
+- Progress screen (`features/progress/progress_screen.dart`) — now data-driven
+  via `ProgressRepository` (a `FutureBuilder<ProgressSnapshot>`): level card
+  (XP + level + progress-to-next), stat cards (current streak, cards reviewed
+  today), a "Your latest review" card with per-rating counts, and the
+  Achievements badges whose earned state derives from the snapshot
+  (First Review / Perfect Round / Three-Day Streak).
+- No-progress empty state: rocket icon + "No progress yet" + "Complete your
+  first review session to start building your Decko streak." Never shows fake
+  numbers. Achievements remain visible (all locked).
+- Persistence is invisible UI-wise but load-bearing: theme choice survives
+  restart; figures come from stored progress, not constants. Storage sits
+  behind `SettingsRepository` / `ProgressRepository` (DEC-009).
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

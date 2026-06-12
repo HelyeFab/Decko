@@ -5,9 +5,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:decko/data/simple_review_scheduler.dart';
 import 'package:decko/domain/deck.dart';
 import 'package:decko/domain/learning_item.dart';
+import 'package:decko/domain/progress_snapshot.dart';
 import 'package:decko/domain/review_rating.dart';
 import 'package:decko/domain/review_session.dart';
 import 'package:decko/domain/review_session_result.dart';
+
+ReviewSessionResult _result(int total, {int good = 0, int again = 0}) =>
+    ReviewSessionResult(
+      deckId: 'd',
+      totalCards: total,
+      againCount: again,
+      hardCount: 0,
+      goodCount: good,
+      easyCount: 0,
+    );
 
 Deck _deck(int count) => Deck(
       id: 'd',
@@ -87,5 +98,63 @@ void main() {
         session: s, rating: ReviewRating.good, answeredAt: _at);
     expect(after.answers, isEmpty);
     expect(after.currentIndex, 0);
+  });
+
+  group('ProgressSnapshot.recordingSession', () {
+    final DateTime mon = DateTime(2026, 6, 8, 9);
+    final DateTime monLater = DateTime(2026, 6, 8, 20);
+    final DateTime tue = DateTime(2026, 6, 9, 9);
+    final DateTime thu = DateTime(2026, 6, 11, 9);
+
+    test('first session: +10 XP/card, streak 1, today = cards', () {
+      final ProgressSnapshot s =
+          ProgressSnapshot.empty.recordingSession(_result(3, good: 3), mon);
+
+      expect(s.totalXp, 30);
+      expect(s.currentLevel, 1);
+      expect(s.currentStreakDays, 1);
+      expect(s.cardsReviewedToday, 3);
+      expect(s.lastReviewedAt, mon);
+      expect(s.hasProgress, isTrue);
+      expect(s.lastSessionResult?.totalCards, 3);
+    });
+
+    test('same day: XP and today accumulate, streak unchanged', () {
+      ProgressSnapshot s =
+          ProgressSnapshot.empty.recordingSession(_result(3, good: 3), mon);
+      s = s.recordingSession(_result(2, good: 2), monLater);
+
+      expect(s.totalXp, 50);
+      expect(s.cardsReviewedToday, 5);
+      expect(s.currentStreakDays, 1);
+    });
+
+    test('consecutive day: streak increments, today resets', () {
+      ProgressSnapshot s =
+          ProgressSnapshot.empty.recordingSession(_result(3, good: 3), mon);
+      s = s.recordingSession(_result(4, good: 4), tue);
+
+      expect(s.currentStreakDays, 2);
+      expect(s.cardsReviewedToday, 4);
+      expect(s.totalXp, 70);
+    });
+
+    test('gap of more than a day: streak resets to 1', () {
+      ProgressSnapshot s =
+          ProgressSnapshot.empty.recordingSession(_result(3, good: 3), mon);
+      s = s.recordingSession(_result(1, good: 1), thu); // Mon -> Thu
+
+      expect(s.currentStreakDays, 1);
+      expect(s.cardsReviewedToday, 1);
+    });
+
+    test('level rolls over every 100 XP', () {
+      ProgressSnapshot s = ProgressSnapshot.empty;
+      // 11 cards * 10 = 110 XP in one session.
+      s = s.recordingSession(_result(11, good: 11), mon);
+      expect(s.totalXp, 110);
+      expect(s.currentLevel, 2);
+      expect(s.xpIntoLevel, 10);
+    });
   });
 }

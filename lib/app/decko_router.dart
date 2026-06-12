@@ -5,7 +5,7 @@ import '../domain/deck.dart';
 import '../features/deck_detail/deck_detail_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
 import '../features/import/import_placeholder_screen.dart';
-import '../features/progress/progress_placeholder_screen.dart';
+import '../features/progress/progress_screen.dart';
 import '../features/review/review_session_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
 import 'decko_app.dart';
@@ -56,7 +56,7 @@ GoRouter buildDeckoRouter() {
           ),
           GoRoute(
             path: 'progress',
-            builder: (_, _) => const ProgressPlaceholderScreen(),
+            builder: (_, _) => const ProgressScreen(),
           ),
           GoRoute(
             path: 'deck/:deckId',

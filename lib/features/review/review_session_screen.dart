@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../app/theme/card_theme_config.dart';
 import '../../core/constants/decko_spacing.dart';
@@ -10,6 +11,7 @@ import '../../domain/deck.dart';
 import '../../domain/repositories/review_scheduler.dart';
 import '../../domain/review_rating.dart';
 import '../../domain/review_session.dart';
+import '../../domain/review_session_result.dart';
 import 'widgets/rating_button_row.dart';
 import 'widgets/session_summary.dart';
 
@@ -38,6 +40,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   late ReviewSession _session =
       widget.scheduler.createSession(deck: widget.deck);
   bool _revealed = false;
+  bool _recorded = false;
   CardThemeStyle _cardStyle = CardThemeStyle.minimal;
 
   void _reveal() => setState(() => _revealed = true);
@@ -51,12 +54,23 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       );
       _revealed = false;
     });
+    if (_session.isComplete) _recordResult();
+  }
+
+  /// Persist the finished session's result exactly once.
+  void _recordResult() {
+    if (_recorded) return;
+    _recorded = true;
+    final ReviewSessionResult result =
+        widget.scheduler.completeSession(_session);
+    DeckoApp.progressOf(context).recordSessionResult(result);
   }
 
   void _restart() {
     setState(() {
       _session = widget.scheduler.createSession(deck: widget.deck);
       _revealed = false;
+      _recorded = false;
     });
   }
 

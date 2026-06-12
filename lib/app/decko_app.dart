@@ -3,31 +3,43 @@ import 'package:go_router/go_router.dart';
 
 import '../core/constants/decko_strings.dart';
 import '../data/mock_deck_repository.dart';
+import '../data/shared_prefs_progress_repository.dart';
+import '../data/shared_prefs_settings_repository.dart';
 import '../domain/repositories/deck_repository.dart';
+import '../domain/repositories/progress_repository.dart';
+import '../domain/repositories/settings_repository.dart';
 import 'decko_router.dart';
 import 'theme/app_theme_config.dart';
 import 'theme/theme_controller.dart';
 
 /// Root Decko widget.
 ///
-/// Owns the app-wide dependencies — the [ThemeController] and the
-/// [DeckRepository] — and rebuilds the [MaterialApp.router] whenever the
-/// selected app theme changes. Dependencies are handed to the widget tree via a
-/// [_DeckoScope] inherited widget, mirrored by [themeOf]/[repositoryOf] so
-/// screens (and GoRouter builders) can reach them without constructor wiring.
+/// Owns the app-wide dependencies — the [ThemeController], [DeckRepository],
+/// [SettingsRepository] and [ProgressRepository] — and rebuilds the
+/// [MaterialApp.router] when the selected app theme changes. Dependencies are
+/// handed to the tree via a [_DeckoScope] inherited widget; the static
+/// `*Of(context)` helpers read them. All repositories are injectable so tests
+/// can supply in-memory fakes.
 class DeckoApp extends StatefulWidget {
-  const DeckoApp({super.key, this.deckRepository = const MockDeckRepository()});
+  const DeckoApp({
+    super.key,
+    this.deckRepository = const MockDeckRepository(),
+    this.settingsRepository = const SharedPrefsSettingsRepository(),
+    this.progressRepository = const SharedPrefsProgressRepository(),
+  });
 
-  /// Injectable so tests (and later, a persistent impl) can override it.
   final DeckRepository deckRepository;
+  final SettingsRepository settingsRepository;
+  final ProgressRepository progressRepository;
 
-  /// Looks up the nearest [ThemeController].
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
 
-  /// Looks up the nearest [DeckRepository].
   static DeckRepository repositoryOf(BuildContext context) =>
-      _scopeOf(context).repository;
+      _scopeOf(context).deckRepository;
+
+  static ProgressRepository progressOf(BuildContext context) =>
+      _scopeOf(context).progressRepository;
 
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
@@ -41,8 +53,15 @@ class DeckoApp extends StatefulWidget {
 }
 
 class _DeckoAppState extends State<DeckoApp> {
-  final ThemeController _themeController = ThemeController();
+  late final ThemeController _themeController;
   final GoRouter _router = buildDeckoRouter();
+
+  @override
+  void initState() {
+    super.initState();
+    _themeController = ThemeController(widget.settingsRepository);
+    _themeController.load();
+  }
 
   @override
   void dispose() {
@@ -54,7 +73,8 @@ class _DeckoAppState extends State<DeckoApp> {
   Widget build(BuildContext context) {
     return _DeckoScope(
       controller: _themeController,
-      repository: widget.deckRepository,
+      deckRepository: widget.deckRepository,
+      progressRepository: widget.progressRepository,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -74,15 +94,18 @@ class _DeckoAppState extends State<DeckoApp> {
 class _DeckoScope extends InheritedWidget {
   const _DeckoScope({
     required this.controller,
-    required this.repository,
+    required this.deckRepository,
+    required this.progressRepository,
     required super.child,
   });
 
   final ThemeController controller;
-  final DeckRepository repository;
+  final DeckRepository deckRepository;
+  final ProgressRepository progressRepository;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
       controller != oldWidget.controller ||
-      repository != oldWidget.repository;
+      deckRepository != oldWidget.deckRepository ||
+      progressRepository != oldWidget.progressRepository;
 }
