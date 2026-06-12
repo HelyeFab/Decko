@@ -128,3 +128,28 @@ When scheduling/progress information does not exist or cannot be read, Decko mus
 ### Related docs
 
 - `docs/import-progress.md`
+
+## DEC-006: GoRouter now, Riverpod deferred until there is real state
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+`docs/CODING_STANDARDS.md` names Riverpod + GoRouter as the preferred stack, but the MVP_001 brief lists "complex state management" and "large dependencies" as non-goals. MVP_001 is a static product shell with no real domain state.
+
+### Decision
+
+Add `go_router` for navigation now (it matches the standards and the roadmap's "basic routing"). Defer `flutter_riverpod` until a later MVP introduces genuine state (review sessions, persistence). For MVP_001, the only mutable UI state — the selected app theme — is driven by a lightweight `ThemeController` (`ValueNotifier`) exposed via an `InheritedWidget`.
+
+### Consequences
+
+- Smaller dependency surface for the first build.
+- Navigation is structured correctly from day one.
+- Riverpod can be introduced in MVP_004+ without reworking routing.
+- The theme controller is a deliberate stop-gap; it will likely become a Riverpod provider later.
+
+### Alternatives considered
+
+- Add Riverpod now: rejected as premature for a shell with no real state.
+- Zero dependencies (Navigator only): rejected because it diverges from the documented stack and would need rework as routing grows.

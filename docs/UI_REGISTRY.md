@@ -64,6 +64,42 @@ The first UI agent should define and then imprint:
 - XP session summary
 - theme selector preview
 
+## Imprinted Patterns (MVP_001)
+
+The product shell established these reusable patterns. Reuse them rather than
+re-inventing equivalents.
+
+### Design tokens
+
+- `core/constants/decko_spacing.dart` — `DeckoSpacing` (xs…xxxl, pagePadding) and
+  `DeckoRadii` (sm/md/lg/pill). Use these instead of magic numbers.
+- `app/theme/theme_registry.dart` — the single source of truth for all app and
+  card themes. Every `ThemeData` is built by one `_build` helper so shape,
+  buttons, cards and chips stay consistent. Add new themes here.
+
+### Reusable widgets
+
+- `DeckoCard` (`core/widgets/decko_card.dart`) — the flashcard surface. Renders a
+  `LearningItem` in any `CardThemeStyle` (minimal / detailed / game) with a
+  `revealed` flag. Shared by the review screen and the theme gallery.
+- `RatingButtonRow` (`features/review/widgets/rating_button_row.dart`) — the
+  Again / Hard / Good / Easy grading row. Presentational only; reports a
+  `ReviewRating` upward and never schedules.
+- `EmptyLibraryCard` (`features/deck_library/widgets/empty_library_card.dart`) —
+  the empty-state pattern (icon tile + title + body + primary/secondary CTA).
+- `PromiseTile`, `SectionHeader`, `AchievementBadge` (`core/widgets/`) — feature
+  preview tile, section title+subtitle, and badge with earned/locked states.
+- App theme selector + colour-swatch cluster live in the theme gallery
+  (`features/themes/theme_gallery_screen.dart`).
+
+### Conventions
+
+- Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for
+  comfortable mobile tap targets.
+- Icon-only buttons carry tooltips; badges/rating buttons carry `Semantics`
+  labels.
+- Sub-screens are pushed over the deck library so back returns to the hub.
+
 ## Accessibility Baseline
 
 All Decko UI work should consider:
