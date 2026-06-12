@@ -90,3 +90,41 @@ Separate AppThemeConfig from CardThemeConfig.
 - Users can mix app shell themes with flashcard presentation themes.
 - Card rendering can evolve independently from app navigation.
 - UI consistency must be tracked in `docs/UI_REGISTRY.md`.
+
+## DEC-005: Decko must never silently reset imported progress
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+Existing deck users may have hundreds or thousands of cards with meaningful study history. For them, the deck content is not enough: due dates, intervals, review state, suspended cards, reps, lapses, and review history are part of the value of the deck.
+
+If Decko imports a deck and treats all cards as new without warning, the user loses trust immediately.
+
+### Decision
+
+Decko must distinguish between clean import and progress-aware import.
+
+When scheduling/progress information exists, the user must be offered a clear choice:
+
+- keep existing progress
+- start fresh
+
+When scheduling/progress information does not exist or cannot be read, Decko must clearly warn that the deck will be imported as new.
+
+### Consequences
+
+- APKG import must eventually inspect both content and scheduling/progress data.
+- Import UX must include a pre-confirmation summary.
+- The domain model needs an import progress mapping layer, not only card content import.
+- A progress-aware import MVP is required before Decko can confidently target serious existing Anki users.
+
+### Alternatives considered
+
+- Always start imported decks as new: rejected because it would make Decko unsafe for users with existing progress.
+- Try to perfectly reproduce external scheduler state immediately: rejected for early MVPs because preserving practical progress is more important than exact scheduler compatibility.
+
+### Related docs
+
+- `docs/import-progress.md`
