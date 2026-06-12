@@ -92,6 +92,20 @@ re-inventing equivalents.
 - App theme selector + colour-swatch cluster live in the theme gallery
   (`features/themes/theme_gallery_screen.dart`).
 
+### Added in MVP_002
+
+- `DeckTile` (`features/deck_library/widgets/deck_tile.dart`) — inviting deck
+  summary card: icon, title, `DEMO DECK` source label, description, and meta
+  chips (card count, "Ready to review"). Tappable, with a trailing chevron.
+  Reuse for any deck list; it deliberately reads like a card, not a table row.
+- Deck detail screen (`features/deck_detail/`) — `DEMO DECK` label, title +
+  description, a three-up placeholder progress summary (`Total / Due today /
+  Reviewed`, the latter two shown as `—` until a scheduler exists), a sampled
+  `Cards` list via `SampleItemRow`, a primary `Start review` CTA and a
+  "Review modes coming soon" note.
+- The empty-state card remains the fallback when the repository returns no
+  decks; the populated library leads with a `Your decks` section.
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

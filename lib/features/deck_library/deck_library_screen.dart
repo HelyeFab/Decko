@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/constants/decko_strings.dart';
 import '../../core/widgets/promise_tile.dart';
 import '../../core/widgets/section_header.dart';
+import '../../domain/deck.dart';
+import 'widgets/deck_tile.dart';
 import 'widgets/empty_library_card.dart';
 
 /// Decko's home: the deck library.
 ///
-/// For MVP_001 the library is empty, so this leads with branding, the product
-/// promise and the two entry points (import / demo). Theme gallery and progress
-/// are reachable from the app bar.
+/// Renders the local decks from the [DeckRepository]. When the repository has
+/// no decks the MVP_001 empty state is shown as a fallback. Theme gallery and
+/// progress remain reachable from the app bar.
 class DeckLibraryScreen extends StatelessWidget {
   const DeckLibraryScreen({super.key});
 
@@ -26,6 +29,13 @@ class DeckLibraryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final List<Deck> decks = DeckoApp.repositoryOf(context).getDecks();
+    final bool hasDecks = decks.isNotEmpty;
+
+    void openImport() => context.push(DeckoRoutes.import);
+    void openDemo() => context.push(
+          hasDecks ? DeckoRoutes.deck(decks.first.id) : DeckoRoutes.import,
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -69,10 +79,10 @@ class DeckLibraryScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: DeckoSpacing.xl),
-            EmptyLibraryCard(
-              onImport: () => context.push(DeckoRoutes.import),
-              onDemo: () => context.push(DeckoRoutes.review),
-            ),
+            if (!hasDecks)
+              EmptyLibraryCard(onImport: openImport, onDemo: openDemo)
+            else
+              _DeckList(decks: decks, onImport: openImport, onDemo: openDemo),
             const SizedBox(height: DeckoSpacing.xxl),
             const SectionHeader(
               title: 'Why you’ll love Decko',
@@ -83,6 +93,51 @@ class DeckLibraryScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DeckList extends StatelessWidget {
+  const _DeckList({
+    required this.decks,
+    required this.onImport,
+    required this.onDemo,
+  });
+
+  final List<Deck> decks;
+  final VoidCallback onImport;
+  final VoidCallback onDemo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const SectionHeader(
+          title: 'Your decks',
+          subtitle: 'Pick a deck to start studying.',
+        ),
+        const SizedBox(height: DeckoSpacing.lg),
+        for (final Deck deck in decks) ...<Widget>[
+          DeckTile(
+            deck: deck,
+            onTap: () => context.push(DeckoRoutes.deck(deck.id)),
+          ),
+          const SizedBox(height: DeckoSpacing.md),
+        ],
+        const SizedBox(height: DeckoSpacing.sm),
+        FilledButton.icon(
+          onPressed: onImport,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text(DeckoStrings.importCta),
+        ),
+        const SizedBox(height: DeckoSpacing.md),
+        OutlinedButton.icon(
+          onPressed: onDemo,
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text(DeckoStrings.demoCta),
+        ),
+      ],
     );
   }
 }

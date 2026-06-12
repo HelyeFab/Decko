@@ -4,42 +4,42 @@
 2026-06-12
 
 ## Current stage
-MVP_001 complete: Flutter product shell built and verified.
+MVP_002 complete: local demo deck model + navigation built and verified.
 
-## Last completed
-- Scaffolded the Flutter app in-repo (`flutter create`, org dev.fabiani, name decko, platforms ios/android/macos).
-- Added `go_router`; deferred Riverpod (see DEC-006).
-- Built domain layer: `Deck`, `LearningItem`, `ReviewRating` (framework-light).
-- Built centralised theme system: 3 app themes (Soft Study default, Decko Light, Decko Dark) and 3 card themes (Minimal / Detailed / Game) via `ThemeRegistry`; live in-memory switching through `ThemeController`.
-- Built 5 screens: Deck Library (home), Import placeholder, Review preview, Theme gallery, Progress preview.
-- Added reusable widgets: `DeckoCard`, `RatingButtonRow`, `EmptyLibraryCard`, `PromiseTile`, `SectionHeader`, `AchievementBadge`.
-- Verified: `flutter analyze` clean; 3 widget tests pass (branding/CTAs, review reveal + ratings, all sub-screens open).
-- Imprinted UI patterns into `docs/UI_REGISTRY.md`; recorded DEC-006.
+## Last completed (MVP_002)
+- Added `DeckRepository` interface (`lib/domain/repositories/deck_repository.dart`) and `MockDeckRepository` backed by `MockDecks`.
+- Expanded `MockDecks` to two demo decks (Japanese Starter Deck, Travel Phrases); friendlier titles.
+- Deck library now renders `DeckTile`s from the repository; MVP_001 empty-state kept as a fallback (injectable empty repo proves it).
+- New deck detail screen (`features/deck_detail/`) with placeholder progress summary, sampled cards, "Start review", "Review modes coming soon".
+- Routing: `/deck/:deckId` and `/deck/:deckId/review`; route builders resolve the deck via `DeckoApp.repositoryOf` (DEC-007); unknown id → "deck not found". "Explore demo deck" now opens deck detail, not review directly.
+- Review screen accepts an optional `Deck` and previews its first card (falls back to sample); app bar shows the deck name.
+- Repository exposed through the app scope (renamed `_ThemeScope` → `_DeckoScope`, added `DeckoApp.repositoryOf`); `DeckoApp` takes an injectable `deckRepository`.
+- 5 widget tests cover the full flow incl. empty fallback; `flutter analyze` clean.
 
-## Files changed recently
-- `pubspec.yaml`: description + `go_router` dependency.
-- `lib/main.dart`, `lib/app/*` (decko_app, decko_router, theme/*).
-- `lib/core/*` (constants + widgets).
-- `lib/domain/*`, `lib/data/mock_decks.dart`.
-- `lib/features/{deck_library,import,review,themes,progress}/*`.
-- `test/widget_test.dart`: Decko smoke tests.
-- `docs/DECISIONS.md` (DEC-006), `docs/UI_REGISTRY.md` (imprint).
+## Earlier (MVP_001)
+- Flutter shell scaffolded (org dev.fabiani); go_router added, Riverpod deferred (DEC-006).
+- 5 screens, domain models, centralised theme system (3 app + 3 card themes), reusable widgets.
+- Fixed home promise-grid overflow (aspect ratio 1.0 + maxLines/Flexible).
 
 ## Decisions to remember
-- Decko Iteration 1 is local-first.
-- Imported deck formats are adapters, not the internal model.
-- Scheduling must be FSRS-ready from the start.
-- App themes and card themes are separate systems.
-- GoRouter now; Riverpod deferred until real state exists (DEC-006).
+- Local-first Iteration 1 (DEC-001).
+- Import formats are adapters, not the internal model (DEC-002).
+- FSRS-ready model from the start; SimpleScheduler behind interface later (DEC-003).
+- App themes vs card themes are separate (DEC-004).
+- Never silently reset imported progress; progress-aware import (DEC-005; see docs/import-progress.md).
+- GoRouter now, Riverpod deferred (DEC-006).
+- Decks read via DeckRepository, resolved by id in routes (DEC-007).
 
 ## What is still placeholder
-- Import buttons are "Coming soon" — no real .apkg/CSV/JSON parsing.
-- Review ratings show a snackbar and reset; no scheduling yet.
-- Theme selection is preview-only (in-memory, not persisted).
-- Progress values (XP 120, streak 3, reviewed 18, level 2) are mock data.
+- All deck data comes from `MockDecks`; no persistence.
+- Deck detail "Due today"/"Reviewed" are `—`; no scheduler/history.
+- "Start review" previews the first card only — no real review queue.
+- Ratings show a snackbar; no scheduling/state update.
+- Import remains "Coming soon" placeholders.
+- Theme selection is in-memory only.
 
 ## Next action
-Awaiting approval. Recommended next: MVP_002 — local demo deck model + navigation (deck library lists real `Deck`s from a repository, deck detail screen, demo deck wired through). Do not start without approval.
+Awaiting approval for the next MVP. Brief present: none yet beyond MVP_002. Likely next: MVP_003 (JSON deck import) or MVP_004 (simple review session state). Do not start without approval.
 
 ## Blockers / open questions
-- Persistence library still unchosen (not needed until I1.6).
+- Persistence library still unchosen (needed around roadmap I1.6).

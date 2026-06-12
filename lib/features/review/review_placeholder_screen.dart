@@ -4,6 +4,7 @@ import '../../app/theme/card_theme_config.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_card.dart';
 import '../../data/mock_decks.dart';
+import '../../domain/deck.dart';
 import '../../domain/learning_item.dart';
 import '../../domain/review_rating.dart';
 import 'widgets/rating_button_row.dart';
@@ -11,10 +12,15 @@ import 'widgets/rating_button_row.dart';
 /// A preview of the review experience.
 ///
 /// Demonstrates the card surface, the reveal interaction and the grading row.
-/// Grading does not schedule anything yet — it simply acknowledges the tap and
-/// resets, ready for a real `SchedulerService` later (DEC-003).
+/// When opened with a [deck] it previews that deck's first card; otherwise it
+/// falls back to the standalone sample. Grading does not schedule anything yet —
+/// it simply acknowledges the tap and resets, ready for a real
+/// `SchedulerService` later (DEC-003). There is no real review queue yet.
 class ReviewPlaceholderScreen extends StatefulWidget {
-  const ReviewPlaceholderScreen({super.key});
+  const ReviewPlaceholderScreen({super.key, this.deck});
+
+  /// The deck being previewed, if any. Null → standalone sample card.
+  final Deck? deck;
 
   @override
   State<ReviewPlaceholderScreen> createState() =>
@@ -22,7 +28,13 @@ class ReviewPlaceholderScreen extends StatefulWidget {
 }
 
 class _ReviewPlaceholderScreenState extends State<ReviewPlaceholderScreen> {
-  final LearningItem _item = MockDecks.sampleCard;
+  late final LearningItem _item = _firstItem();
+
+  LearningItem _firstItem() {
+    final Deck? deck = widget.deck;
+    if (deck != null && deck.items.isNotEmpty) return deck.items.first;
+    return MockDecks.sampleCard;
+  }
   bool _revealed = false;
   CardThemeStyle _cardStyle = CardThemeStyle.minimal;
 
@@ -45,7 +57,7 @@ class _ReviewPlaceholderScreenState extends State<ReviewPlaceholderScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Review preview'),
+        title: Text(widget.deck?.name ?? 'Review preview'),
         actions: <Widget>[
           PopupMenuButton<CardThemeStyle>(
             tooltip: 'Card theme',

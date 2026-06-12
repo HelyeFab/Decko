@@ -153,3 +153,28 @@ Add `go_router` for navigation now (it matches the standards and the roadmap's "
 
 - Add Riverpod now: rejected as premature for a shell with no real state.
 - Zero dependencies (Navigator only): rejected because it diverges from the documented stack and would need rework as routing grows.
+
+## DEC-007: Decks are read through a DeckRepository, resolved by id in routes
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+MVP_002 makes the library render real local decks and adds a deck detail screen. The UI needs a source of decks and a way to carry the selected deck into detail/review, without persistence or Riverpod yet.
+
+### Decision
+
+Introduce a small `DeckRepository` interface (`getDecks()`, `getDeckById(id)`) with a `MockDeckRepository` backed by `MockDecks`. The repository is provided through the existing app-scope `InheritedWidget` (`DeckoApp.repositoryOf`), the same mechanism used for the theme controller. Deck context flows through the URL: routes are `/deck/:deckId` and `/deck/:deckId/review`, and route builders resolve the `Deck` from the repository by id (falling back to a "deck not found" screen).
+
+### Consequences
+
+- Screens depend on an interface, not concrete data — a persistent repo can replace the mock later with no UI change.
+- Navigation is URL-driven and link/deep-link friendly; no `Deck` objects passed via router `extra`.
+- The repository is injectable, so tests can supply an empty repo to exercise the empty state.
+- A non-existent deck id is handled explicitly rather than crashing.
+
+### Alternatives considered
+
+- Pass the `Deck` object via GoRouter `extra`: rejected because it breaks on refresh/deep-link and couples navigation to in-memory objects.
+- Constructor-inject the repository into each screen: rejected because GoRouter builders make that awkward; the existing scope pattern is simpler and consistent.

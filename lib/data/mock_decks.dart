@@ -1,17 +1,25 @@
 import '../domain/deck.dart';
 import '../domain/learning_item.dart';
 
-/// Hard-coded demo content for the MVP_001 product shell.
+/// Hard-coded demo content for the local-first MVP flow.
 ///
 /// This stands in for the import + persistence layers that arrive in later
-/// MVPs. Nothing here is real user data — it exists only to populate the
-/// preview screens so the product direction is visible.
+/// MVPs. Nothing here is real user data — it exists so the deck library, deck
+/// detail and review screens have believable local decks to render.
 abstract final class MockDecks {
-  /// A small Japanese vocabulary deck used by the "Explore demo deck" flow.
-  static const Deck demoJapanese = Deck(
+  /// Every demo deck, in the order the library should show them.
+  static const List<Deck> all = <Deck>[_japaneseStarter, _travelPhrases];
+
+  /// The deck used by the "Explore demo deck" shortcut and review preview.
+  static const Deck demoJapanese = _japaneseStarter;
+
+  /// The single card shown when the review screen has no deck context.
+  static LearningItem get sampleCard => _japaneseStarter.items.first;
+
+  static const Deck _japaneseStarter = Deck(
     id: 'demo-japanese',
-    name: 'Everyday Japanese',
-    description: 'A taste of Decko — common words to get you started.',
+    name: 'Japanese Starter Deck',
+    description: 'A tiny sample deck for testing Decko’s review experience.',
     items: <LearningItem>[
       LearningItem(
         id: 'jp-taberu',
@@ -40,6 +48,27 @@ abstract final class MockDecks {
     ],
   );
 
-  /// The single card shown on the review preview screen.
-  static LearningItem get sampleCard => demoJapanese.items.first;
+  static const Deck _travelPhrases = Deck(
+    id: 'demo-travel',
+    name: 'Travel Phrases',
+    description: 'Handy expressions for your first trip to Japan.',
+    items: <LearningItem>[
+      LearningItem(
+        id: 'jp-konnichiwa',
+        front: 'こんにちは',
+        reading: 'konnichiwa',
+        back: 'hello / good afternoon',
+        example: 'こんにちは、元気ですか？',
+        tags: <String>['greeting'],
+      ),
+      LearningItem(
+        id: 'jp-arigatou',
+        front: 'ありがとう',
+        reading: 'arigatou',
+        back: 'thank you',
+        example: '本当にありがとう。',
+        tags: <String>['greeting'],
+      ),
+    ],
+  );
 }
