@@ -56,6 +56,19 @@ Goal: prove the core promise.
 - Persist review cards and review events
 - Persist theme choice and progress
 
+## Deferred Notes
+
+Small, intentionally-postponed improvements captured so they are not lost.
+
+- **Empty deck handling (review).** Review currently falls back to the sample
+  card when a deck has zero items (acceptable while data is mock). Once imported
+  decks are real, an empty deck should show an explicit "This deck has no cards
+  yet." state instead of a fallback card. (From MVP_002 review.)
+- **Reading normalisation (Japanese data).** Demo readings are mixed: the
+  Japanese Starter Deck uses kana (たべる) while Travel Phrases uses romaji
+  (konnichiwa). Fine for demo data, but real Japanese decks should normalise
+  readings to kana where possible. (From MVP_002 review.)
+
 ## I2 — APKG Import Beta
 
 - Parse APKG package

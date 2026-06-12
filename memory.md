@@ -4,7 +4,11 @@
 2026-06-12
 
 ## Current stage
-MVP_002 complete: local demo deck model + navigation built and verified.
+MVP_002 complete and APPROVED (2026-06-12): local demo deck model + navigation.
+
+## Deferred notes (see docs/ROADMAP.md "Deferred Notes")
+- Empty deck (zero items) should later show "This deck has no cards yet." instead of the current sample-card fallback in review.
+- Normalise Japanese readings to kana for real decks (demo data mixes kana/romaji).
 
 ## Last completed (MVP_002)
 - Added `DeckRepository` interface (`lib/domain/repositories/deck_repository.dart`) and `MockDeckRepository` backed by `MockDecks`.
