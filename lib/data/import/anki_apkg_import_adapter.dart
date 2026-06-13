@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../core/content/anki_content.dart';
 import '../../domain/deck.dart';
 import '../../domain/import/deck_import_adapter.dart';
 import '../../domain/import/deck_import_info.dart';
@@ -12,6 +13,7 @@ import '../../domain/import/deck_import_preview.dart';
 import '../../domain/import/imported_card_progress.dart';
 import '../../domain/import/imported_card_state.dart';
 import '../../domain/learning_item.dart';
+import '../../domain/repositories/media_store.dart';
 
 /// Imports a (legacy, uncompressed) Anki `.apkg` package.
 ///
@@ -36,6 +38,9 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       hasProgressData: parsed.hasProgressData,
       approxDueToday: parsed.approxDueToday,
       notes: parsed.notes,
+      mediaFiles: parsed.mediaMap.length,
+      audioRefs: parsed.audioRefs,
+      imageRefs: parsed.imageRefs,
     );
   }
 
@@ -44,6 +49,7 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     Uint8List bytes, {
     required bool keepProgress,
     required DateTime importedAt,
+    MediaStore? mediaStore,
   }) async {
     final _Parsed parsed = _parse(bytes);
     final bool keep = keepProgress && parsed.hasProgressData;
@@ -76,13 +82,32 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
         ),
     ];
 
+    final String deckId = 'anki-${importedAt.millisecondsSinceEpoch}';
+    if (mediaStore != null && parsed.mediaMap.isNotEmpty) {
+      await _extractMedia(parsed, deckId, mediaStore);
+    }
+
     return Deck(
-      id: 'anki-${importedAt.millisecondsSinceEpoch}',
+      id: deckId,
       name: parsed.deckName,
       description: 'Imported from Anki · ${items.length} cards',
       items: items,
       importInfo: DeckImportInfo(progressMode: mode, importedAt: importedAt),
     );
+  }
+
+  /// Copies each package media payload to the [MediaStore] under its original
+  /// filename, one at a time so large decks don't balloon memory.
+  Future<void> _extractMedia(
+      _Parsed parsed, String deckId, MediaStore store) async {
+    for (final MapEntry<String, String> e in parsed.mediaMap.entries) {
+      final ArchiveFile? file = parsed.archive.findFile(e.key);
+      if (file == null) continue;
+      try {
+        await store.saveMedia(
+            deckId, e.value, Uint8List.fromList(file.content as List<int>));
+      } catch (_) {/* skip a single bad media file rather than fail import */}
+    }
   }
 
   // --- parsing ---------------------------------------------------------------
@@ -116,7 +141,7 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     try {
       dbFile.writeAsBytesSync(db.content as List<int>);
       handle = sqlite3.open(dbFile.path);
-      return _readCollection(handle);
+      return _readCollection(handle, archive);
     } on DeckImportException {
       rethrow;
     } catch (_) {
@@ -136,7 +161,7 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       archive.findFile('collection.anki21') ??
       archive.findFile('collection.anki2');
 
-  _Parsed _readCollection(Database db) {
+  _Parsed _readCollection(Database db, Archive archive) {
     final ResultSet col = db.select('SELECT crt, decks FROM col LIMIT 1');
     final int crt = col.isEmpty ? 0 : (col.first['crt'] as int? ?? 0);
     final Map<String, String> deckNames = _deckNames(db, col);
@@ -144,9 +169,13 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     // note id -> fields. Anki joins fields with the unit-separator (0x1F).
     final String fieldSeparator = String.fromCharCode(0x1f);
     final Map<int, List<String>> fields = <int, List<String>>{};
+    int audioRefs = 0;
+    int imageRefs = 0;
     for (final Row r in db.select('SELECT id, flds FROM notes')) {
-      fields[r['id'] as int] =
-          (r['flds'] as String).split(fieldSeparator);
+      final String flds = r['flds'] as String;
+      fields[r['id'] as int] = flds.split(fieldSeparator);
+      audioRefs += countAudioRefs(flds);
+      imageRefs += countImageRefs(flds);
     }
 
     final List<_Card> cards = <_Card>[];
@@ -185,7 +214,26 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       hasProgressData: hasProgress,
       approxDueToday: approxDue,
       notes: notes,
+      archive: archive,
+      mediaMap: _readMediaMap(archive),
+      audioRefs: audioRefs,
+      imageRefs: imageRefs,
     );
+  }
+
+  /// Reads the package's `media` mapping (numbered payload -> original name).
+  Map<String, String> _readMediaMap(Archive archive) {
+    final ArchiveFile? f = archive.findFile('media');
+    if (f == null) return const <String, String>{};
+    try {
+      final Map<String, dynamic> decoded =
+          jsonDecode(utf8.decode(f.content as List<int>))
+              as Map<String, dynamic>;
+      return decoded.map(
+          (String k, dynamic v) => MapEntry<String, String>(k, v as String));
+    } catch (_) {
+      return const <String, String>{};
+    }
   }
 
   Map<String, String> _deckNames(Database db, ResultSet col) {
@@ -240,6 +288,10 @@ class _Parsed {
     required this.hasProgressData,
     required this.approxDueToday,
     required this.notes,
+    required this.archive,
+    required this.mediaMap,
+    required this.audioRefs,
+    required this.imageRefs,
   });
 
   final String deckName;
@@ -247,6 +299,10 @@ class _Parsed {
   final bool hasProgressData;
   final int? approxDueToday;
   final List<String> notes;
+  final Archive archive;
+  final Map<String, String> mediaMap;
+  final int audioRefs;
+  final int imageRefs;
 }
 
 class _Card {
@@ -366,24 +422,25 @@ class _Fields {
 ///    example) for note types that split those out.
 /// Still an isolated, heuristic layer flagged for improvement (DEC-010).
 _Fields _mapFields(List<String> raw) {
-  final String front = _cleanField(raw.isNotEmpty ? raw[0] : '');
+  final String front0 = _cleanField(raw.isNotEmpty ? raw[0] : '');
   final String rawBack = raw.length > 1 ? raw[1] : '';
 
   final List<String> backLines = _splitLines(rawBack)
       .map(_cleanField)
-      .where((String s) => s.isNotEmpty && s != front && !_isIdLike(s))
+      .where((String s) => s.isNotEmpty && s != front0 && !_isIdLike(s))
       .toList();
   final String back = backLines.isNotEmpty ? backLines.first : '';
   String? example =
       backLines.length > 1 ? backLines.skip(1).join('\n') : null;
 
-  // Fallbacks for note types that split reading/example into their own fields.
+  // Fallbacks for note types that split reading/example into their own fields
+  // (test the text only, ignoring any media markers).
   String? reading;
-  if (!front.contains('[')) {
+  if (!stripMedia(front0).contains('[')) {
     for (final String f in raw.skip(2)) {
-      final String c = _cleanField(f);
-      if (!c.contains('[') && _isKanaReading(c)) {
-        reading = c;
+      final String t = stripMedia(_cleanField(f));
+      if (t.isNotEmpty && !t.contains('[') && _isKanaReading(t)) {
+        reading = t;
         break;
       }
     }
@@ -391,19 +448,62 @@ _Fields _mapFields(List<String> raw) {
   if (example == null) {
     for (final String f in raw.skip(2)) {
       final String c = _cleanField(f);
-      if (c != back && c != front && _isSentence(c)) {
+      final String t = stripMedia(c);
+      // A real example must contain Japanese — avoids picking id/tag fields
+      // like "item:435851".
+      if (t.isNotEmpty && t != back && t != front0 && _isSentence(t) &&
+          _hasJapanese(t)) {
         example = c;
         break;
       }
     }
   }
 
+  // Media in separate fields is placed where it belongs rather than dumped on
+  // the front: the word's audio stays with the front (the prompt); a second
+  // audio (in field order) is the sentence audio and goes with the example;
+  // images move to the answer (back) so the front stays a clean prompt and the
+  // back is substantial. Media already inline in front/back/example is kept.
+  final String present = '$front0\n$back\n${example ?? ''}';
+  final List<String> orphanAudio = <String>[];
+  final List<String> orphanImages = <String>[];
+  for (final String f in raw.skip(2)) {
+    for (final String marker in mediaMarkers(_cleanField(f))) {
+      if (present.contains(marker)) continue;
+      final List<String> bucket =
+          marker.startsWith('[sound:') ? orphanAudio : orphanImages;
+      if (!bucket.contains(marker)) bucket.add(marker);
+    }
+  }
+
+  final bool splitAudio =
+      example != null && example.isNotEmpty && orphanAudio.length > 1;
+
+  // Front (prompt) carries the word's audio and the image; a second audio is the
+  // sentence's and rides with the example.
+  final List<String> frontMedia = <String>[
+    ...(splitAudio ? <String>[orphanAudio.first] : orphanAudio),
+    ...orphanImages,
+  ];
+  final String front = frontMedia.isEmpty
+      ? front0
+      : <String>[front0, ...frontMedia].where((String s) => s.isNotEmpty).join(' ');
+
+  if (splitAudio) {
+    example = <String>[example, ...orphanAudio.skip(1)].join(' ');
+  }
+
   return _Fields(front: front, back: back, reading: reading, example: example);
 }
 
 final RegExp _rubyTag = RegExp(r'<ruby>(.*?)<rt>(.*?)</rt></ruby>', dotAll: true);
+final RegExp _imgTag = RegExp(
+  r'<img[^>]*\bsrc\s*=\s*["' "'" r']([^"' "'" r']+)["' "'" r'][^>]*>',
+  caseSensitive: false,
+);
 
-/// Cleans one Anki field to plain text **but preserves furigana** as `漢字[かな]`.
+/// Cleans one Anki field to plain text but **preserves furigana** (`漢字[かな]`)
+/// and **media references** (`[sound:x]`, normalised `<img src="x">`).
 String _cleanField(String raw) {
   // <ruby>漢字<rt>かな</rt></ruby> -> 漢字[かな]
   String s = raw.replaceAllMapped(_rubyTag, (Match m) {
@@ -411,10 +511,11 @@ String _cleanField(String raw) {
     final String read = _stripTags(m.group(2) ?? '');
     return read.isEmpty ? base : '$base[$read]';
   });
+  // Normalise images, then strip every tag EXCEPT <img …>.
+  s = s.replaceAllMapped(_imgTag, (Match m) => '<img src="${m.group(1)}">');
+  s = s.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ');
   s = s
-      .replaceAll(RegExp(r'\[sound:[^\]]*\]'), '') // audio refs
-      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ');
-  s = _stripTags(s)
+      .replaceAll(RegExp(r'<(?!img )[^>]*>', caseSensitive: false), '')
       .replaceAll('&nbsp;', ' ')
       .replaceAll('&amp;', '&')
       .replaceAll('&lt;', '<')
@@ -441,6 +542,9 @@ bool _isKanaReading(String s) {
 /// Looks like an example sentence: long enough, or with sentence punctuation.
 bool _isSentence(String s) =>
     s.length >= 8 || s.contains('。') || s.contains('、') || s.contains('？');
+
+/// Whether the text contains any Japanese (kana or CJK).
+bool _hasJapanese(String s) => RegExp(r'[぀-ヿ㐀-鿿]').hasMatch(s);
 
 /// Collapses a string of identical whitespace-separated tokens to one.
 String _collapseRepeat(String s) {

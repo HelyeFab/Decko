@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../constants/decko_spacing.dart';
 
@@ -11,19 +12,19 @@ abstract final class DeckoSnackbar {
   static void showSuccess(BuildContext context, String message) => _show(
         context,
         message: message,
-        icon: Icons.check_circle_rounded,
+        icon: FontAwesomeIcons.circleCheck,
       );
 
   static void showInfo(BuildContext context, String message) => _show(
         context,
         message: message,
-        icon: Icons.info_rounded,
+        icon: FontAwesomeIcons.circleInfo,
       );
 
   static void _show(
     BuildContext context, {
     required String message,
-    required IconData icon,
+    required FaIconData icon,
   }) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context)
@@ -38,7 +39,7 @@ abstract final class DeckoSnackbar {
           ),
           content: Row(
             children: <Widget>[
-              Icon(icon, color: scheme.inversePrimary, size: 20),
+              FaIcon(icon, color: scheme.inversePrimary, size: 20),
               const SizedBox(width: DeckoSpacing.md),
               Expanded(
                 child: Text(

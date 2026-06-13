@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../constants/decko_spacing.dart';
 
@@ -13,7 +14,7 @@ class PromiseTile extends StatelessWidget {
     required this.blurb,
   });
 
-  final IconData icon;
+  final FaIconData icon;
   final String title;
   final String blurb;
 
@@ -32,7 +33,7 @@ class PromiseTile extends StatelessWidget {
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(DeckoRadii.sm),
               ),
-              child: Icon(
+              child: FaIcon(
                 icon,
                 color: theme.colorScheme.onPrimaryContainer,
                 size: 22,

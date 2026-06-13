@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../../core/constants/decko_spacing.dart';
 import '../../../domain/review_rating.dart';
@@ -35,8 +36,8 @@ class SessionSummary extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Icon(
-              Icons.celebration_rounded,
+            FaIcon(
+              FontAwesomeIcons.trophy,
               size: 56,
               color: theme.colorScheme.primary,
             ),
@@ -77,13 +78,13 @@ class SessionSummary extends StatelessWidget {
             const SizedBox(height: DeckoSpacing.xl),
             FilledButton.icon(
               onPressed: onReviewAgain,
-              icon: const Icon(Icons.replay_rounded),
+              icon: const FaIcon(FontAwesomeIcons.rotateRight),
               label: const Text('Review again'),
             ),
             const SizedBox(height: DeckoSpacing.md),
             OutlinedButton.icon(
               onPressed: onBackToDeck,
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: const FaIcon(FontAwesomeIcons.arrowLeft),
               label: const Text('Back to deck'),
             ),
           ],

@@ -342,3 +342,52 @@ MVP_006 shipped a deliberately temporary fixed-interval policy (Again=now / Hard
 - Pull a pub `fsrs` package: rejected — the FSRS-5 core is ~60 lines; pure Dart keeps it dependency-free, fully testable, and version-stable.
 - Keep the fixed policy: rejected — not credible scheduling; the seam existed precisely to replace it.
 - Convert Anki scheduler params exactly: rejected — out of scope; conservative seeding preserves practical progress without claiming parity.
+
+## DEC-014: Anki media imported to local files, rendered by a field-content parser
+
+Date: 2026-06-13
+Status: Accepted
+
+### Context
+
+Real `.apkg` decks contain audio (`[sound:x]`) and images (`<img src="x">`); legacy packages ship a `media` JSON map plus numbered payload files. Decko previously stripped these references, making audio/image decks feel broken.
+
+### Decision
+
+- **Extraction:** during import, read the package `media` map and copy each payload to a `MediaStore` under its original filename, keyed by deck id (single zip decode; saved one file at a time so big decks don't balloon memory).
+- **Storage:** `MediaStore` interface + `FileMediaStore` — files live under `<appSupport>/decko_media/<deckId>/`, never in `shared_preferences`. Per-deck folders avoid collisions and make deletion a recursive remove; injectable base dir for tests.
+- **Content preservation:** field cleaning now **keeps** `[sound:x]` and normalised `<img src="x">` (alongside furigana). Media that lives in separate note fields is gathered and attached to the front so it renders.
+- **Rendering:** a small `parseAnkiContent` splits a field into text / audio / image segments; `DeckoFieldContent` renders text via `FuriganaText`, audio as a play button (`audioplayers`), and images via `Image.file`. **No full HTML renderer.** Missing media → friendly placeholder / disabled button.
+- **Deps:** `path_provider` (storage location) and `audioplayers` (local playback). Images need none.
+- **Lifecycle:** deleting an imported deck also deletes its media. Import preview reports media/audio/image counts. FSRS, review state, and progress are unchanged.
+
+### Consequences
+
+- Audio/image decks import and play/render; everything survives restart and is removed on delete.
+- "Import all media" means very large decks (hundreds of MB) are slower and use more disk — a noted limitation.
+- Media placement is heuristic (orphan media → front); good enough for the common note types, refinable later.
+
+### Alternatives considered
+
+- Full HTML/CSS/template rendering: rejected — far beyond scope; a targeted segment parser covers Decko's media patterns.
+- Store media in `shared_preferences` / a DB: rejected — blobs belong on the filesystem.
+- Cap media by size: offered but rejected for this slice — completeness preferred; revisit if huge decks bite.
+
+## DEC-015: Iconography uses Font Awesome free, via FaIcon/FaIconData
+
+Date: 2026-06-13
+Status: Accepted
+
+### Context
+
+The app used Material `Icons`. The product owner wants a consistent Font Awesome look.
+
+### Decision
+
+All app icons use **`font_awesome_flutter`** (free tier) rendered with `FaIcon`; icon constants are `FontAwesomeIcons.*` (typed `FaIconData`, not `IconData`). Widgets that take an icon parameter declare it `FaIconData`. Fixed-size decorative icon containers must set `alignment: Alignment.center` — FA glyphs lack the built-in padding Material icons have, so they otherwise sit off-centre.
+
+### Consequences
+
+- One coherent icon style; new icons should be `FontAwesomeIcons.*` + `FaIcon`.
+- `FaIconData` ≠ `IconData`, so icon params/lists use `FaIconData`.
+- Centre fixed-size icon chips/badges explicitly.

@@ -15,6 +15,13 @@ Decko should feel:
 - more beautiful than a utility flashcard database
 - focused during review sessions
 
+**Beautiful visual design is the product's core reason to exist** — explicitly
+the opposite of AnkiDroid's utilitarian look. NEVER drop in stock/default
+Material UI (e.g. a bare `AlertDialog`); always use Decko's polished components
+(`DeckoConfirmDialog`, `DeckoSnackbar`, themed surfaces, DeckoSpacing/Radii) and
+consider the interaction model, not just the content. A fix that looks like
+generic Android/Anki must be redone.
+
 ## Theme Layers
 
 Decko has two visual layers:
@@ -177,6 +184,33 @@ re-inventing equivalents.
 - **Example emphasis** — `DeckoCard` renders the example sentence large (titleLarge,
   furigana) with the translation muted beneath; the meaning/answer is secondary.
   The sentence is the focal point of a vocab card (DEC-012).
+
+### Added in MVP_008
+
+- **Media in cards** — `DeckoFieldContent` (`core/widgets/`) renders a card field
+  that mixes text (furigana via `FuriganaText`), `[sound:…]` audio (a filled-tonal
+  **play button**, `audioplayers`), and `<img>` images (`Image.file`, max-height
+  220, rounded). Parsed by `parseAnkiContent` (`core/content/anki_content.dart`).
+  `DeckoCard` uses it for front / back / example and takes a `deckId` to resolve
+  media via the `MediaStore`.
+- **Missing media** — audio shows a disabled muted-volume button ("Audio
+  unavailable"); images show a broken-image placeholder. Never crashes.
+- **Import preview** now lists Audio references / Image references / Media files
+  when the package has media.
+- Media is per-deck on disk (`FileMediaStore`), deleted with the deck (DEC-014).
+- Deck-detail sample rows strip media markers for a clean one-line preview.
+- **Card is a true two-sided flip card** (`DeckoCard`): a clean **front** (word +
+  word-audio only, centered prompt) that **3D-flips** (rotateY, ~460ms) on tap /
+  "Show answer" to a **distinct back** (reading, meaning prominent, image, and the
+  example box with sentence + sentence-audio). The word is NOT repeated on the
+  back — it's the other side, not a taller front. Tap the card to flip.
+- **`DeckoConfirmDialog`** (`core/widgets/`) — the on-brand replacement for stock
+  `AlertDialog`: rounded surface, icon medallion, full-width confirm + text
+  cancel; `destructive` flag colours it with the error scheme. Use for all
+  confirmations (deck delete uses it).
+- **Icons** — all icons are Font Awesome free (`FaIcon` + `FontAwesomeIcons.*`,
+  typed `FaIconData`); fixed-size icon containers set `alignment: Alignment.center`
+  (FA glyphs aren't auto-padded like Material icons). New icons follow suit (DEC-015).
 - Reusable-component note: a **floating bottom nav bar** is a proposed future
   direction (rounded, elevated, active-tab-labelled) — would need a
   `StatefulShellRoute` refactor; tracked in ROADMAP Deferred Notes, not built.

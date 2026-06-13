@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/decko_spacing.dart';
+import '../../../core/content/anki_content.dart';
 import '../../../core/widgets/furigana_text.dart';
 import '../../../domain/learning_item.dart';
 
@@ -23,8 +24,8 @@ class SampleItemRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 FuriganaText(
-                  item.front,
-                  showReadings: false, // compact base text in the list
+                  stripMedia(item.front), // compact base text, no media markers
+                  showReadings: false,
                   baseStyle: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w600),
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../../core/constants/decko_spacing.dart';
 import '../../../core/constants/decko_strings.dart';
@@ -32,8 +33,8 @@ class EmptyLibraryCard extends StatelessWidget {
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(DeckoRadii.md),
               ),
-              child: Icon(
-                Icons.style_rounded,
+              child: FaIcon(
+                FontAwesomeIcons.layerGroup,
                 size: 36,
                 color: theme.colorScheme.onPrimaryContainer,
               ),
@@ -54,13 +55,13 @@ class EmptyLibraryCard extends StatelessWidget {
             const SizedBox(height: DeckoSpacing.xl),
             FilledButton.icon(
               onPressed: onImport,
-              icon: const Icon(Icons.add_rounded),
+              icon: const FaIcon(FontAwesomeIcons.plus),
               label: const Text(DeckoStrings.importCta),
             ),
             const SizedBox(height: DeckoSpacing.md),
             OutlinedButton.icon(
               onPressed: onDemo,
-              icon: const Icon(Icons.play_arrow_rounded),
+              icon: const FaIcon(FontAwesomeIcons.play),
               label: const Text(DeckoStrings.demoCta),
             ),
           ],

@@ -14,6 +14,9 @@ class DeckImportPreview {
     required this.hasProgressData,
     this.approxDueToday,
     this.notes = const <String>[],
+    this.mediaFiles = 0,
+    this.audioRefs = 0,
+    this.imageRefs = 0,
   });
 
   final String deckName;
@@ -30,4 +33,12 @@ class DeckImportPreview {
 
   /// Caveats worth surfacing (e.g. multiple decks collapsed into one).
   final List<String> notes;
+
+  /// Number of media payloads in the package, and how many cards reference
+  /// audio / images.
+  final int mediaFiles;
+  final int audioRefs;
+  final int imageRefs;
+
+  bool get hasMedia => mediaFiles > 0 || audioRefs > 0 || imageRefs > 0;
 }

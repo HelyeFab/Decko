@@ -1,339 +1,298 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme/card_theme_config.dart';
 import '../../domain/learning_item.dart';
 import '../constants/decko_spacing.dart';
-import 'furigana_text.dart';
+import 'decko_field_content.dart';
 
-/// Renders a [LearningItem] in one of Decko's card themes.
+/// A two-sided flashcard that **flips** between a clean prompt (front) and a
+/// distinct answer (back) with a 3D rotation — not a front that grows taller.
 ///
-/// Shared by the review screen and the theme gallery. Japanese text with
-/// furigana (`漢字[かな]`) renders as ruby via [FuriganaText]; [showFurigana]
-/// toggles the readings. The example sentence is given prominence — it's the
-/// most useful part of a vocab card.
-class DeckoCard extends StatelessWidget {
+/// Front = the word + its audio. Back = meaning, reading, image, and the
+/// example sentence. Fields render via [DeckoFieldContent] (furigana, audio,
+/// images). [showFurigana] toggles readings.
+class DeckoCard extends StatefulWidget {
   const DeckoCard({
     super.key,
     required this.item,
+    required this.deckId,
     required this.style,
     this.revealed = false,
     this.showFurigana = true,
   });
 
   final LearningItem item;
+  final String deckId;
   final CardThemeStyle style;
   final bool revealed;
   final bool showFurigana;
 
   @override
-  Widget build(BuildContext context) {
-    return switch (style) {
-      CardThemeStyle.minimal =>
-        _MinimalCard(item: item, revealed: revealed, furigana: showFurigana),
-      CardThemeStyle.detailed =>
-        _DetailedCard(item: item, revealed: revealed, furigana: showFurigana),
-      CardThemeStyle.game =>
-        _GameCard(item: item, revealed: revealed, furigana: showFurigana),
-    };
-  }
+  State<DeckoCard> createState() => _DeckoCardState();
 }
 
-/// The example block: the Japanese sentence prominent, translation muted.
-class _ExampleBlock extends StatelessWidget {
-  const _ExampleBlock({
-    required this.example,
-    required this.furigana,
-    this.center = false,
-  });
+class _DeckoCardState extends State<DeckoCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _flip = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+    value: widget.revealed ? 1 : 0,
+  );
 
-  final String example;
-  final bool furigana;
-  final bool center;
+  @override
+  void didUpdateWidget(DeckoCard old) {
+    super.didUpdateWidget(old);
+    if (widget.revealed != old.revealed) {
+      widget.revealed ? _flip.forward() : _flip.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _flip.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final List<String> lines = example.split('\n');
-    final String sentence = lines.first;
-    final String translation = lines.skip(1).join(' ').trim();
-    final TextAlign align = center ? TextAlign.center : TextAlign.start;
+    final Widget front = _PromptFace(
+      item: widget.item,
+      deckId: widget.deckId,
+      style: widget.style,
+      furigana: widget.showFurigana,
+    );
+    final Widget back = _AnswerFace(
+      item: widget.item,
+      deckId: widget.deckId,
+      style: widget.style,
+      furigana: widget.showFurigana,
+    );
 
-    return Column(
-      crossAxisAlignment:
-          center ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-      children: <Widget>[
-        FuriganaText(
-          sentence,
-          showReadings: furigana,
-          align: align,
-          baseStyle: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            height: 1.3,
-          ),
-        ),
-        if (translation.isNotEmpty) ...<Widget>[
-          const SizedBox(height: DeckoSpacing.sm),
-          Text(
-            translation,
-            textAlign: align,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ],
+    return AnimatedBuilder(
+      animation: _flip,
+      builder: (BuildContext context, _) {
+        final double angle = _flip.value * math.pi;
+        final bool showFront = angle <= math.pi / 2;
+        final Matrix4 transform = Matrix4.identity()
+          ..setEntry(3, 2, 0.0012)
+          ..rotateY(angle);
+        return Transform(
+          alignment: Alignment.center,
+          transform: transform,
+          child: showFront
+              ? front
+              : Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()..rotateY(math.pi),
+                  child: back,
+                ),
+        );
+      },
     );
   }
 }
 
-class _MinimalCard extends StatelessWidget {
-  const _MinimalCard({
-    required this.item,
-    required this.revealed,
-    required this.furigana,
-  });
+/// A card surface (rounded, themed; gradient for the playful "game" theme),
+/// sized so front and back read as the same physical card.
+class _CardFace extends StatelessWidget {
+  const _CardFace({required this.child, required this.style});
 
-  final LearningItem item;
-  final bool revealed;
-  final bool furigana;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DeckoSpacing.xl,
-          vertical: DeckoSpacing.xxxl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            FuriganaText(
-              item.front,
-              showReadings: furigana,
-              align: TextAlign.center,
-              baseStyle: theme.textTheme.displaySmall
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            if (item.reading != null && furigana) ...<Widget>[
-              const SizedBox(height: DeckoSpacing.sm),
-              Text(
-                item.reading!,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-            if (revealed) ...<Widget>[
-              const SizedBox(height: DeckoSpacing.xl),
-              Divider(color: theme.colorScheme.outlineVariant),
-              const SizedBox(height: DeckoSpacing.xl),
-              Text(
-                item.back,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (item.example != null) ...<Widget>[
-                const SizedBox(height: DeckoSpacing.xl),
-                _ExampleBlock(
-                  example: item.example!,
-                  furigana: furigana,
-                  center: true,
-                ),
-              ],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailedCard extends StatelessWidget {
-  const _DetailedCard({
-    required this.item,
-    required this.revealed,
-    required this.furigana,
-  });
-
-  final LearningItem item;
-  final bool revealed;
-  final bool furigana;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(DeckoSpacing.xl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(
-                  child: FuriganaText(
-                    item.front,
-                    showReadings: furigana,
-                    baseStyle: theme.textTheme.headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-                if (item.reading != null && furigana)
-                  Chip(
-                    label: Text(item.reading!),
-                    visualDensity: VisualDensity.compact,
-                  ),
-              ],
-            ),
-            const SizedBox(height: DeckoSpacing.lg),
-            _LabelledRow(
-              label: 'Meaning',
-              child: Text(
-                revealed ? item.back : 'Tap to reveal',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: revealed
-                      ? theme.colorScheme.onSurface
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            if (item.example != null && revealed) ...<Widget>[
-              const SizedBox(height: DeckoSpacing.lg),
-              _LabelledRow(
-                label: 'Example',
-                child: _ExampleBlock(example: item.example!, furigana: furigana),
-              ),
-            ],
-            if (item.tags.isNotEmpty) ...<Widget>[
-              const SizedBox(height: DeckoSpacing.lg),
-              Wrap(
-                spacing: DeckoSpacing.sm,
-                children: <Widget>[
-                  for (final String tag in item.tags)
-                    Chip(
-                      label: Text('#$tag'),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LabelledRow extends StatelessWidget {
-  const _LabelledRow({required this.label, required this.child});
-
-  final String label;
   final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          label.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: DeckoSpacing.xs),
-        child,
-      ],
-    );
-  }
-}
-
-class _GameCard extends StatelessWidget {
-  const _GameCard({
-    required this.item,
-    required this.revealed,
-    required this.furigana,
-  });
-
-  final LearningItem item;
-  final bool revealed;
-  final bool furigana;
+  final CardThemeStyle style;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(DeckoSpacing.xl),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(DeckoRadii.lg),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[scheme.primary, scheme.tertiary],
+    final bool game = style == CardThemeStyle.game;
+    final Widget content = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 260),
+      child: Padding(
+        padding: const EdgeInsets.all(DeckoSpacing.xl),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[child]),
+          ),
         ),
       ),
+    );
+
+    if (game) {
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(DeckoRadii.lg),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[scheme.primary, scheme.tertiary],
+          ),
+        ),
+        child: content,
+      );
+    }
+    return Card(child: SizedBox(width: double.infinity, child: content));
+  }
+}
+
+class _PromptFace extends StatelessWidget {
+  const _PromptFace({
+    required this.item,
+    required this.deckId,
+    required this.style,
+    required this.furigana,
+  });
+
+  final LearningItem item;
+  final String deckId;
+  final CardThemeStyle style;
+  final bool furigana;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final Color onSurface = style == CardThemeStyle.game
+        ? theme.colorScheme.onPrimary
+        : theme.colorScheme.onSurface;
+    return _CardFace(
+      style: style,
+      child: DeckoFieldContent(
+        item.front,
+        deckId: deckId,
+        showFurigana: furigana,
+        align: TextAlign.center,
+        baseStyle: theme.textTheme.displaySmall
+            ?.copyWith(fontWeight: FontWeight.w600, color: onSurface),
+      ),
+    );
+  }
+}
+
+class _AnswerFace extends StatelessWidget {
+  const _AnswerFace({
+    required this.item,
+    required this.deckId,
+    required this.style,
+    required this.furigana,
+  });
+
+  final LearningItem item;
+  final String deckId;
+  final CardThemeStyle style;
+  final bool furigana;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool game = style == CardThemeStyle.game;
+    final Color onSurface =
+        game ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+    final Color muted = game
+        ? theme.colorScheme.onPrimary.withValues(alpha: 0.85)
+        : theme.colorScheme.onSurfaceVariant;
+
+    return _CardFace(
+      style: style,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(Icons.bolt_rounded, color: scheme.onPrimary, size: 20),
-              const SizedBox(width: DeckoSpacing.xs),
-              Text(
-                'CHALLENGE',
-                style: textTheme.labelMedium?.copyWith(
-                  color: scheme.onPrimary,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          if (item.reading != null) ...<Widget>[
+            DeckoFieldContent(
+              item.reading!,
+              deckId: deckId,
+              showFurigana: furigana,
+              align: TextAlign.center,
+              baseStyle: theme.textTheme.titleMedium?.copyWith(color: muted),
+            ),
+            const SizedBox(height: DeckoSpacing.sm),
+          ],
+          DeckoFieldContent(
+            item.back,
+            deckId: deckId,
+            showFurigana: furigana,
+            align: TextAlign.center,
+            baseStyle: theme.textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w700, color: onSurface),
           ),
-          const SizedBox(height: DeckoSpacing.xl),
-          FuriganaText(
-            item.front,
-            showReadings: furigana,
-            baseStyle: textTheme.displaySmall?.copyWith(
-              color: scheme.onPrimary,
+          if (item.example != null) ...<Widget>[
+            const SizedBox(height: DeckoSpacing.xl),
+            _ExampleSection(
+              example: item.example!,
+              deckId: deckId,
+              furigana: furigana,
+              onGame: game,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The example sentence in its own clearly-separated, labelled box.
+class _ExampleSection extends StatelessWidget {
+  const _ExampleSection({
+    required this.example,
+    required this.deckId,
+    required this.furigana,
+    this.onGame = false,
+  });
+
+  final String example;
+  final String deckId;
+  final bool furigana;
+  final bool onGame;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final List<String> lines = example.split('\n');
+    final String sentence = lines.first;
+    final String translation = lines.skip(1).join(' ').trim();
+    final Color boxColor =
+        onGame ? scheme.onPrimary.withValues(alpha: 0.16) : scheme.surfaceContainerHighest;
+    final Color onBox = onGame ? scheme.onPrimary : scheme.onSurface;
+    final Color label =
+        onGame ? scheme.onPrimary.withValues(alpha: 0.85) : scheme.onSurfaceVariant;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(DeckoSpacing.lg),
+      decoration: BoxDecoration(
+        color: boxColor,
+        borderRadius: BorderRadius.circular(DeckoRadii.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Text(
+            'EXAMPLE',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: label,
+              letterSpacing: 1.0,
               fontWeight: FontWeight.w700,
             ),
           ),
-          if (item.reading != null && furigana) ...<Widget>[
-            const SizedBox(height: DeckoSpacing.xs),
+          const SizedBox(height: DeckoSpacing.md),
+          DeckoFieldContent(
+            sentence,
+            deckId: deckId,
+            showFurigana: furigana,
+            align: TextAlign.center,
+            baseStyle: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w600, height: 1.3, color: onBox),
+          ),
+          if (translation.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeckoSpacing.sm),
             Text(
-              item.reading!,
-              style: textTheme.titleMedium?.copyWith(
-                color: scheme.onPrimary.withValues(alpha: 0.85),
-              ),
+              translation,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: label),
             ),
           ],
-          const SizedBox(height: DeckoSpacing.xl),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(DeckoSpacing.lg),
-            decoration: BoxDecoration(
-              color: scheme.onPrimary.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(DeckoRadii.md),
-            ),
-            child: Text(
-              revealed ? item.back : 'Reveal to score XP',
-              style: textTheme.titleLarge?.copyWith(
-                color: scheme.onPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
         ],
       ),
     );

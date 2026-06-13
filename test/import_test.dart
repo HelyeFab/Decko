@@ -4,6 +4,7 @@
 // valid Anki collection with sqlite3 and zips it with `archive`, so the parser
 // is exercised end-to-end on the host (system libsqlite3 on macOS).
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -11,6 +12,8 @@ import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
+
+import 'package:decko/domain/repositories/media_store.dart';
 
 import 'package:decko/data/import/anki_apkg_import_adapter.dart';
 import 'package:decko/data/imported_deck_storage.dart';
@@ -22,11 +25,25 @@ import 'package:decko/domain/import/imported_card_state.dart';
 
 final String _fs = String.fromCharCode(0x1f); // Anki field separator
 
+class _FakeMediaStore implements MediaStore {
+  final Map<String, Uint8List> saved = <String, Uint8List>{};
+  @override
+  Future<void> saveMedia(String deckId, String fileName, Uint8List bytes) async =>
+      saved['$deckId/$fileName'] = bytes;
+  @override
+  Future<String?> resolveMedia(String deckId, String fileName) async =>
+      saved.containsKey('$deckId/$fileName') ? '$deckId/$fileName' : null;
+  @override
+  Future<void> deleteMediaForDeck(String deckId) async =>
+      saved.removeWhere((String k, _) => k.startsWith('$deckId/'));
+}
+
 /// Builds a `.apkg` (zip with a `collection.anki21` SQLite DB) from card specs.
 /// Each card spec: [type, queue, reps, ivl, factor], with fields front/back/ex.
 Uint8List _buildApkg({
   required String deckName,
   required List<_CardSpec> cards,
+  Map<String, List<int>> media = const <String, List<int>>{},
 }) {
   final Directory tmp = Directory.systemTemp.createTempSync('decko_fixture');
   final String path = '${tmp.path}/collection.anki21';
@@ -62,9 +79,18 @@ Uint8List _buildApkg({
   final Uint8List dbBytes = File(path).readAsBytesSync();
   tmp.deleteSync(recursive: true);
 
+  // Media: numbered payload files + the `media` JSON mapping (numbered->name).
+  final Map<String, String> mediaMap = <String, String>{};
   final Archive archive = Archive()
-    ..addFile(ArchiveFile('collection.anki21', dbBytes.length, dbBytes))
-    ..addFile(ArchiveFile('media', 2, '{}'.codeUnits));
+    ..addFile(ArchiveFile('collection.anki21', dbBytes.length, dbBytes));
+  int n = 0;
+  media.forEach((String name, List<int> bytes) {
+    archive.addFile(ArchiveFile('$n', bytes.length, bytes));
+    mediaMap['$n'] = name;
+    n++;
+  });
+  final List<int> mediaJson = jsonEncode(mediaMap).codeUnits;
+  archive.addFile(ArchiveFile('media', mediaJson.length, mediaJson));
   return Uint8List.fromList(ZipEncoder().encode(archive));
 }
 
@@ -236,13 +262,51 @@ void main() {
         keepProgress: false, importedAt: DateTime(2026, 6, 12));
     final item = deck.items.single;
 
-    expect(item.front, '会社[かいしゃ]'); // furigana preserved as bracket notation
-    expect(item.reading, isNull); // furigana is inline now, not a separate field
+    expect(item.front, contains('会社[かいしゃ]')); // furigana preserved
+    expect(item.front, contains('[sound:word_101.wav]')); // word audio kept
+    expect(item.reading, isNull);
     expect(item.back, 'n - company; office'); // first back line only
     expect(item.example, contains('会社[かいしゃ]どう？'));
     expect(item.example, contains("How's work?"));
+    expect(item.example, contains('[sound:sentence_101.wav]')); // sentence audio kept
     expect(item.example, isNot(contains('jp500'))); // id dropped
-    expect(item.example, isNot(contains('sound'))); // audio dropped
+  });
+
+  test('extracts media, counts refs, and keeps media markers on the card',
+      () async {
+    final Uint8List bytes = _buildApkg(
+      deckName: 'Media Deck',
+      cards: const <_CardSpec>[
+        _CardSpec(
+          type: 0,
+          queue: 0,
+          front: '食[た]べる [sound:taberu.mp3] <img src="taberu.jpg">',
+          back: 'to eat',
+          field2: '',
+        ),
+      ],
+      media: <String, List<int>>{
+        'taberu.mp3': <int>[1, 2, 3],
+        'taberu.jpg': <int>[4, 5, 6],
+      },
+    );
+
+    final DeckImportPreview p = await adapter.preview(bytes);
+    expect(p.mediaFiles, 2);
+    expect(p.audioRefs, 1);
+    expect(p.imageRefs, 1);
+
+    final _FakeMediaStore store = _FakeMediaStore();
+    final Deck deck = await adapter.importDeck(bytes,
+        keepProgress: false, importedAt: DateTime(2026, 6, 13), mediaStore: store);
+
+    // Media saved under the deck id; markers preserved on the card.
+    expect(store.saved.keys, containsAll(<String>[
+      '${deck.id}/taberu.mp3',
+      '${deck.id}/taberu.jpg',
+    ]));
+    expect(deck.items.first.front, contains('[sound:taberu.mp3]'));
+    expect(deck.items.first.front, contains('<img src="taberu.jpg">'));
   });
 
   test('imported decks survive a storage round-trip', () async {

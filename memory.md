@@ -4,9 +4,20 @@
 2026-06-12
 
 ## Current stage
-MVP_007 complete: FSRS-5 scheduler replaces the temporary policy. Awaiting approval.
+MVP_008 complete: Anki media import + rendering (audio + images). Awaiting approval.
 
-## Last completed (MVP_007)
+## Last completed (MVP_008)
+- Deps: path_provider, audioplayers (DEC-014).
+- `MediaStore` interface + `FileMediaStore` (app support dir /decko_media/<deckId>/<file>; injectable baseDir for tests). Exposed via DeckoApp.mediaOf.
+- Importer: reads package `media` map, extracts every payload to MediaStore under original name (single decode; one file at a time); preview reports mediaFiles/audioRefs/imageRefs.
+- Field cleaning now PRESERVES `[sound:x]` and normalised `<img src="x">` (+ furigana); media in separate note fields gathered onto the front. Fixed example-fallback bug (required `_hasJapanese` so it won't pick id fields like `item:435851`).
+- `core/content/anki_content.dart`: parseAnkiContent → text/audio/image segments; stripMedia, mediaMarkers, counts. `DeckoFieldContent` renders them (FuriganaText / AudioButton via audioplayers / Image.file). DeckoCard takes deckId, uses DeckoFieldContent for front/back/example.
+- Swipe-delete also deletes the deck's media. SampleItemRow strips media.
+- Verified on real "+ Images" deck: 999 cards, 597 media, front gets audio+image markers, no junk example.
+- Follow-ups (post-test): (1) card layout — meaning now prominent (headlineSmall), example in a labelled tinted box (`_ExampleSection`) so word-meaning and sentence don't blur; (2) ALL icons → Font Awesome free (`font_awesome_flutter`, FaIcon/FaIconData) DEC-015; centered fixed-size icon containers (deck tile, badge) with `alignment: Alignment.center`. 54 tests, analyze clean.
+- Known nuance: Core 2k Optimized has an 11-field note with a pitch-accent SVG in the reading field; mapping survives via collapseRepeat but SVG-derived readings could occasionally be imperfect (not addressed).
+
+## Earlier (MVP_007)
 - `ReviewSchedulingPolicy` is now an INTERFACE; `FsrsSchedulingPolicy` (lib/data/) is a pure-Dart FSRS-5 impl with default weights (no dependency). Injected into the review screen (default FSRS); UI has no scheduling maths (DEC-013).
 - `ReviewCardState` gained nullable `stability`/`difficulty`/`schedulerVersion` (safe migration; serialized in SharedPrefsReviewStateRepository).
 - Imported/legacy cards: scheduler only runs on grade, so un-reviewed cards keep imported due dates; first grade seeds S/D from interval/ease/lapses — never reset (DEC-005).

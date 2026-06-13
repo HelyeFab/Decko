@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../constants/decko_spacing.dart';
 
@@ -13,7 +14,7 @@ class AchievementBadge extends StatelessWidget {
     this.earned = false,
   });
 
-  final IconData icon;
+  final FaIconData icon;
   final String label;
   final bool earned;
 
@@ -30,12 +31,13 @@ class AchievementBadge extends StatelessWidget {
           Container(
             height: 64,
             width: 64,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: earned ? scheme.primary : scheme.surfaceContainerHighest,
               border: Border.all(color: ring, width: 2),
             ),
-            child: Icon(icon, color: fg, size: 28),
+            child: FaIcon(icon, color: fg, size: 26),
           ),
           const SizedBox(height: DeckoSpacing.sm),
           SizedBox(

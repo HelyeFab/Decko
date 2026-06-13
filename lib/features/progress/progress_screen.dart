@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../app/decko_app.dart';
 import '../../core/constants/decko_spacing.dart';
@@ -66,7 +67,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         children: <Widget>[
           Expanded(
             child: _StatCard(
-              icon: Icons.local_fire_department_rounded,
+              icon: FontAwesomeIcons.fire,
               value: '${s.currentStreakDays} '
                   '${s.currentStreakDays == 1 ? 'day' : 'days'}',
               label: 'Current streak',
@@ -75,7 +76,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           const SizedBox(width: DeckoSpacing.md),
           Expanded(
             child: _StatCard(
-              icon: Icons.task_alt_rounded,
+              icon: FontAwesomeIcons.listCheck,
               value: '${s.cardsReviewedToday}',
               label: 'Cards reviewed today',
             ),
@@ -129,8 +130,8 @@ class _EmptyProgress extends StatelessWidget {
                 color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(DeckoRadii.md),
               ),
-              child: Icon(
-                Icons.rocket_launch_rounded,
+              child: FaIcon(
+                FontAwesomeIcons.rocket,
                 size: 36,
                 color: theme.colorScheme.onPrimaryContainer,
               ),
@@ -243,7 +244,7 @@ class _StatCard extends StatelessWidget {
     required this.label,
   });
 
-  final IconData icon;
+  final FaIconData icon;
   final String value;
   final String label;
 
@@ -256,7 +257,7 @@ class _StatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Icon(icon, color: theme.colorScheme.primary),
+            FaIcon(icon, color: theme.colorScheme.primary),
             const SizedBox(height: DeckoSpacing.md),
             Text(
               value,
@@ -375,17 +376,17 @@ class _BadgeRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         AchievementBadge(
-          icon: Icons.flag_rounded,
+          icon: FontAwesomeIcons.flag,
           label: 'First Review',
           earned: snapshot.hasProgress,
         ),
         AchievementBadge(
-          icon: Icons.workspace_premium_rounded,
+          icon: FontAwesomeIcons.medal,
           label: 'Perfect Round',
           earned: perfectRound,
         ),
         AchievementBadge(
-          icon: Icons.local_fire_department_rounded,
+          icon: FontAwesomeIcons.fire,
           label: 'Three Day Streak',
           earned: snapshot.currentStreakDays >= 3,
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/deck_store.dart';
@@ -6,6 +7,7 @@ import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/constants/decko_strings.dart';
+import '../../core/widgets/decko_confirm_dialog.dart';
 import '../../core/widgets/decko_snackbar.dart';
 import '../../core/widgets/promise_tile.dart';
 import '../../core/widgets/section_header.dart';
@@ -21,11 +23,11 @@ import 'widgets/empty_library_card.dart';
 class DeckLibraryScreen extends StatelessWidget {
   const DeckLibraryScreen({super.key});
 
-  static const List<IconData> _promiseIcons = <IconData>[
-    Icons.schedule_rounded,
-    Icons.palette_rounded,
-    Icons.local_fire_department_rounded,
-    Icons.extension_rounded,
+  static const List<FaIconData> _promiseIcons = <FaIconData>[
+    FontAwesomeIcons.clock,
+    FontAwesomeIcons.palette,
+    FontAwesomeIcons.fire,
+    FontAwesomeIcons.puzzlePiece,
   ];
 
   @override
@@ -49,12 +51,12 @@ class DeckLibraryScreen extends StatelessWidget {
         actions: <Widget>[
           IconButton(
             tooltip: 'Theme gallery',
-            icon: const Icon(Icons.palette_outlined),
+            icon: const FaIcon(FontAwesomeIcons.palette),
             onPressed: () => context.push(DeckoRoutes.themes),
           ),
           IconButton(
             tooltip: 'Progress',
-            icon: const Icon(Icons.insights_rounded),
+            icon: const FaIcon(FontAwesomeIcons.chartLine),
             onPressed: () => context.push(DeckoRoutes.progress),
           ),
           const SizedBox(width: DeckoSpacing.sm),
@@ -137,13 +139,13 @@ class _DeckList extends StatelessWidget {
         const SizedBox(height: DeckoSpacing.sm),
         FilledButton.icon(
           onPressed: onImport,
-          icon: const Icon(Icons.add_rounded),
+          icon: const FaIcon(FontAwesomeIcons.plus),
           label: const Text(DeckoStrings.importCta),
         ),
         const SizedBox(height: DeckoSpacing.md),
         OutlinedButton.icon(
           onPressed: onDemo,
-          icon: const Icon(Icons.play_arrow_rounded),
+          icon: const FaIcon(FontAwesomeIcons.play),
           label: const Text(DeckoStrings.demoCta),
         ),
       ],
@@ -160,36 +162,22 @@ class _DeckListItem extends StatelessWidget {
 
   void _open(BuildContext context) => context.push(DeckoRoutes.deck(deck.id));
 
-  Future<bool> _confirmDelete(BuildContext context) async {
-    final bool? ok = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text('Delete “${deck.name}”?'),
-        content: const Text(
-          'This removes the deck and its review progress from Decko. '
+  Future<bool> _confirmDelete(BuildContext context) {
+    return DeckoConfirmDialog.show(
+      context,
+      icon: FontAwesomeIcons.trashCan,
+      title: 'Delete “${deck.name}”?',
+      message: 'This removes the deck and its review progress from Decko. '
           'Your original Anki file is untouched.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete deck',
+      destructive: true,
     );
-    return ok ?? false;
   }
 
   void _delete(BuildContext context) {
     DeckoApp.deckStoreOf(context).removeImportedDeck(deck.id);
     DeckoApp.reviewStateOf(context).resetDeckStates(deck.id);
+    DeckoApp.mediaOf(context).deleteMediaForDeck(deck.id);
     DeckoSnackbar.showInfo(context, 'Deleted “${deck.name}”.');
   }
 
@@ -211,7 +199,7 @@ class _DeckListItem extends StatelessWidget {
           color: scheme.errorContainer,
           borderRadius: BorderRadius.circular(DeckoRadii.lg),
         ),
-        child: Icon(Icons.delete_outline_rounded,
+        child: FaIcon(FontAwesomeIcons.trashCan,
             color: scheme.onErrorContainer),
       ),
       child: tile,
@@ -222,7 +210,7 @@ class _DeckListItem extends StatelessWidget {
 class _PromiseGrid extends StatelessWidget {
   const _PromiseGrid({required this.icons});
 
-  final List<IconData> icons;
+  final List<FaIconData> icons;
 
   @override
   Widget build(BuildContext context) {

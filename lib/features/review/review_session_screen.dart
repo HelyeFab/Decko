@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/decko_app.dart';
@@ -190,12 +191,12 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     if (session.isEmpty) {
       return widget.deck.isEmpty
           ? _CaughtUpState(
-              icon: Icons.inbox_rounded,
+              icon: FontAwesomeIcons.inbox,
               title: 'This deck has no cards yet.',
               onBackToDeck: _leave,
             )
           : _CaughtUpState(
-              icon: Icons.check_circle_rounded,
+              icon: FontAwesomeIcons.circleCheck,
               title: 'All caught up.',
               subtitle: 'No cards are due right now.',
               onBackToDeck: _leave,
@@ -226,16 +227,21 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
           Expanded(
             child: Center(
               child: SingleChildScrollView(
-                child: ValueListenableBuilder<bool>(
-                  valueListenable: DeckoApp.furiganaOf(context),
-                  builder: (BuildContext context, bool furigana, _) {
-                    return DeckoCard(
-                      item: session.currentItem!,
-                      style: _cardStyle,
-                      revealed: _revealed,
-                      showFurigana: furigana,
-                    );
-                  },
+                child: GestureDetector(
+                  // Tap to flip either way (front ⇄ back).
+                  onTap: () => setState(() => _revealed = !_revealed),
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: DeckoApp.furiganaOf(context),
+                    builder: (BuildContext context, bool furigana, _) {
+                      return DeckoCard(
+                        item: session.currentItem!,
+                        deckId: widget.deck.id,
+                        style: _cardStyle,
+                        revealed: _revealed,
+                        showFurigana: furigana,
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -244,7 +250,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
           if (!_revealed)
             FilledButton.icon(
               onPressed: _reveal,
-              icon: const Icon(Icons.visibility_rounded),
+              icon: const FaIcon(FontAwesomeIcons.eye),
               label: const Text('Show answer'),
             )
           else ...<Widget>[
@@ -270,7 +276,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
         return IconButton(
           tooltip: on ? 'Hide furigana' : 'Show furigana',
           isSelected: on,
-          icon: const Icon(Icons.translate_rounded),
+          icon: const FaIcon(FontAwesomeIcons.language),
           onPressed: controller.toggle,
         );
       },
@@ -280,7 +286,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   Widget _cardThemeMenu() {
     return PopupMenuButton<CardThemeStyle>(
       tooltip: 'Card theme',
-      icon: const Icon(Icons.style_outlined),
+      icon: const FaIcon(FontAwesomeIcons.layerGroup),
       initialValue: _cardStyle,
       onSelected: (CardThemeStyle style) =>
           setState(() => _cardStyle = style),
@@ -348,7 +354,7 @@ class _CaughtUpState extends StatelessWidget {
     this.subtitle,
   });
 
-  final IconData icon;
+  final FaIconData icon;
   final String title;
   final String? subtitle;
   final VoidCallback onBackToDeck;
@@ -362,7 +368,7 @@ class _CaughtUpState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 56, color: theme.colorScheme.primary),
+            FaIcon(icon, size: 56, color: theme.colorScheme.primary),
             const SizedBox(height: DeckoSpacing.lg),
             Text(
               title,
@@ -383,7 +389,7 @@ class _CaughtUpState extends StatelessWidget {
             const SizedBox(height: DeckoSpacing.xl),
             OutlinedButton.icon(
               onPressed: onBackToDeck,
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: const FaIcon(FontAwesomeIcons.arrowLeft),
               label: const Text('Back to deck'),
             ),
           ],

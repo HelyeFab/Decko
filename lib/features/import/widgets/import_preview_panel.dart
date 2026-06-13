@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../../core/constants/decko_spacing.dart';
 import '../../../domain/import/deck_import_preview.dart';
@@ -69,6 +70,18 @@ class ImportPreviewPanel extends StatelessWidget {
                   label: 'Progress data',
                   value: hasProgress ? 'Available' : 'Not found',
                 ),
+                if (preview.hasMedia) ...<Widget>[
+                  if (preview.audioRefs > 0)
+                    _Stat(
+                        label: 'Audio references',
+                        value: '${preview.audioRefs}'),
+                  if (preview.imageRefs > 0)
+                    _Stat(
+                        label: 'Image references',
+                        value: '${preview.imageRefs}'),
+                  _Stat(
+                      label: 'Media files', value: '${preview.mediaFiles}'),
+                ],
               ],
             ),
           ),
@@ -91,13 +104,13 @@ class ImportPreviewPanel extends StatelessWidget {
           const SizedBox(height: DeckoSpacing.lg),
           FilledButton.icon(
             onPressed: onKeepProgress,
-            icon: const Icon(Icons.history_rounded),
+            icon: const FaIcon(FontAwesomeIcons.clockRotateLeft),
             label: const Text('Keep Anki progress'),
           ),
           const SizedBox(height: DeckoSpacing.md),
           OutlinedButton.icon(
             onPressed: onStartFresh,
-            icon: const Icon(Icons.fiber_new_rounded),
+            icon: const FaIcon(FontAwesomeIcons.seedling),
             label: const Text('Start fresh'),
           ),
         ] else ...<Widget>[
@@ -118,7 +131,7 @@ class ImportPreviewPanel extends StatelessWidget {
           const SizedBox(height: DeckoSpacing.lg),
           FilledButton.icon(
             onPressed: onStartFresh,
-            icon: const Icon(Icons.add_rounded),
+            icon: const FaIcon(FontAwesomeIcons.plus),
             label: const Text('Import as new'),
           ),
         ],

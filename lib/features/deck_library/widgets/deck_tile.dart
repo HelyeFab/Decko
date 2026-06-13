@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../../core/constants/decko_spacing.dart';
 import '../../../domain/deck.dart';
@@ -39,12 +40,14 @@ class DeckTile extends StatelessWidget {
                   Container(
                     height: 44,
                     width: 44,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: scheme.primaryContainer,
                       borderRadius: BorderRadius.circular(DeckoRadii.md),
                     ),
-                    child: Icon(
-                      Icons.style_rounded,
+                    child: FaIcon(
+                      FontAwesomeIcons.layerGroup,
+                      size: 20,
                       color: scheme.onPrimaryContainer,
                     ),
                   ),
@@ -66,7 +69,7 @@ class DeckTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded,
+                  FaIcon(FontAwesomeIcons.chevronRight,
                       color: scheme.onSurfaceVariant),
                 ],
               ),
@@ -85,12 +88,12 @@ class DeckTile extends StatelessWidget {
                 runSpacing: DeckoSpacing.sm,
                 children: <Widget>[
                   _MetaChip(
-                    icon: Icons.layers_rounded,
+                    icon: FontAwesomeIcons.layerGroup,
                     label: '${deck.itemCount} '
                         '${deck.itemCount == 1 ? 'card' : 'cards'}',
                   ),
                   const _MetaChip(
-                    icon: Icons.play_circle_outline_rounded,
+                    icon: FontAwesomeIcons.circlePlay,
                     label: 'Ready to review',
                   ),
                 ],
@@ -125,7 +128,7 @@ class _SourceLabel extends StatelessWidget {
 class _MetaChip extends StatelessWidget {
   const _MetaChip({required this.icon, required this.label});
 
-  final IconData icon;
+  final FaIconData icon;
   final String label;
 
   @override
@@ -143,7 +146,7 @@ class _MetaChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
+          FaIcon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: DeckoSpacing.xs),
           Text(
             label,

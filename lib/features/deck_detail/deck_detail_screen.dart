@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/decko_app.dart';
@@ -135,7 +136,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
             const SizedBox(height: DeckoSpacing.xl),
             FilledButton.icon(
               onPressed: _startReview,
-              icon: const Icon(Icons.play_arrow_rounded),
+              icon: const FaIcon(FontAwesomeIcons.play),
               label: const Text('Start review'),
             ),
             const SizedBox(height: DeckoSpacing.md),
@@ -170,7 +171,7 @@ class _ProvenanceCard extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.download_done_rounded,
+          FaIcon(FontAwesomeIcons.download,
               color: theme.colorScheme.primary, size: 20),
           const SizedBox(width: DeckoSpacing.md),
           Expanded(

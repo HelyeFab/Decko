@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/constants/decko_strings.dart';
+import '../data/file_media_store.dart';
 import '../data/mock_deck_repository.dart';
 import '../data/shared_prefs_progress_repository.dart';
 import '../data/shared_prefs_review_state_repository.dart';
 import '../data/shared_prefs_settings_repository.dart';
 import '../domain/repositories/deck_repository.dart';
+import '../domain/repositories/media_store.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/review_state_repository.dart';
 import '../domain/repositories/settings_repository.dart';
@@ -31,12 +33,14 @@ class DeckoApp extends StatefulWidget {
     this.settingsRepository = const SharedPrefsSettingsRepository(),
     this.progressRepository = const SharedPrefsProgressRepository(),
     this.reviewStateRepository = const SharedPrefsReviewStateRepository(),
+    this.mediaStore = const FileMediaStore(),
   });
 
   final DeckRepository deckRepository;
   final SettingsRepository settingsRepository;
   final ProgressRepository progressRepository;
   final ReviewStateRepository reviewStateRepository;
+  final MediaStore mediaStore;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -55,6 +59,9 @@ class DeckoApp extends StatefulWidget {
 
   static ReviewStateRepository reviewStateOf(BuildContext context) =>
       _scopeOf(context).reviewStateRepository;
+
+  static MediaStore mediaOf(BuildContext context) =>
+      _scopeOf(context).mediaStore;
 
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
@@ -100,6 +107,7 @@ class _DeckoAppState extends State<DeckoApp> {
       deckStore: _deckStore,
       progressRepository: widget.progressRepository,
       reviewStateRepository: widget.reviewStateRepository,
+      mediaStore: widget.mediaStore,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -123,6 +131,7 @@ class _DeckoScope extends InheritedWidget {
     required this.deckStore,
     required this.progressRepository,
     required this.reviewStateRepository,
+    required this.mediaStore,
     required super.child,
   });
 
@@ -131,6 +140,7 @@ class _DeckoScope extends InheritedWidget {
   final DeckStore deckStore;
   final ProgressRepository progressRepository;
   final ReviewStateRepository reviewStateRepository;
+  final MediaStore mediaStore;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -138,5 +148,6 @@ class _DeckoScope extends InheritedWidget {
       furiganaController != oldWidget.furiganaController ||
       deckStore != oldWidget.deckStore ||
       progressRepository != oldWidget.progressRepository ||
-      reviewStateRepository != oldWidget.reviewStateRepository;
+      reviewStateRepository != oldWidget.reviewStateRepository ||
+      mediaStore != oldWidget.mediaStore;
 }

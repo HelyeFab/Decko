@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../app/decko_app.dart';
 import '../../app/theme/app_theme_config.dart';
@@ -123,10 +124,10 @@ class _AppThemeTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
+              FaIcon(
                 selected
-                    ? Icons.check_circle_rounded
-                    : Icons.circle_outlined,
+                    ? FontAwesomeIcons.circleCheck
+                    : FontAwesomeIcons.circle,
                 color: selected ? scheme.primary : scheme.outlineVariant,
               ),
             ],
@@ -207,6 +208,7 @@ class _CardThemePreview extends StatelessWidget {
         const SizedBox(height: DeckoSpacing.md),
         DeckoCard(
           item: MockDecks.sampleCard,
+          deckId: MockDecks.demoJapanese.id,
           style: config.style,
           revealed: true,
         ),

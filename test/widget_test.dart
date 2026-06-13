@@ -18,9 +18,14 @@ import 'package:decko/domain/repositories/deck_repository.dart';
 import 'package:decko/domain/repositories/progress_repository.dart';
 import 'package:decko/domain/import/deck_import_info.dart';
 import 'package:decko/domain/import/deck_import_preview.dart';
+import 'dart:typed_data';
+
+import 'package:decko/domain/repositories/media_store.dart';
 import 'package:decko/domain/repositories/review_state_repository.dart';
 import 'package:decko/domain/repositories/settings_repository.dart';
 import 'package:decko/domain/review_card_state.dart';
+import 'package:decko/app/theme/card_theme_config.dart';
+import 'package:decko/core/widgets/decko_card.dart';
 import 'package:decko/domain/review_session_result.dart';
 import 'package:decko/features/import/widgets/import_preview_panel.dart';
 
@@ -115,12 +120,27 @@ class _InMemoryReviewState implements ReviewStateRepository {
   Future<void> resetDeckStates(String deckId) async => _byDeck.remove(deckId);
 }
 
+/// In-memory media store so widget tests avoid path_provider.
+class _InMemoryMediaStore implements MediaStore {
+  final Map<String, Uint8List> _files = <String, Uint8List>{};
+  @override
+  Future<void> saveMedia(String deckId, String fileName, Uint8List bytes) async =>
+      _files['$deckId/$fileName'] = bytes;
+  @override
+  Future<String?> resolveMedia(String deckId, String fileName) async =>
+      _files.containsKey('$deckId/$fileName') ? '$deckId/$fileName' : null;
+  @override
+  Future<void> deleteMediaForDeck(String deckId) async =>
+      _files.removeWhere((String k, _) => k.startsWith('$deckId/'));
+}
+
 Future<void> _pumpApp(
   WidgetTester tester, {
   DeckRepository? deckRepository,
   SettingsRepository? settingsRepository,
   ProgressRepository? progressRepository,
   ReviewStateRepository? reviewStateRepository,
+  MediaStore? mediaStore,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   tester.view.physicalSize = const Size(420, 2400);
@@ -135,6 +155,7 @@ Future<void> _pumpApp(
           progressRepository ?? const SharedPrefsProgressRepository(),
       reviewStateRepository:
           reviewStateRepository ?? const SharedPrefsReviewStateRepository(),
+      mediaStore: mediaStore ?? _InMemoryMediaStore(),
     ),
   );
   await tester.pumpAndSettle();
@@ -479,6 +500,30 @@ void main() {
     expect(find.text('1'), findsOneWidget);
   });
 
+  testWidgets('Revealed card shows the example in a labelled box',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: DeckoCard(
+          item: LearningItem(
+            id: 'x',
+            front: '食[た]べる',
+            back: 'to eat',
+            example: '毎日食べます。\nI eat every day.',
+          ),
+          deckId: 'd',
+          style: CardThemeStyle.minimal,
+          revealed: true,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('to eat'), findsOneWidget); // meaning
+    expect(find.text('EXAMPLE'), findsOneWidget); // separated, labelled box
+    expect(find.text('I eat every day.'), findsOneWidget); // translation
+  });
+
   testWidgets('Swipe-left deletes an imported deck after confirmation',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(420, 2400);
@@ -496,16 +541,15 @@ void main() {
     );
     await const ImportedDeckStorage().save(<Deck>[imported]);
 
-    await tester.pumpWidget(const DeckoApp());
+    await tester.pumpWidget(DeckoApp(mediaStore: _InMemoryMediaStore()));
     await tester.pumpAndSettle();
     expect(find.text('Imported Z'), findsOneWidget);
 
     // Swipe the imported deck tile left, then confirm.
     await tester.fling(find.text('Imported Z'), const Offset(-600, 0), 1200);
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.textContaining('Delete'), findsWidgets);
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    expect(find.text('Delete deck'), findsOneWidget); // custom confirm dialog
+    await tester.tap(find.text('Delete deck'));
     await tester.pumpAndSettle();
 
     expect(find.text('Imported Z'), findsNothing);

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/deck_store.dart';
@@ -85,6 +86,7 @@ class _ImportScreenState extends State<ImportScreen> {
         bytes,
         keepProgress: keepProgress,
         importedAt: DateTime.now(),
+        mediaStore: DeckoApp.mediaOf(context),
       );
       await store.addImportedDeck(deck);
       // Seed per-card review state (keeps imported Anki progress, or starts new).
@@ -198,7 +200,7 @@ class _IdleOptions extends StatelessWidget {
               padding: const EdgeInsets.all(DeckoSpacing.lg),
               child: Row(
                 children: <Widget>[
-                  Icon(Icons.inventory_2_outlined,
+                  FaIcon(FontAwesomeIcons.boxArchive,
                       size: 28, color: theme.colorScheme.primary),
                   const SizedBox(width: DeckoSpacing.lg),
                   Expanded(
@@ -220,7 +222,7 @@ class _IdleOptions extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded),
+                  const FaIcon(FontAwesomeIcons.chevronRight),
                 ],
               ),
             ),
@@ -241,7 +243,7 @@ class _IdleOptions extends StatelessWidget {
           ),
           child: Row(
             children: <Widget>[
-              Icon(Icons.info_outline_rounded,
+              FaIcon(FontAwesomeIcons.circleInfo,
                   color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: DeckoSpacing.md),
               Expanded(
@@ -276,7 +278,7 @@ class _ComingSoonOption extends StatelessWidget {
           padding: const EdgeInsets.all(DeckoSpacing.lg),
           child: Row(
             children: <Widget>[
-              Icon(Icons.description_outlined,
+              FaIcon(FontAwesomeIcons.fileLines,
                   size: 28, color: theme.colorScheme.primary),
               const SizedBox(width: DeckoSpacing.lg),
               Expanded(
@@ -317,7 +319,7 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.error_outline_rounded,
+            FaIcon(FontAwesomeIcons.circleExclamation,
                 size: 56, color: theme.colorScheme.error),
             const SizedBox(height: DeckoSpacing.lg),
             Text(
