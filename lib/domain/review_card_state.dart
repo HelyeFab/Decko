@@ -7,9 +7,10 @@ enum ReviewQueueState { newCard, learning, review, relearning, suspended }
 /// Persistent, per-card local review state.
 ///
 /// Framework-light. This is Decko's neutral scheduling state — populated from
-/// imported Anki progress on import, then advanced by the (temporary)
-/// [ReviewSchedulingPolicy] as the user grades cards. It is FSRS-ready: a real
-/// scheduler can read/write the same fields without any UI change (DEC-011).
+/// imported Anki progress on import, then advanced by a `ReviewSchedulingPolicy`
+/// as the user grades cards. The FSRS memory fields ([stability], [difficulty])
+/// are nullable so imported and pre-FSRS persisted states load unchanged and
+/// are initialised lazily on first review (DEC-011 / DEC-013).
 class ReviewCardState {
   const ReviewCardState({
     required this.deckId,
@@ -22,6 +23,9 @@ class ReviewCardState {
     this.easeFactor,
     this.lastReviewedAt,
     this.sourceSystem = 'decko',
+    this.stability,
+    this.difficulty,
+    this.schedulerVersion,
   });
 
   /// A fresh, never-studied card.
@@ -70,6 +74,15 @@ class ReviewCardState {
   final DateTime? lastReviewedAt;
   final String sourceSystem;
 
+  /// FSRS memory stability in days (expected interval at target retention).
+  final double? stability;
+
+  /// FSRS difficulty in [1, 10].
+  final double? difficulty;
+
+  /// Which scheduler last wrote this state, e.g. `fsrs-5`.
+  final String? schedulerVersion;
+
   bool get isSuspended => queueState == ReviewQueueState.suspended;
   bool get isNew => queueState == ReviewQueueState.newCard;
   bool get hasBeenReviewed =>
@@ -91,6 +104,9 @@ class ReviewCardState {
     int? intervalDays,
     double? easeFactor,
     DateTime? lastReviewedAt,
+    double? stability,
+    double? difficulty,
+    String? schedulerVersion,
   }) {
     return ReviewCardState(
       deckId: deckId,
@@ -103,6 +119,9 @@ class ReviewCardState {
       easeFactor: easeFactor ?? this.easeFactor,
       lastReviewedAt: lastReviewedAt ?? this.lastReviewedAt,
       sourceSystem: sourceSystem,
+      stability: stability ?? this.stability,
+      difficulty: difficulty ?? this.difficulty,
+      schedulerVersion: schedulerVersion ?? this.schedulerVersion,
     );
   }
 

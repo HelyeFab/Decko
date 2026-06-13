@@ -7,6 +7,7 @@ import '../../app/furigana_controller.dart';
 import '../../app/theme/card_theme_config.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_card.dart';
+import '../../data/fsrs_scheduling_policy.dart';
 import '../../data/simple_review_scheduler.dart';
 import '../../domain/deck.dart';
 import '../../domain/due_queue.dart';
@@ -33,10 +34,12 @@ class ReviewSessionScreen extends StatefulWidget {
     super.key,
     required this.deck,
     this.scheduler = const SimpleReviewScheduler(),
+    this.policy = const FsrsSchedulingPolicy(),
   });
 
   final Deck deck;
   final ReviewScheduler scheduler;
+  final ReviewSchedulingPolicy policy;
 
   @override
   State<ReviewSessionScreen> createState() => _ReviewSessionScreenState();
@@ -100,8 +103,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
 
     final ReviewCardState current = _states[item.id] ??
         ReviewCardState.newCard(deckId: widget.deck.id, itemId: item.id);
-    final ReviewCardState next =
-        ReviewSchedulingPolicy.next(current, rating, now);
+    final ReviewCardState next = widget.policy.next(current, rating, now);
     _states[item.id] = next;
     _changed[item.id] = next;
 

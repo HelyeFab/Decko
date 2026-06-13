@@ -314,3 +314,31 @@ Real Japanese decks carry furigana (`<ruby>漢字<rt>かな</rt></ruby>`). The f
 
 - Store kanji and readings as structured pairs on the model: rejected — bracket notation is simpler, human-readable, and round-trips through the existing string fields.
 - Drop readings entirely: rejected — loses the core value of a Japanese deck.
+
+## DEC-013: Scheduling uses an FSRS-5 policy (pure Dart, default weights)
+
+Date: 2026-06-12
+Status: Accepted
+
+### Context
+
+MVP_006 shipped a deliberately temporary fixed-interval policy (Again=now / Hard=1d / Good=3d / Easy=7d). It made write-back work but isn't credible scheduling. The seam (`ReviewSchedulingPolicy` → persisted `ReviewCardState`) was built to allow swapping it.
+
+### Decision
+
+- Turn `ReviewSchedulingPolicy` into an **interface** and implement `FsrsSchedulingPolicy` — a faithful **FSRS-5** memory model (stability + difficulty) with the **published default weights**, written in **pure Dart** (no dependency). It is FSRS-*style*, not a per-user trained optimiser, and omits intra-day learning steps. Interval = days until the card drops to the target retention (0.9), ≥ 1.
+- `ReviewCardState` gains nullable `stability`, `difficulty`, `schedulerVersion`. Nullable = safe migration: imported and pre-FSRS persisted states load unchanged.
+- The policy is injected into the review screen (default `FsrsSchedulingPolicy`); the UI contains no scheduling maths.
+- **Imported progress is preserved:** the scheduler only runs when a card is graded, so un-reviewed cards keep their imported due dates. On a card's first FSRS grade, missing `stability`/`difficulty` are seeded conservatively from existing interval/ease/lapses — never reset to new (DEC-005 honoured).
+
+### Consequences
+
+- Real spaced repetition: new Good ≈ 3d, Easy ≈ 16d; repeated Good grows 3→11→35→101→269d; difficulty adapts per rating.
+- Closes the temporary-scheduler gap from DEC-011 / the roadmap.
+- A future MVP can train per-deck FSRS weights or add learning steps behind the same interface.
+
+### Alternatives considered
+
+- Pull a pub `fsrs` package: rejected — the FSRS-5 core is ~60 lines; pure Dart keeps it dependency-free, fully testable, and version-stable.
+- Keep the fixed policy: rejected — not credible scheduling; the seam existed precisely to replace it.
+- Convert Anki scheduler params exactly: rejected — out of scope; conservative seeding preserves practical progress without claiming parity.

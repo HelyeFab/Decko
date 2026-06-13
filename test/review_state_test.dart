@@ -4,6 +4,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:decko/data/fsrs_scheduling_policy.dart';
 import 'package:decko/data/shared_prefs_review_state_repository.dart';
 import 'package:decko/domain/due_queue.dart';
 import 'package:decko/domain/import/imported_card_progress.dart';
@@ -11,41 +12,78 @@ import 'package:decko/domain/import/imported_card_state.dart';
 import 'package:decko/domain/learning_item.dart';
 import 'package:decko/domain/review_card_state.dart';
 import 'package:decko/domain/review_rating.dart';
-import 'package:decko/domain/review_scheduling_policy.dart';
 
 final DateTime _now = DateTime(2026, 6, 12, 10);
 
 LearningItem _item(String id) => LearningItem(id: id, front: id, back: id);
 
 void main() {
-  group('ReviewSchedulingPolicy', () {
+  group('FsrsSchedulingPolicy', () {
+    const FsrsSchedulingPolicy fsrs = FsrsSchedulingPolicy();
     final ReviewCardState fresh =
         ReviewCardState.newCard(deckId: 'd', itemId: 'a');
 
-    test('Good schedules +3 days as review and increments reps', () {
-      final ReviewCardState s =
-          ReviewSchedulingPolicy.next(fresh, ReviewRating.good, _now);
+    test('new + Good schedules into the future as review, sets FSRS fields', () {
+      final ReviewCardState s = fsrs.next(fresh, ReviewRating.good, _now);
       expect(s.queueState, ReviewQueueState.review);
       expect(s.reps, 1);
-      expect(s.intervalDays, 3);
-      expect(s.dueAt, _now.add(const Duration(days: 3)));
-      expect(s.isDueForReview(_now), isFalse); // not due until later
+      expect(s.intervalDays, greaterThanOrEqualTo(1));
+      expect(s.dueAt!.isAfter(_now), isTrue);
+      expect(s.isDueForReview(_now), isFalse);
+      expect(s.stability, isNotNull);
+      expect(s.difficulty, inInclusiveRange(1.0, 10.0));
+      expect(s.schedulerVersion, 'fsrs-5');
     });
 
-    test('Again relearns, lapses+1, due now, interval 0', () {
-      final ReviewCardState s = ReviewSchedulingPolicy.next(
-          fresh.copyWith(reps: 2), ReviewRating.again, _now);
+    test('new + Again → relearning, lapses+1, still scheduled (>=1 day)', () {
+      final ReviewCardState s = fsrs.next(fresh, ReviewRating.again, _now);
       expect(s.queueState, ReviewQueueState.relearning);
       expect(s.lapses, 1);
-      expect(s.intervalDays, 0);
-      expect(s.dueAt, _now);
+      expect(s.intervalDays, greaterThanOrEqualTo(1));
     });
 
-    test('Hard +1 day, Easy +7 days', () {
-      expect(ReviewSchedulingPolicy.next(fresh, ReviewRating.hard, _now).dueAt,
-          _now.add(const Duration(days: 1)));
-      expect(ReviewSchedulingPolicy.next(fresh, ReviewRating.easy, _now).dueAt,
-          _now.add(const Duration(days: 7)));
+    test('Easy schedules farther than Good, which is farther than Hard', () {
+      final int hard = fsrs.next(fresh, ReviewRating.hard, _now).intervalDays;
+      final int good = fsrs.next(fresh, ReviewRating.good, _now).intervalDays;
+      final int easy = fsrs.next(fresh, ReviewRating.easy, _now).intervalDays;
+      expect(hard, lessThanOrEqualTo(good));
+      expect(good, lessThan(easy));
+    });
+
+    test('reviewing an established card again grows its interval', () {
+      // A card reviewed a while ago; review it now with Good.
+      final ReviewCardState established = ReviewCardState(
+        deckId: 'd',
+        itemId: 'a',
+        queueState: ReviewQueueState.review,
+        reps: 3,
+        intervalDays: 10,
+        stability: 10,
+        difficulty: 5,
+        lastReviewedAt: _now.subtract(const Duration(days: 10)),
+      );
+      final ReviewCardState s = fsrs.next(established, ReviewRating.good, _now);
+      expect(s.intervalDays, greaterThan(10));
+      expect(s.stability!, greaterThan(10));
+    });
+
+    test('imported reviewed card is seeded, not reset (progress preserved)', () {
+      final ReviewCardState imported = ReviewCardState(
+        deckId: 'd',
+        itemId: 'a',
+        queueState: ReviewQueueState.review,
+        reps: 8,
+        lapses: 1,
+        intervalDays: 30,
+        easeFactor: 2.5,
+        lastReviewedAt: _now.subtract(const Duration(days: 30)),
+        // no stability/difficulty yet
+      );
+      final ReviewCardState s = fsrs.next(imported, ReviewRating.good, _now);
+      expect(s.reps, 9); // not reset to new
+      expect(s.queueState, ReviewQueueState.review);
+      expect(s.intervalDays, greaterThanOrEqualTo(1));
+      expect(s.stability, isNotNull);
     });
   });
 

@@ -82,6 +82,9 @@ class SharedPrefsReviewStateRepository implements ReviewStateRepository {
         'easeFactor': s.easeFactor,
         'lastReviewedAt': s.lastReviewedAt?.toIso8601String(),
         'sourceSystem': s.sourceSystem,
+        'stability': s.stability,
+        'difficulty': s.difficulty,
+        'schedulerVersion': s.schedulerVersion,
       };
 
   ReviewCardState _fromMap(String deckId, Map<String, dynamic> m) =>
@@ -96,6 +99,9 @@ class SharedPrefsReviewStateRepository implements ReviewStateRepository {
         easeFactor: (m['easeFactor'] as num?)?.toDouble(),
         lastReviewedAt: _date(m['lastReviewedAt']),
         sourceSystem: (m['sourceSystem'] as String?) ?? 'decko',
+        stability: (m['stability'] as num?)?.toDouble(),
+        difficulty: (m['difficulty'] as num?)?.toDouble(),
+        schedulerVersion: m['schedulerVersion'] as String?,
       );
 
   DateTime? _date(dynamic v) => v == null ? null : DateTime.parse(v as String);

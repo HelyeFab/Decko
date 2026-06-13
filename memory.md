@@ -4,9 +4,16 @@
 2026-06-12
 
 ## Current stage
-MVP_006 complete: due queue + scheduler write-back. Awaiting approval.
+MVP_007 complete: FSRS-5 scheduler replaces the temporary policy. Awaiting approval.
 
-## Last completed (MVP_006)
+## Last completed (MVP_007)
+- `ReviewSchedulingPolicy` is now an INTERFACE; `FsrsSchedulingPolicy` (lib/data/) is a pure-Dart FSRS-5 impl with default weights (no dependency). Injected into the review screen (default FSRS); UI has no scheduling maths (DEC-013).
+- `ReviewCardState` gained nullable `stability`/`difficulty`/`schedulerVersion` (safe migration; serialized in SharedPrefsReviewStateRepository).
+- Imported/legacy cards: scheduler only runs on grade, so un-reviewed cards keep imported due dates; first grade seeds S/D from interval/ease/lapses — never reset (DEC-005).
+- Verified numbers: new Good=3d, Easy=16d; repeated Good 3→11→35→101→269d. 46 tests (FSRS policy tests + existing); analyze clean.
+- Old fixed policy (now/1d/3d/7d) removed; review_state_test rewritten for FSRS (relative assertions).
+
+## Earlier (MVP_006)
 - `ReviewCardState` (+ ReviewQueueState enum) persistent per-card state; `fromLearningItem` maps imported Anki progress.
 - `ReviewStateRepository` + `SharedPrefsReviewStateRepository` (per-deck JSON blob, key `decko.reviewState.<deckId>`).
 - Pure `DueQueue.build` (due review → due learning → new; suspended/future excluded) and pure, TEMPORARY `ReviewSchedulingPolicy` (Again→now/relearning, Hard→+1d, Good→+3d, Easy→+7d) — NOT FSRS (DEC-011).
@@ -83,10 +90,12 @@ MVP_006 complete: due queue + scheduler write-back. Awaiting approval.
 - Review scheduler seam is `ReviewScheduler`; SimpleReviewScheduler now, FSRS later (DEC-008).
 - Local persistence via shared_preferences behind SettingsRepository/ProgressRepository (DEC-009).
 - Anki import: legacy .apkg only, behind DeckImportAdapter, decks in a DeckStore (DEC-010).
-- Persistent per-card ReviewCardState + temporary scheduling policy; due queue + write-back (DEC-011).
+- Persistent per-card ReviewCardState + due queue + write-back (DEC-011).
+- Furigana preserved as 漢字[かな], toggleable ruby (DEC-012).
+- Scheduling: FSRS-5 policy, pure Dart, default weights, behind the seam (DEC-013).
 
 ## What is still placeholder
-- Scheduling is a FIXED-interval placeholder (Again/Hard/Good/Easy → now/1d/3d/7d), NOT FSRS.
+- FSRS uses DEFAULT weights (no per-user training) and no intra-day learning steps — FSRS-style, not Anki parity.
 - Modern zstd `.anki21b` not supported (legacy export only).
 - Import ignores media (image/audio) and templates; multi-deck packages collapse; field mapping heuristic.
 - Demo deck content still from `MockDecks` (but their review state now persists once studied).
@@ -95,10 +104,10 @@ MVP_006 complete: due queue + scheduler write-back. Awaiting approval.
 ## Now persisted
 - Selected app theme; progress snapshot (MVP_004).
 - Imported decks incl. cards + provenance (MVP_005).
-- Per-card review state (queueState/dueAt/reps/lapses/interval/ease); due decrements & survives restart (MVP_006).
+- Per-card review state incl. FSRS stability/difficulty (MVP_006/007); due decrements & survives restart.
 
 ## Next action
-Awaiting approval. Strong candidates: FSRS-real scheduler (replace the placeholder policy behind the same seam), import media support, modern .anki21b, or the floating bottom-nav UI MVP (StatefulShellRoute). Do not start without approval.
+Awaiting approval. Per MVP_007 brief, next candidates (MVP_008): media import (audio/images), modern .anki21b support, or floating bottom-nav UI (StatefulShellRoute). Do not start without approval.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).
