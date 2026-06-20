@@ -5,6 +5,7 @@ import '../domain/deck.dart';
 import '../features/deck_detail/deck_detail_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
 import '../features/import/import_screen.dart';
+import '../features/imported_source/imported_source_screen.dart';
 import '../features/progress/progress_screen.dart';
 import '../features/review/review_session_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
@@ -25,6 +26,9 @@ abstract final class DeckoRoutes {
 
   /// Review session for the deck with [id].
   static String deckReview(String id) => '/deck/$id/review';
+
+  /// Imported-source inspector for the deck with [id].
+  static String deckSource(String id) => '/deck/$id/source';
 }
 
 /// Root navigator key — deck/review routes attach here so they cover the shell.
@@ -72,6 +76,16 @@ GoRouter buildDeckoRouter() {
                         return deck == null
                             ? const _DeckNotFound()
                             : ReviewSessionScreen(deck: deck);
+                      },
+                    ),
+                    GoRoute(
+                      path: 'source',
+                      builder: (BuildContext context, GoRouterState state) {
+                        final Deck? deck = _resolveDeck(context, state);
+                        return deck == null
+                            ? const _DeckNotFound()
+                            : ImportedSourceScreen(
+                                deckId: deck.id, deckName: deck.name);
                       },
                     ),
                   ],

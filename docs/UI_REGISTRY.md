@@ -260,6 +260,20 @@ re-inventing equivalents.
 - Home's app-bar action icons were removed (those destinations are now tabs); the
   Home Import affordances switch to the Import tab via `context.go`.
 
+### Added in MVP_009 (imported-source inspector, DEC-016)
+
+- **`ImportedSourceScreen`** (`features/imported_source/`) — a Decko-styled view of
+  the preserved Anki source (not a raw debug table). Reached from a "View imported
+  source" tile on deck detail (imported decks only), route `/deck/:id/source`.
+  Sections: a primary-container **summary** (notes · note types · cards), a
+  **note-types** card per model (field chips + numbered card-template chips), a
+  **cards-by-template** breakdown (count chips, proving Listening/Reading/Production
+  stay distinct), and a **sample note** card listing each field's name → plain value
+  with small audio/image media pips, plus tag chips. Falls back to a friendly
+  "No preserved source" empty state for pre-feature/demo decks.
+- Reuses the shelf-card idiom (rounded `cardColor` + `outlineVariant` border),
+  `SectionHeader`, and pill chips — no new primitives.
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

@@ -149,7 +149,69 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                 ),
               ),
             ),
+            if (deck.isImported) ...<Widget>[
+              const SizedBox(height: DeckoSpacing.xl),
+              _ImportedSourceTile(
+                onTap: () =>
+                    context.push(DeckoRoutes.deckSource(deck.id)),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A quiet entry point to the preserved Anki source for an imported deck.
+class _ImportedSourceTile extends StatelessWidget {
+  const _ImportedSourceTile({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(DeckoSpacing.lg),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(DeckoRadii.lg),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Row(
+            children: <Widget>[
+              FaIcon(FontAwesomeIcons.layerGroup,
+                  size: 18, color: scheme.primary),
+              const SizedBox(width: DeckoSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'View imported source',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Original Anki fields, tags, and card templates',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              FaIcon(FontAwesomeIcons.chevronRight,
+                  size: 14, color: scheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );

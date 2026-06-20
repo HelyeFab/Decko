@@ -22,6 +22,8 @@ import 'package:decko/domain/import/deck_import_adapter.dart';
 import 'package:decko/domain/import/deck_import_info.dart';
 import 'package:decko/domain/import/deck_import_preview.dart';
 import 'package:decko/domain/import/imported_card_state.dart';
+import 'package:decko/domain/import/source/imported_anki_source.dart';
+import 'package:decko/domain/repositories/imported_source_store.dart';
 
 final String _fs = String.fromCharCode(0x1f); // Anki field separator
 
@@ -148,6 +150,132 @@ class _CardSpec {
   final String front;
   final String back;
   final String field2;
+}
+
+// --- Rich fixtures for lossless-source tests (MVP_009) ----------------------
+
+/// A source note with explicit model id, named field values, and Anki tags.
+class _SrcNote {
+  const _SrcNote({
+    required this.id,
+    required this.mid,
+    required this.flds,
+    this.tags = '',
+  });
+  final int id;
+  final String mid;
+  final List<String> flds;
+  final String tags;
+}
+
+/// A source card with its note id and card-template ordinal (new + due now).
+class _SrcCard {
+  const _SrcCard({required this.id, required this.nid, required this.ord});
+  final int id;
+  final int nid;
+  final int ord;
+}
+
+/// Captures the [ImportedAnkiSource] handed to the import adapter, so source
+/// preservation can be asserted without touching disk.
+class _CapturingSourceStore implements ImportedSourceStore {
+  ImportedAnkiSource? saved;
+  @override
+  Future<void> saveSource(ImportedAnkiSource source) async => saved = source;
+  @override
+  Future<ImportedAnkiSource?> getSourceForDeck(String deckId) async =>
+      saved?.deckId == deckId ? saved : null;
+  @override
+  Future<void> deleteSourceForDeck(String deckId) async {
+    if (saved?.deckId == deckId) saved = null;
+  }
+}
+
+/// Builds a `col.models` blob with one model: [fields] in order + [templates]
+/// in order (each with empty q/a format — text is irrelevant to these tests).
+String _modelJson(
+  String id,
+  String name,
+  List<String> fields,
+  List<String> templates,
+) {
+  return jsonEncode(<String, dynamic>{
+    id: <String, dynamic>{
+      'name': name,
+      'flds': <Map<String, Object>>[
+        for (int i = 0; i < fields.length; i++)
+          <String, Object>{'name': fields[i], 'ord': i},
+      ],
+      'tmpls': <Map<String, Object>>[
+        for (int i = 0; i < templates.length; i++)
+          <String, Object>{
+            'name': templates[i],
+            'ord': i,
+            'qfmt': '',
+            'afmt': '',
+          },
+      ],
+    },
+  });
+}
+
+/// Builds a `.apkg` with full control over the model, notes (named fields +
+/// tags + model id), and cards (note id + template ordinal) — for source tests.
+Uint8List _buildSourceApkg({
+  required String deckName,
+  required String modelsJson,
+  required List<_SrcNote> notes,
+  required List<_SrcCard> cards,
+  Map<String, List<int>> media = const <String, List<int>>{},
+}) {
+  final Directory tmp = Directory.systemTemp.createTempSync('decko_src_fixture');
+  final String path = '${tmp.path}/collection.anki21';
+  final Database db = sqlite3.open(path);
+  try {
+    db.execute('CREATE TABLE col (id INTEGER PRIMARY KEY, crt INTEGER, '
+        'decks TEXT, models TEXT);');
+    db.execute('CREATE TABLE notes (id INTEGER PRIMARY KEY, guid TEXT, '
+        'mid INTEGER, flds TEXT, tags TEXT);');
+    db.execute('CREATE TABLE cards (id INTEGER PRIMARY KEY, nid INTEGER, '
+        'did INTEGER, ord INTEGER, queue INTEGER, type INTEGER, due INTEGER, '
+        'ivl INTEGER, reps INTEGER, lapses INTEGER, factor INTEGER);');
+
+    db.execute(
+      'INSERT INTO col (id, crt, decks, models) VALUES (1, 1600000000, ?, ?);',
+      <Object?>['{"1":{"name":"$deckName"}}', modelsJson],
+    );
+    for (final _SrcNote n in notes) {
+      db.execute(
+        'INSERT INTO notes (id, guid, mid, flds, tags) VALUES (?, ?, ?, ?, ?);',
+        <Object?>[n.id, 'guid-${n.id}', n.mid, n.flds.join(_fs), n.tags],
+      );
+    }
+    for (final _SrcCard c in cards) {
+      db.execute(
+        'INSERT INTO cards (id, nid, did, ord, queue, type, due, ivl, reps, '
+        'lapses, factor) VALUES (?, ?, 1, ?, 0, 0, 0, 0, 0, 0, 0);',
+        <Object?>[c.id, c.nid, c.ord],
+      );
+    }
+  } finally {
+    db.close();
+  }
+
+  final Uint8List dbBytes = File(path).readAsBytesSync();
+  tmp.deleteSync(recursive: true);
+
+  final Map<String, String> mediaMap = <String, String>{};
+  final Archive archive = Archive()
+    ..addFile(ArchiveFile('collection.anki21', dbBytes.length, dbBytes));
+  int n = 0;
+  media.forEach((String name, List<int> bytes) {
+    archive.addFile(ArchiveFile('$n', bytes.length, bytes));
+    mediaMap['$n'] = name;
+    n++;
+  });
+  final List<int> mediaJson = jsonEncode(mediaMap).codeUnits;
+  archive.addFile(ArchiveFile('media', mediaJson.length, mediaJson));
+  return Uint8List.fromList(ZipEncoder().encode(archive));
 }
 
 void main() {
@@ -362,5 +490,114 @@ void main() {
     final restored = loaded.first.items.firstWhere((i) => i.front == '飲む');
     expect(restored.importedProgress!.state, ImportedCardState.review);
     expect(restored.importedProgress!.reps, 5);
+  });
+
+  group('lossless source preservation (MVP_009)', () {
+    test('preserves named fields by name + ordinal, with raw values, tags, '
+        'and per-field media refs', () async {
+      final Uint8List bytes = _buildSourceApkg(
+        deckName: 'Core 2k',
+        modelsJson: _modelJson('m1', 'Japanese Vocab', <String>[
+          'Reading', 'Audio', 'Sentence', 'Sentence-Kana',
+          'Sentence-English', 'Sentence Audio', 'Image_URI', 'Tags',
+        ], <String>['Card 1']),
+        notes: const <_SrcNote>[
+          _SrcNote(id: 100, mid: 'm1', tags: 'n5 vocab', flds: <String>[
+            '会社[かいしゃ]',
+            '[sound:word.mp3]',
+            '会社はどこ？',
+            'かいしゃはどこ？',
+            'Where is the company?',
+            '[sound:sent.mp3]',
+            '<img src="office.jpg">',
+            'business formal',
+          ]),
+        ],
+        cards: const <_SrcCard>[_SrcCard(id: 200, nid: 100, ord: 0)],
+      );
+
+      final _CapturingSourceStore store = _CapturingSourceStore();
+      await adapter.importDeck(bytes,
+          keepProgress: false,
+          importedAt: DateTime(2026, 6, 12),
+          sourceStore: store);
+
+      final ImportedAnkiSource src = store.saved!;
+      final ImportedAnkiNote note = src.notes.single;
+
+      // Every field preserved by name, in ordinal order — none dropped.
+      expect(note.fields.map((ImportedAnkiField f) => f.name).toList(),
+          <String>[
+            'Reading', 'Audio', 'Sentence', 'Sentence-Kana',
+            'Sentence-English', 'Sentence Audio', 'Image_URI', 'Tags',
+          ]);
+      expect(note.fields.map((ImportedAnkiField f) => f.ordinal).toList(),
+          <int>[0, 1, 2, 3, 4, 5, 6, 7]);
+
+      // Raw values kept verbatim (may carry markup Decko doesn't understand).
+      expect(note.fieldByName('Reading')!.rawValue, '会社[かいしゃ]');
+      expect(note.fieldByName('Image_URI')!.rawValue, '<img src="office.jpg">');
+      // Plain-text value available where useful.
+      expect(note.fieldByName('Sentence-Kana')!.plainTextValue,
+          contains('かいしゃ'));
+
+      // Note-level tags preserved.
+      expect(note.tags, <String>['n5', 'vocab']);
+
+      // Per-field media references detected for audio and image fields.
+      final MediaReference wordAudio =
+          note.fieldByName('Audio')!.mediaReferences.single;
+      expect(wordAudio.kind, MediaKind.audio);
+      expect(wordAudio.fileName, 'word.mp3');
+      expect(note.fieldByName('Sentence Audio')!.mediaReferences.single.kind,
+          MediaKind.audio);
+      final MediaReference image =
+          note.fieldByName('Image_URI')!.mediaReferences.single;
+      expect(image.kind, MediaKind.image);
+      expect(image.fileName, 'office.jpg');
+    });
+
+    test('preserves model identity + Listening/Reading/Production templates, '
+        'and links each card to its template', () async {
+      final Uint8List bytes = _buildSourceApkg(
+        deckName: 'JP 3-card',
+        modelsJson: _modelJson('m2', 'Japanese (3 cards)',
+            <String>['Expression', 'Meaning'],
+            <String>['Listening', 'Reading', 'Production']),
+        notes: const <_SrcNote>[
+          _SrcNote(id: 100, mid: 'm2', flds: <String>['食べる', 'to eat']),
+        ],
+        cards: const <_SrcCard>[
+          _SrcCard(id: 200, nid: 100, ord: 0),
+          _SrcCard(id: 201, nid: 100, ord: 1),
+          _SrcCard(id: 202, nid: 100, ord: 2),
+        ],
+      );
+
+      final _CapturingSourceStore store = _CapturingSourceStore();
+      final Deck deck = await adapter.importDeck(bytes,
+          keepProgress: false,
+          importedAt: DateTime(2026, 6, 12),
+          sourceStore: store);
+
+      final ImportedAnkiSource src = store.saved!;
+      final ImportedAnkiModel model = src.models.single;
+      expect(model.name, 'Japanese (3 cards)');
+      expect(model.fieldNames, <String>['Expression', 'Meaning']);
+      expect(model.templates.map((ImportedAnkiCardTemplate t) => t.name).toList(),
+          <String>['Listening', 'Reading', 'Production']);
+      expect(model.templateByOrdinal(2)!.name, 'Production');
+
+      // The three generated cards keep their template identity — not collapsed.
+      expect(src.cardSources, hasLength(3));
+      expect(
+        src.cardSources
+            .map((ImportedAnkiCardSource c) => c.templateName)
+            .toSet(),
+        <String>{'Listening', 'Reading', 'Production'},
+      );
+      // Review still opens: the deck produced usable Decko cards.
+      expect(deck.items, isNotEmpty);
+    });
   });
 }

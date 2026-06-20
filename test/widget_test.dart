@@ -20,6 +20,8 @@ import 'package:decko/domain/import/deck_import_info.dart';
 import 'package:decko/domain/import/deck_import_preview.dart';
 import 'dart:typed_data';
 
+import 'package:decko/domain/import/source/imported_anki_source.dart';
+import 'package:decko/domain/repositories/imported_source_store.dart';
 import 'package:decko/domain/repositories/media_store.dart';
 import 'package:decko/domain/repositories/review_state_repository.dart';
 import 'package:decko/domain/repositories/settings_repository.dart';
@@ -134,6 +136,20 @@ class _InMemoryMediaStore implements MediaStore {
       _files.removeWhere((String k, _) => k.startsWith('$deckId/'));
 }
 
+class _InMemorySourceStore implements ImportedSourceStore {
+  final Map<String, ImportedAnkiSource> _byDeck = <String, ImportedAnkiSource>{};
+  void seed(ImportedAnkiSource source) => _byDeck[source.deckId] = source;
+  @override
+  Future<void> saveSource(ImportedAnkiSource source) async =>
+      _byDeck[source.deckId] = source;
+  @override
+  Future<ImportedAnkiSource?> getSourceForDeck(String deckId) async =>
+      _byDeck[deckId];
+  @override
+  Future<void> deleteSourceForDeck(String deckId) async =>
+      _byDeck.remove(deckId);
+}
+
 Future<void> _pumpApp(
   WidgetTester tester, {
   DeckRepository? deckRepository,
@@ -141,6 +157,7 @@ Future<void> _pumpApp(
   ProgressRepository? progressRepository,
   ReviewStateRepository? reviewStateRepository,
   MediaStore? mediaStore,
+  ImportedSourceStore? importedSourceStore,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   tester.view.physicalSize = const Size(420, 2400);
@@ -156,6 +173,7 @@ Future<void> _pumpApp(
       reviewStateRepository:
           reviewStateRepository ?? const SharedPrefsReviewStateRepository(),
       mediaStore: mediaStore ?? _InMemoryMediaStore(),
+      importedSourceStore: importedSourceStore ?? _InMemorySourceStore(),
     ),
   );
   await tester.pumpAndSettle();
@@ -424,6 +442,89 @@ void main() {
     expect(find.text('3'), findsOneWidget); // total cards
     expect(find.text('2'), findsNWidgets(2)); // due today + reviewed
     expect(find.text('Progress: kept from Anki'), findsOneWidget);
+  });
+
+  testWidgets('Imported deck detail can inspect the preserved Anki source',
+      (WidgetTester tester) async {
+    final Deck deck = Deck(
+      id: 'anki-src',
+      name: 'Source Deck',
+      description: 'd',
+      importInfo: DeckImportInfo(
+          progressMode: ImportProgressMode.fresh, importedAt: DateTime(2026)),
+      items: const <LearningItem>[LearningItem(id: 'a', front: 'a', back: 'a')],
+    );
+    final _InMemorySourceStore source = _InMemorySourceStore()
+      ..seed(const ImportedAnkiSource(
+        deckId: 'anki-src',
+        models: <ImportedAnkiModel>[
+          ImportedAnkiModel(
+            id: 'm1',
+            name: 'Japanese Vocab',
+            fieldNames: <String>['Reading', 'Sentence'],
+            templates: <ImportedAnkiCardTemplate>[
+              ImportedAnkiCardTemplate(
+                  sourceModelId: 'm1',
+                  ordinal: 0,
+                  name: 'Listening',
+                  questionTemplate: '',
+                  answerTemplate: ''),
+            ],
+          ),
+        ],
+        notes: <ImportedAnkiNote>[
+          ImportedAnkiNote(
+            sourceNoteId: '100',
+            sourceGuid: 'g',
+            sourceModelId: 'm1',
+            modelName: 'Japanese Vocab',
+            deckId: 'anki-src',
+            tags: <String>['n5'],
+            fields: <ImportedAnkiField>[
+              ImportedAnkiField(
+                  name: 'Reading',
+                  ordinal: 0,
+                  rawValue: '会社',
+                  plainTextValue: '会社'),
+              ImportedAnkiField(
+                  name: 'Sentence',
+                  ordinal: 1,
+                  rawValue: '会社はどこ',
+                  plainTextValue: '会社はどこ'),
+            ],
+          ),
+        ],
+        cardSources: <ImportedAnkiCardSource>[
+          ImportedAnkiCardSource(
+            sourceCardId: '200',
+            sourceNoteId: '100',
+            sourceDeckId: 'anki-src',
+            templateOrdinal: 0,
+            templateName: 'Listening',
+            queueState: 'newCard',
+            due: 0,
+            reps: 0,
+            lapses: 0,
+          ),
+        ],
+      ));
+
+    await _pumpApp(tester,
+        deckRepository: _FixedDeckRepository(<Deck>[deck]),
+        importedSourceStore: source);
+
+    await tester.tap(find.text('Source Deck').last); // shelf row → deck detail
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('View imported source'));
+    await tester.pumpAndSettle();
+
+    // The preserved model, fields, tags and template are all on screen.
+    expect(find.text('Japanese Vocab'), findsOneWidget);
+    expect(find.text('Reading'), findsWidgets);
+    expect(find.text('Sentence'), findsWidgets);
+    expect(find.text('n5'), findsOneWidget); // preserved tag
+    expect(find.text('1. Listening'), findsOneWidget); // template identity
   });
 
   testWidgets('Due today decrements after reviewing due cards',

@@ -97,10 +97,12 @@ Small, intentionally-postponed improvements captured so they are not lost.
   reusable `DeckoAppBar`, made Home study-first (the `StudyRibbon` hero + compact
   `DeckRow` shelf + dashed Import row), moved the marketing promise grid to the
   empty state only, and kept Import on its own screen.
-- **Lossless Anki source — inspect UI.** The lossless source is now preserved on
-  import (MVP_009 data layer, DEC-016), but the deck-detail "View imported source"
-  affordance and named-field/template tests are still pending — the remaining
-  slice of MVP_009 before note-type-aware rendering (MVP_010).
+- ~~**Lossless Anki source.**~~ DONE (MVP_009, DEC-016): import now preserves the
+  full Anki source — every named field (raw + plain + media refs), tags, model
+  field/template definitions, and card→template links — persisted per deck, with a
+  Decko-styled "View imported source" inspect screen on deck detail and
+  named-field / Listening-Reading-Production template tests. Note-type-aware
+  *rendering* of that data is the next step (MVP_010).
 
 ## I2 — APKG Import Beta
 

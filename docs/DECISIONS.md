@@ -412,7 +412,7 @@ Decko's importer is positional/template-blind: it maps Anki fields by index and 
 
 - Note-type-aware rendering (MVP_010) has the data it needs without re-importing.
 - Larger on-disk footprint per imported deck (one JSON blob); acceptable and isolated to local app-support storage.
-- Inspect UI for the preserved source is still pending (the remaining slice of MVP_009).
+- A Decko-styled inspect screen (`ImportedSourceScreen`, reached from deck detail's "View imported source") proves the rich data is kept: note-type fields + templates, a per-template card breakdown, and a sample note's named fields, tags, and per-field media refs.
 
 ## DEC-017: Reusable app shell, and Home separated from the Import workflow
 
