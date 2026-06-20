@@ -456,3 +456,28 @@ Primary destinations were reached from app-bar action icons on Home, which doesn
 - Import/Progress/Settings are always one tap away; tab state survives switching.
 - Deck detail shows the bar (a content screen within Home); only review is immersive.
 - Going forward, new top-level destinations are added as shell branches; transient/full-screen flows attach to the root navigator.
+
+## DEC-019: Note-type-aware card mapping derived from the preserved source
+
+Date: 2026-06-20
+Status: Accepted
+
+### Context
+
+Import built one `LearningItem` per Anki card via a **positional** mapper that ignored the card template — so a note generating Listening / Reading / Production cards produced three lookalike Decko cards (the 3× inflation). MVP_009 preserved the templates + named fields; MVP_010 uses them so those cards become *different study activities*.
+
+### Decision
+
+- A pure `NoteTypeAwareCardMapper` (`lib/domain/import/`) consumes the preserved `ImportedAnkiSource` + one `ImportedAnkiCardSource` and returns a `CardMapping`: Decko content (front/back/reading/example) + a `ReviewCardMode` (`generic | listening | reading | production`) + an inspectable rationale (`matchedBy`, `frontFields`, `backFields`).
+- **Template identity first** (templateName → mode), then **named field roles** (expression / reading / meaning / sentence / sentence-kana / sentence-english / sentence-audio / word-audio / image) resolved by name, most-specific first. Generic names (`Front`/`Back`/`Field N`) deliberately match nothing.
+- **Per-mode composition:** Listening = audio-first front, word revealed on back; Reading = Japanese-text front; Production = English prompt front, Japanese hidden until flip. Each maps the source media to the right side.
+- **Fallback:** when neither template nor fields give a useful signal, the mapping is `recognized: false` and the adapter keeps its existing positional content with `mode: generic`. Simple/demo decks are untouched.
+- **Progress safety (the hard rule):** the `LearningItem.id` stays `anki-card-<cardId>` and imported progress is unchanged — only the *content arrangement* changes, so review state / FSRS are never reset.
+- **UI:** `DeckoCard` shows a quiet small-caps mode eyebrow (no badge/pill); the imported-source inspect screen shows each template's mode + matched-by + front/back fields.
+
+### Consequences
+
+- Multi-template notes review as distinct cards; one source card still ↔ one Decko card.
+- The mapper is heuristic and extensible (add template/field synonyms over time); it doesn't aim for full Anki template fidelity.
+- Re-import is needed for already-imported decks to pick up modes (mapping runs at import time).
+- Furigana display stays globally toggled (not hidden per-face); deferred refinement.

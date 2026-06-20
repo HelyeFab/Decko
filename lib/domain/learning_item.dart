@@ -1,4 +1,5 @@
 import 'import/imported_card_progress.dart';
+import 'review_card_mode.dart';
 
 /// A single thing to learn — the format-independent unit Decko studies.
 ///
@@ -14,9 +15,14 @@ class LearningItem {
     this.example,
     this.tags = const <String>[],
     this.importedProgress,
+    this.mode = ReviewCardMode.generic,
   });
 
   final String id;
+
+  /// What this card trains (Listening / Reading / Production) when the import
+  /// could infer it from the Anki source; [ReviewCardMode.generic] otherwise.
+  final ReviewCardMode mode;
 
   /// The prompt shown first (e.g. a word or question).
   final String front;

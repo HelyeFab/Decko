@@ -4,9 +4,32 @@
 2026-06-20
 
 ## Current stage
-MVP_009 complete: lossless Anki note import + field preservation, with a
-"View imported source" inspect screen. Pushed to main (commits f991f02 +
-8b3b3e7). Next: MVP_010 (note-type-aware card mapping). 60 tests, analyze clean.
+MVP_010 complete: note-type-aware card mapping — Listening/Reading/Production
+cards derived from the MVP_009 preserved source (was 3× lookalikes). Next:
+MVP_011 (Study Options & Deck Overrides). 72 tests, analyze clean.
+
+## Last completed (MVP_010 — note-type-aware card mapping, DEC-019)
+- `NoteTypeAwareCardMapper` (`lib/domain/import/`, pure): ImportedAnkiSource +
+  one ImportedAnkiCardSource → `CardMapping` (front/back/reading/example +
+  `ReviewCardMode` {generic,listening,reading,production} + inspect rationale
+  matchedBy/frontFields/backFields). Template identity first, then named field
+  roles (expression/reading/meaning/sentence/sentence-kana/-english/-audio/
+  word-audio/image). Generic Front/Back/Field names match nothing →
+  recognized:false → adapter keeps positional content (simple/demo decks
+  untouched).
+- Per mode: Listening = audio-first front (word on back); Reading = JP-text
+  front; Production = English prompt, JP hidden until flip.
+- `ReviewCardMode` (`lib/domain/review_card_mode.dart`) + `LearningItem.mode`
+  (default generic). `DeckoCard` shows a quiet small-caps mode eyebrow (no
+  badge). Inspect screen gained a "Card mapping" section (mode chip + matched-by
+  + front/back fields per template).
+- SAFETY (held): `LearningItem.id` stays `anki-card-<cardId>`, imported progress
+  unchanged — only content arrangement changes, review state/FSRS never reset.
+- Mapping runs at IMPORT time → RE-IMPORT already-imported decks to get modes.
+- Tests: 8 pure mapper + 2 adapter integration (3-template → 3 distinct modes;
+  simple deck stays generic) + 2 DeckoCard widget (listening eyebrow; production
+  hides JP until flip). 72 total.
+- Brief renamed on disk to MVP_010_NOTE_TYPE_AWARE_DECKO_CARD_MAPPING.md.
 
 ## Last completed (MVP_009 — lossless Anki source, DEC-016)
 - Import now preserves the FULL Anki source before deriving the simplified
@@ -152,14 +175,15 @@ MVP_009 complete: lossless Anki note import + field preservation, with a
 - Anki imports preserve a lossless source note layer before mapping to Decko cards (DEC-016).
 - Reusable app shell (DeckoAppBar) + Home separated from the Import workflow (DEC-017).
 - Floating bottom nav over a StatefulShellRoute (Home/Import/Progress/Settings) (DEC-018).
+- Note-type-aware card mapping from the preserved source; positional fallback (DEC-019).
 
 ## What is still placeholder
 - FSRS uses DEFAULT weights (no per-user training) and no intra-day learning steps — FSRS-style, not Anki parity.
 - Modern zstd `.anki21b` not supported (legacy export only).
-- Media IS imported/rendered (MVP_008) and the full source IS preserved (MVP_009),
-  BUT the review card is still derived by positional mapping — NOT note-type-aware.
-  A 3-template note (Listening/Reading/Production) still makes 3 lookalike cards
-  (the 3× inflation). MVP_010 fixes this using the preserved templates/fields.
+- Note-type-aware mapping (MVP_010) now makes Listening/Reading/Production cards
+  distinct, BUT it's heuristic (template/field-name synonyms; add more over time)
+  and furigana is still globally toggled, not hidden per-face. RE-IMPORT decks to
+  apply. Positional fallback handles simple/demo decks.
 - Demo deck content still from `MockDecks` (but their review state now persists once studied).
 - Review-state storage = per-deck JSON blob in shared_preferences (flush on session exit); large libraries want a DB later.
 
@@ -170,10 +194,10 @@ MVP_009 complete: lossless Anki note import + field preservation, with a
 - Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-MVP_010 — Note-Type-Aware Decko Card Mapping. Use the preserved source
-fields/templates (MVP_009, DEC-016) to render Listening/Reading/Production and
-audio-/image-first cards distinctly, collapsing the 3× template inflation.
-The user has asked to start this as the next build.
+MVP_011 — Study Options and Deck Overrides (brief:
+.agent/mvp_briefs/MVP_011_STUDY_OPTIONS_AND_DECK_OVERRIDES.md). Then MVP_012 —
+Advanced Deck Option Profiles. These build on the note-type understanding from
+MVP_010 (audio-first / image-first / card limits / bury siblings, etc.).
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).

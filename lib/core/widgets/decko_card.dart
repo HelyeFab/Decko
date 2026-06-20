@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/card_theme_config.dart';
 import '../../domain/learning_item.dart';
+import '../../domain/review_card_mode.dart';
 import '../constants/decko_spacing.dart';
 import 'decko_field_content.dart';
 
@@ -157,13 +158,51 @@ class _PromptFace extends StatelessWidget {
         : theme.colorScheme.onSurface;
     return _CardFace(
       style: style,
-      child: DeckoFieldContent(
-        item.front,
-        deckId: deckId,
-        showFurigana: furigana,
-        align: TextAlign.center,
-        baseStyle: theme.textTheme.displaySmall
-            ?.copyWith(fontWeight: FontWeight.w600, color: onSurface),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _ModeEyebrow(mode: item.mode, style: style),
+          DeckoFieldContent(
+            item.front,
+            deckId: deckId,
+            showFurigana: furigana,
+            align: TextAlign.center,
+            baseStyle: theme.textTheme.displaySmall
+                ?.copyWith(fontWeight: FontWeight.w600, color: onSurface),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A quiet small-caps eyebrow naming what the card trains (Listening / Reading /
+/// Production). Deliberately understated — muted colour, letter-spaced, no
+/// badge or pill — so it guides without making Decko feel like Anki's chrome.
+/// Renders nothing for [ReviewCardMode.generic].
+class _ModeEyebrow extends StatelessWidget {
+  const _ModeEyebrow({required this.mode, required this.style});
+
+  final ReviewCardMode mode;
+  final CardThemeStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final String? label = mode.label;
+    if (label == null) return const SizedBox.shrink();
+    final ThemeData theme = Theme.of(context);
+    final Color color = style == CardThemeStyle.game
+        ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
+        : theme.colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DeckoSpacing.lg),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: color,
+          letterSpacing: 2.0,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -198,6 +237,7 @@ class _AnswerFace extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
+          _ModeEyebrow(mode: item.mode, style: style),
           if (item.reading != null) ...<Widget>[
             DeckoFieldContent(
               item.reading!,

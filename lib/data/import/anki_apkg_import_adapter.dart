@@ -12,10 +12,12 @@ import '../../domain/import/deck_import_info.dart';
 import '../../domain/import/deck_import_preview.dart';
 import '../../domain/import/imported_card_progress.dart';
 import '../../domain/import/imported_card_state.dart';
+import '../../domain/import/note_type_aware_card_mapper.dart';
 import '../../domain/import/source/imported_anki_source.dart';
 import '../../domain/learning_item.dart';
 import '../../domain/repositories/imported_source_store.dart';
 import '../../domain/repositories/media_store.dart';
+import '../../domain/review_card_mode.dart';
 
 /// Imports a (legacy, uncompressed) Anki `.apkg` package.
 ///
@@ -26,6 +28,8 @@ import '../../domain/repositories/media_store.dart';
 /// failure surfaces as a [DeckImportException] so the UI can stay friendly.
 class AnkiApkgImportAdapter implements DeckImportAdapter {
   const AnkiApkgImportAdapter();
+
+  static const NoteTypeAwareCardMapper _mapper = NoteTypeAwareCardMapper();
 
   @override
   Future<DeckImportPreview> preview(Uint8List bytes) async {
@@ -62,36 +66,28 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
             ? ImportProgressMode.kept
             : ImportProgressMode.fresh;
 
+    final String deckId = 'anki-${importedAt.millisecondsSinceEpoch}';
+
+    // Build the lossless source, then derive each Decko card from it — note-type
+    // aware where the template/fields allow, positional otherwise (DEC-019).
+    final ImportedAnkiSource source = _sourceFor(parsed, deckId);
+    final Map<String, ImportedAnkiCardSource> cardSourceById =
+        <String, ImportedAnkiCardSource>{
+      for (final ImportedAnkiCardSource cs in source.cardSources)
+        cs.sourceCardId: cs,
+    };
+
     final List<LearningItem> items = <LearningItem>[
       for (final _Card c in parsed.cards)
-        LearningItem(
-          id: 'anki-card-${c.cardId}',
-          front: c.front,
-          back: c.back,
-          reading: c.reading,
-          example: c.example,
-          importedProgress: keep
-              ? ImportedCardProgress(
-                  state: c.state,
-                  sourceCardId: '${c.cardId}',
-                  sourceNoteId: '${c.noteId}',
-                  dueAt: c.dueAt,
-                  intervalDays: c.intervalDays,
-                  reps: c.reps,
-                  lapses: c.lapses,
-                  easeFactor: c.easeFactor,
-                )
-              : null,
-        ),
+        _itemFor(c, source, cardSourceById['${c.cardId}'], keep),
     ];
 
-    final String deckId = 'anki-${importedAt.millisecondsSinceEpoch}';
     if (mediaStore != null && parsed.mediaMap.isNotEmpty) {
       await _extractMedia(parsed, deckId, mediaStore);
     }
     // Preserve the lossless Anki source alongside the deck (DEC-016).
     if (sourceStore != null) {
-      await sourceStore.saveSource(_sourceFor(parsed, deckId));
+      await sourceStore.saveSource(source);
     }
 
     return Deck(
@@ -100,6 +96,58 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       description: 'Imported from Anki · ${items.length} cards',
       items: items,
       importInfo: DeckImportInfo(progressMode: mode, importedAt: importedAt),
+    );
+  }
+
+  /// Builds the Decko [LearningItem] for one Anki card.
+  ///
+  /// Keeps the id stable (`anki-card-<cardId>`) and the imported progress from
+  /// the card row, so review state / FSRS are never reset — only the content
+  /// arrangement changes. Uses the note-type-aware mapper when it recognises the
+  /// source; otherwise keeps the positional mapping (simple/demo decks).
+  LearningItem _itemFor(
+    _Card c,
+    ImportedAnkiSource source,
+    ImportedAnkiCardSource? cardSource,
+    bool keep,
+  ) {
+    String front = c.front;
+    String back = c.back;
+    String? reading = c.reading;
+    String? example = c.example;
+    ReviewCardMode mode = ReviewCardMode.generic;
+
+    if (cardSource != null) {
+      final CardMapping m =
+          _mapper.map(source: source, cardSource: cardSource);
+      if (m.recognized) {
+        front = m.front;
+        back = m.back;
+        reading = m.reading;
+        example = m.example;
+        mode = m.mode;
+      }
+    }
+
+    return LearningItem(
+      id: 'anki-card-${c.cardId}',
+      front: front,
+      back: back,
+      reading: reading,
+      example: example,
+      mode: mode,
+      importedProgress: keep
+          ? ImportedCardProgress(
+              state: c.state,
+              sourceCardId: '${c.cardId}',
+              sourceNoteId: '${c.noteId}',
+              dueAt: c.dueAt,
+              intervalDays: c.intervalDays,
+              reps: c.reps,
+              lapses: c.lapses,
+              easeFactor: c.easeFactor,
+            )
+          : null,
     );
   }
 

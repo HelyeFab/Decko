@@ -274,6 +274,22 @@ re-inventing equivalents.
 - Reuses the shelf-card idiom (rounded `cardColor` + `outlineVariant` border),
   `SectionHeader`, and pill chips — no new primitives.
 
+### Added in MVP_010 (note-type-aware cards, DEC-019)
+
+- **Mode eyebrow** — `DeckoCard` shows a quiet small-caps eyebrow
+  (`LISTENING` / `READING` / `PRODUCTION`) on both faces when
+  `LearningItem.mode != generic`. Deliberately understated: muted
+  `onSurfaceVariant`, letter-spaced `labelSmall`, **no badge or pill** — guides
+  without making Decko feel like Anki's chrome. Nothing renders for `generic`.
+- **Card-mapping inspect** — the imported-source screen gained a "Card mapping"
+  section: one card per template showing the mapped Decko mode (a small
+  secondary-container chip), the `Matched by …` rationale, and the FRONT / BACK
+  source field lists — so import decisions are explainable.
+- Per-mode front emphasis (audio-first listening, Japanese-text reading,
+  English-prompt production) is driven by content arrangement from the
+  `NoteTypeAwareCardMapper`, not new card widgets — the two-sided flip card is
+  unchanged.
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

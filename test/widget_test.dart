@@ -28,6 +28,7 @@ import 'package:decko/domain/repositories/settings_repository.dart';
 import 'package:decko/domain/review_card_state.dart';
 import 'package:decko/app/theme/card_theme_config.dart';
 import 'package:decko/core/widgets/decko_card.dart';
+import 'package:decko/domain/review_card_mode.dart';
 import 'package:decko/domain/review_session_result.dart';
 import 'package:decko/features/import/widgets/import_preview_panel.dart';
 
@@ -647,6 +648,55 @@ void main() {
     expect(find.text('to eat'), findsOneWidget); // meaning
     expect(find.text('EXAMPLE'), findsOneWidget); // separated, labelled box
     expect(find.text('I eat every day.'), findsOneWidget); // translation
+  });
+
+  testWidgets('Listening card shows a quiet LISTENING eyebrow',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: DeckoCard(
+          item: LearningItem(
+            id: 'x',
+            front: 'listen',
+            back: '会社',
+            mode: ReviewCardMode.listening,
+          ),
+          deckId: 'd',
+          style: CardThemeStyle.minimal,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('LISTENING'), findsOneWidget);
+  });
+
+  testWidgets('Production card prompts in English, hides Japanese until flip',
+      (WidgetTester tester) async {
+    Widget card({required bool revealed}) => MaterialApp(
+          home: Scaffold(
+            body: DeckoCard(
+              item: const LearningItem(
+                id: 'x',
+                front: 'company',
+                back: '会社',
+                mode: ReviewCardMode.production,
+              ),
+              deckId: 'd',
+              style: CardThemeStyle.minimal,
+              revealed: revealed,
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(card(revealed: false));
+    await tester.pumpAndSettle();
+    expect(find.text('PRODUCTION'), findsOneWidget);
+    expect(find.text('company'), findsOneWidget); // English prompt
+    expect(find.text('会社'), findsNothing); // Japanese hidden before flip
+
+    await tester.pumpWidget(card(revealed: true));
+    await tester.pumpAndSettle();
+    expect(find.text('会社'), findsOneWidget); // revealed on the back
   });
 
   testWidgets('Swipe-left deletes an imported deck after confirmation',

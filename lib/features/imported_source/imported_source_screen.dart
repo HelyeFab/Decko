@@ -5,7 +5,9 @@ import '../../app/decko_app.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_app_bar.dart';
 import '../../core/widgets/section_header.dart';
+import '../../domain/import/note_type_aware_card_mapper.dart';
 import '../../domain/import/source/imported_anki_source.dart';
+import '../../domain/review_card_mode.dart';
 
 /// Inspect the lossless Anki source preserved for an imported deck (MVP_009).
 ///
@@ -115,6 +117,19 @@ class _SourceBody extends StatelessWidget {
       perTemplate[key] = (perTemplate[key] ?? 0) + 1;
     }
 
+    // One representative card per template, run through the note-type-aware
+    // mapper to explain how each becomes a Decko mode (MVP_010).
+    const NoteTypeAwareCardMapper mapper = NoteTypeAwareCardMapper();
+    final Set<String> seenTemplate = <String>{};
+    final List<(ImportedAnkiCardSource, CardMapping)> mappings =
+        <(ImportedAnkiCardSource, CardMapping)>[];
+    for (final ImportedAnkiCardSource c in source.cardSources) {
+      final String key = c.templateName ?? 'ord${c.templateOrdinal}';
+      if (seenTemplate.add(key)) {
+        mappings.add((c, mapper.map(source: source, cardSource: c)));
+      }
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         DeckoSpacing.pagePadding,
@@ -139,19 +154,25 @@ class _SourceBody extends StatelessWidget {
           _ModelCard(model: m),
           const SizedBox(height: DeckoSpacing.md),
         ],
-        if (perTemplate.isNotEmpty) ...<Widget>[
+        if (mappings.isNotEmpty) ...<Widget>[
           const SizedBox(height: DeckoSpacing.sm),
           const SectionHeader(
-            title: 'Cards by template',
-            subtitle: 'Each note’s cards keep their template identity.',
+            title: 'Card mapping',
+            subtitle: 'How each template becomes a Decko study mode.',
           ),
           const SizedBox(height: DeckoSpacing.md),
-          _ChipsCard(
-            chips: <Widget>[
-              for (final MapEntry<String, int> e in perTemplate.entries)
-                _CountChip(label: e.key, count: e.value),
+          for (final (ImportedAnkiCardSource c, CardMapping m) in mappings)
+            ...<Widget>[
+              _MappingCard(
+                templateLabel:
+                    c.templateName ?? 'Card ${c.templateOrdinal + 1}',
+                count: perTemplate[
+                        c.templateName ?? 'Card ${c.templateOrdinal + 1}'] ??
+                    1,
+                mapping: m,
+              ),
+              const SizedBox(height: DeckoSpacing.md),
             ],
-          ),
         ],
         const SizedBox(height: DeckoSpacing.xl),
         SectionHeader(
@@ -394,30 +415,6 @@ class _FieldRow extends StatelessWidget {
   }
 }
 
-class _ChipsCard extends StatelessWidget {
-  const _ChipsCard({required this.chips});
-
-  final List<Widget> chips;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(DeckoSpacing.lg),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(DeckoRadii.lg),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Wrap(
-        spacing: DeckoSpacing.sm,
-        runSpacing: DeckoSpacing.sm,
-        children: chips,
-      ),
-    );
-  }
-}
-
 class _MiniLabel extends StatelessWidget {
   const _MiniLabel({required this.text});
 
@@ -463,16 +460,100 @@ class _PlainChip extends StatelessWidget {
   }
 }
 
-class _CountChip extends StatelessWidget {
-  const _CountChip({required this.label, required this.count});
+/// Explains how one Anki template maps to a Decko mode, with the rationale and
+/// which source fields feed the front vs back (MVP_010 inspect aid).
+class _MappingCard extends StatelessWidget {
+  const _MappingCard({
+    required this.templateLabel,
+    required this.count,
+    required this.mapping,
+  });
 
-  final String label;
+  final String templateLabel;
   final int count;
+  final CardMapping mapping;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(DeckoSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  '$templateLabel · ${count == 1 ? '1 card' : '$count cards'}',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              _ModeChip(mode: mapping.mode),
+            ],
+          ),
+          const SizedBox(height: DeckoSpacing.sm),
+          Text(
+            'Matched by ${mapping.matchedBy}',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: DeckoSpacing.md),
+          _FieldsLine(label: 'FRONT', fields: mapping.frontFields),
+          const SizedBox(height: DeckoSpacing.xs),
+          _FieldsLine(label: 'BACK', fields: mapping.backFields),
+        ],
+      ),
+    );
+  }
+}
+
+class _FieldsLine extends StatelessWidget {
+  const _FieldsLine({required this.label, required this.fields});
+
+  final String label;
+  final List<String> fields;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SizedBox(width: 48, child: _MiniLabel(text: label)),
+        const SizedBox(width: DeckoSpacing.sm),
+        Expanded(
+          child: Text(
+            fields.isEmpty ? '—' : fields.join(', '),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: fields.isEmpty
+                  ? theme.colorScheme.onSurfaceVariant
+                  : theme.colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({required this.mode});
+
+  final ReviewCardMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final String text = mode.label ?? 'GENERIC';
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: DeckoSpacing.md,
@@ -483,10 +564,11 @@ class _CountChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(DeckoRadii.pill),
       ),
       child: Text(
-        '$label · $count',
-        style: theme.textTheme.labelMedium?.copyWith(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
           color: scheme.onSecondaryContainer,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
         ),
       ),
     );

@@ -101,8 +101,15 @@ Small, intentionally-postponed improvements captured so they are not lost.
   full Anki source — every named field (raw + plain + media refs), tags, model
   field/template definitions, and card→template links — persisted per deck, with a
   Decko-styled "View imported source" inspect screen on deck detail and
-  named-field / Listening-Reading-Production template tests. Note-type-aware
-  *rendering* of that data is the next step (MVP_010).
+  named-field / Listening-Reading-Production template tests.
+- ~~**Note-type-aware card mapping.**~~ DONE (MVP_010, DEC-019): a pure
+  `NoteTypeAwareCardMapper` consumes the preserved source to produce distinct
+  Listening / Reading / Production presentations (audio-first / text / English-
+  prompt) instead of 3× lookalikes, with a quiet mode eyebrow on the card and
+  mapping rationale in the inspect screen. `LearningItem.id` is unchanged so
+  progress/FSRS are safe; simple decks fall back to generic. Next: learner
+  control — MVP_011 (Study Options & Deck Overrides), then MVP_012 (Advanced
+  Deck Option Profiles).
 
 ## I2 — APKG Import Beta
 

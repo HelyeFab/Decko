@@ -24,6 +24,7 @@ import 'package:decko/domain/import/deck_import_preview.dart';
 import 'package:decko/domain/import/imported_card_state.dart';
 import 'package:decko/domain/import/source/imported_anki_source.dart';
 import 'package:decko/domain/repositories/imported_source_store.dart';
+import 'package:decko/domain/review_card_mode.dart';
 
 final String _fs = String.fromCharCode(0x1f); // Anki field separator
 
@@ -598,6 +599,67 @@ void main() {
       );
       // Review still opens: the deck produced usable Decko cards.
       expect(deck.items, isNotEmpty);
+    });
+  });
+
+  group('note-type-aware card mapping (MVP_010)', () {
+    test('a 3-template note produces 3 distinct, mode-tagged Decko cards',
+        () async {
+      final Uint8List bytes = _buildSourceApkg(
+        deckName: 'JP 3-card',
+        modelsJson: _modelJson('m', 'JP', <String>[
+          'Expression', 'Meaning', 'Audio', 'Sentence', 'Sentence Audio',
+          'Image',
+        ], <String>['Listening', 'Reading', 'Production']),
+        notes: const <_SrcNote>[
+          _SrcNote(id: 100, mid: 'm', flds: <String>[
+            '会社[かいしゃ]',
+            'company',
+            '[sound:word.mp3]',
+            '会社へ行く',
+            '[sound:sent.mp3]',
+            '<img src="office.jpg">',
+          ]),
+        ],
+        cards: const <_SrcCard>[
+          _SrcCard(id: 200, nid: 100, ord: 0),
+          _SrcCard(id: 201, nid: 100, ord: 1),
+          _SrcCard(id: 202, nid: 100, ord: 2),
+        ],
+      );
+
+      final Deck deck = await adapter.importDeck(bytes,
+          keepProgress: false, importedAt: DateTime(2026, 6, 20));
+
+      expect(deck.items, hasLength(3));
+      // Stable ids = imported progress / FSRS safety.
+      expect(deck.items.map((i) => i.id).toList(),
+          <String>['anki-card-200', 'anki-card-201', 'anki-card-202']);
+      // Three distinct study modes, not lookalikes.
+      expect(
+        deck.items.map((i) => i.mode).toSet(),
+        <ReviewCardMode>{
+          ReviewCardMode.listening,
+          ReviewCardMode.reading,
+          ReviewCardMode.production,
+        },
+      );
+      final listening =
+          deck.items.firstWhere((i) => i.mode == ReviewCardMode.listening);
+      final production =
+          deck.items.firstWhere((i) => i.mode == ReviewCardMode.production);
+      expect(listening.front, contains('[sound:word.mp3]'));
+      expect(listening.front, isNot(contains('会社'))); // audio-first
+      expect(production.front, contains('company'));
+      expect(production.front, isNot(contains('会社'))); // Japanese hidden
+    });
+
+    test('a simple positional deck stays generic (fallback unchanged)',
+        () async {
+      final Deck deck = await adapter.importDeck(mixedDeck(),
+          keepProgress: false, importedAt: DateTime(2026, 6, 20));
+      expect(deck.items.every((i) => i.mode == ReviewCardMode.generic), isTrue);
+      expect(deck.items.first.front, '食べる'); // positional content preserved
     });
   });
 }
