@@ -58,7 +58,9 @@ class DeckoFieldContent extends StatelessWidget {
             baseStyle: baseStyle,
           ));
         case AudioSegment(:final String fileName):
-          inline.add(_AudioButton(deckId: deckId, fileName: fileName));
+          // Audio sits on its own line (under the word / sentence), not inline.
+          flush();
+          blocks.add(_AudioButton(deckId: deckId, fileName: fileName));
         case ImageSegment(:final String fileName):
           flush();
           blocks.add(Padding(
