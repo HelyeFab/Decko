@@ -29,6 +29,22 @@ The key product promise is:
 
 > I can create a study profile once, reuse it across multiple decks, and optionally tune advanced scheduling/media behaviour without breaking Decko’s simpler defaults.
 
+## Critical Anki-parity loose ends from MVP_011
+
+MVP_011 intentionally shipped two honest limitations. Because Decko’s goal is to support a close Anki-compatible study experience, these must not be treated as cosmetic follow-ups:
+
+1. **Daily limits are currently per-session caps.**
+   - MVP_011 can cap new/review/session size, but reopening a session later the same day can grant a fresh allowance.
+   - MVP_012 should either implement true daily accounting or explicitly mark it as the next blocking scheduler-parity item.
+   - A true implementation should track cards studied today by deck/profile, reset at the correct day boundary, and make the remaining allowance visible or testable.
+
+2. **Bury siblings is stored but not enforced.**
+   - MVP_011 stores the preference, but the queue does not yet hide sibling cards from the same Anki note.
+   - For Anki-like behaviour, effective options must drive queue filtering so related new/review cards are buried until tomorrow after one sibling is shown or reviewed.
+   - Burying must never delete cards or reset FSRS state.
+
+If MVP_012 cannot complete both of these, it must clearly report which one remains and why. Do not let these disappear behind profile-management UI.
+
 ## Context
 
 This MVP assumes MVP_011 has shipped:
@@ -193,20 +209,36 @@ New-card order: in deck order / random
 
 Avoid raw FSRS weights for now.
 
-### 6. Improve sibling burying semantics
+### 6. Implement or explicitly advance sibling burying semantics
 
-If the imported Anki data can identify siblings or note relationships, improve burying behaviour.
+Because MVP_011 only stores bury-siblings without enforcing it, MVP_012 should treat this as Anki-parity work.
 
 Expected behaviour:
 
-- If a card from a note is reviewed today, sibling cards from the same note may be buried until tomorrow when burying is enabled.
+- If a card from a note is studied today, sibling cards from the same note may be buried until tomorrow when burying is enabled.
+- Sibling identity should come from the preserved Anki source where available: note id / card source / imported source links.
 - Burying should be controlled by effective options.
 - Burying must not delete or permanently hide cards.
+- Burying must not reset FSRS state.
 - Due counts should reflect buried cards clearly if possible.
 
 If sibling identity is not reliable yet, record that limitation and keep the UI honest.
 
-### 7. Add import-aware profile suggestions
+### 7. Implement or explicitly advance true daily limits
+
+Because MVP_011 limits are per-session, MVP_012 should either make them true daily limits or create a dedicated next-MVP blocker.
+
+Expected behaviour:
+
+- Track new/review counts already consumed today.
+- Reopening a session on the same day should not reset the allowance.
+- The day boundary should be deterministic and testable.
+- Counts should be per deck or per effective profile, whichever matches the final option-resolution model.
+- Tests should cover starting a second session on the same day and after the next-day reset.
+
+This is required for Anki-like study control. Do not describe daily limits as complete until this exists.
+
+### 8. Add import-aware profile suggestions
 
 When importing a deck, Decko may suggest an option profile based on media/card characteristics.
 
@@ -218,7 +250,7 @@ Examples:
 
 This should be a suggestion only, not automatic behaviour that surprises the user.
 
-### 8. Keep simple mode simple
+### 9. Keep simple mode simple
 
 Decko should still feel approachable.
 
@@ -282,11 +314,16 @@ Avoid making the user learn Anki terminology unless necessary.
 - [ ] Existing MVP_011 options continue to work.
 - [ ] Advanced scheduling settings are optional and do not break FSRS.
 - [ ] Desired retention and maximum interval, if implemented, are tested.
-- [ ] Sibling burying behaviour is tested if implemented.
+- [ ] Sibling burying behaviour is implemented or explicitly deferred with a blocking follow-up.
+- [ ] If sibling burying is implemented, sibling cards from the same imported note are hidden until tomorrow when burying is enabled.
+- [ ] True daily limits are implemented or explicitly deferred with a blocking follow-up.
+- [ ] If true daily limits are implemented, a second same-day session does not reset the allowance.
 - [ ] Imported progress is not reset.
 - [ ] Existing deck import, media, review, and progress flows still work.
 - [ ] `flutter analyze` passes.
 - [ ] Tests cover profile resolution and deck assignment.
+- [ ] Tests cover true daily limits and/or the documented deferred blocker.
+- [ ] Tests cover sibling burying and/or the documented deferred blocker.
 
 ## Approval report required
 
@@ -299,9 +336,10 @@ When complete, report:
 5. UI added.
 6. Advanced settings included or deferred.
 7. Sibling burying behaviour.
-8. Tests added.
-9. Known limitations.
-10. Recommendation for next MVP.
+8. True daily limit behaviour.
+9. Tests added.
+10. Known limitations.
+11. Recommendation for next MVP.
 
 ## Likely next MVP
 
