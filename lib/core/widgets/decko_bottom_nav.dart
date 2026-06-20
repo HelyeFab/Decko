@@ -43,10 +43,9 @@ class DeckoBottomNav extends StatelessWidget {
           DeckoSpacing.md,
         ),
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: DeckoSpacing.sm,
-            vertical: DeckoSpacing.sm,
-          ),
+          // A thin, uniform frame so the active pill sits nearly flush with the
+          // bar (fills its height) — not floating inset with a wide gap.
+          padding: const EdgeInsets.all(DeckoSpacing.xs),
           decoration: BoxDecoration(
             color: scheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(DeckoRadii.pill),
@@ -60,17 +59,16 @@ class DeckoBottomNav extends StatelessWidget {
             ],
           ),
           child: Row(
+            // spaceBetween pins the first/last items to the edges (only the
+            // bar's thin frame around them); spare room goes between items, not
+            // before the first or after the last.
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
               for (int i = 0; i < items.length; i++)
-                Expanded(
-                  // The active pill needs extra room for its label; idle items
-                  // are just icons, so give them less.
-                  flex: i == currentIndex ? 2 : 1,
-                  child: _NavButton(
-                    item: items[i],
-                    selected: i == currentIndex,
-                    onTap: () => onSelect(i),
-                  ),
+                _NavButton(
+                  item: items[i],
+                  selected: i == currentIndex,
+                  onTap: () => onSelect(i),
                 ),
             ],
           ),
@@ -112,32 +110,31 @@ class _NavButton extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(
-                horizontal: DeckoSpacing.md,
-                vertical: DeckoSpacing.md,
-              ),
+              // Hug the content: an icon-only tap target when idle, an
+              // icon + label pill when active. No stretched, half-empty pill.
+              padding: selected
+                  ? const EdgeInsets.symmetric(
+                      horizontal: DeckoSpacing.lg,
+                      vertical: DeckoSpacing.md,
+                    )
+                  : const EdgeInsets.all(DeckoSpacing.md),
               decoration: BoxDecoration(
                 color: selected ? scheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(DeckoRadii.pill),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  FaIcon(item.icon, size: 17, color: fg),
+                  FaIcon(item.icon, size: selected ? 17 : 19, color: fg),
                   if (selected) ...<Widget>[
                     const SizedBox(width: DeckoSpacing.sm),
-                    Flexible(
-                      child: Text(
-                        item.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.clip,
-                        softWrap: false,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: fg,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 9,
-                        ),
+                    Text(
+                      item.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: fg,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
