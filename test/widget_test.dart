@@ -162,7 +162,9 @@ Future<void> _pumpApp(
 }
 
 Future<void> _startReviewOfFirstDeck(WidgetTester tester) async {
-  await tester.tap(find.text(DeckoStrings.demoCta));
+  // Open the deck via its shelf row (the ribbon also shows the name), then
+  // start the session from deck detail.
+  await tester.tap(find.text('Japanese Starter Deck').last);
   await tester.pumpAndSettle();
   await tester.tap(find.text('Start review'));
   await tester.pumpAndSettle();
@@ -183,8 +185,33 @@ void main() {
       (WidgetTester tester) async {
     await _pumpApp(tester);
     expect(find.text(DeckoStrings.wordmark), findsOneWidget);
-    expect(find.text('Japanese Starter Deck'), findsOneWidget);
+    // The deck name appears in the study ribbon and its shelf row.
+    expect(find.text('Japanese Starter Deck'), findsWidgets);
     expect(find.text(DeckoStrings.importCta), findsOneWidget);
+  });
+
+  testWidgets('Home leads with the study ribbon, not the marketing grid',
+      (WidgetTester tester) async {
+    await _pumpApp(tester);
+    expect(find.text('CONTINUE STUDYING'), findsOneWidget); // ribbon hero
+    expect(find.text('Your decks'), findsOneWidget);
+    // The product promise grid is no longer crowding a populated Home.
+    expect(find.text('Why you’ll love Decko'), findsNothing);
+  });
+
+  testWidgets('Empty Home keeps the inviting promise grid',
+      (WidgetTester tester) async {
+    await _pumpApp(tester, deckRepository: const _EmptyDeckRepository());
+    expect(find.text(DeckoStrings.emptyTitle), findsOneWidget);
+    expect(find.text('Why you’ll love Decko'), findsOneWidget);
+  });
+
+  testWidgets('Import action on Home opens the Import screen',
+      (WidgetTester tester) async {
+    await _pumpApp(tester);
+    await tester.tap(find.text(DeckoStrings.importCta));
+    await tester.pumpAndSettle();
+    expect(find.text('Import Anki deck (.apkg)'), findsOneWidget);
   });
 
   testWidgets('Review loop records progress shown on the Progress screen',
@@ -237,7 +264,7 @@ void main() {
     // Default is the light "Soft Study" theme.
     expect(_appBrightness(tester), Brightness.light);
 
-    await tester.tap(find.byTooltip('Theme gallery'));
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Decko Dark'));
     await tester.pumpAndSettle();
@@ -277,19 +304,16 @@ void main() {
     expect(find.text('Japanese Starter Deck'), findsNothing);
   });
 
-  testWidgets('Theme gallery and import screens open cleanly',
+  testWidgets('Settings and Import tabs open from the floating nav',
       (WidgetTester tester) async {
     await _pumpApp(tester);
 
-    await tester.tap(find.byTooltip('Theme gallery'));
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     expect(find.text('App themes'), findsOneWidget);
     expect(find.text('Card themes'), findsOneWidget);
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text(DeckoStrings.importCta));
+    await tester.tap(find.byTooltip('Import'));
     await tester.pumpAndSettle();
     expect(find.text('Import Anki deck (.apkg)'), findsOneWidget);
     expect(find.text('Coming soon'), findsWidgets); // CSV/JSON still placeholder
@@ -393,7 +417,7 @@ void main() {
         deckRepository: _FixedDeckRepository(<Deck>[deck]),
         reviewStateRepository: states);
 
-    await tester.tap(find.text('Imported'));
+    await tester.tap(find.text('Imported').last); // the shelf row, not the ribbon
     await tester.pumpAndSettle();
 
     // Two review cards due/reviewed; total 3.
@@ -434,7 +458,7 @@ void main() {
         deckRepository: _FixedDeckRepository(<Deck>[deck]),
         reviewStateRepository: states);
 
-    await tester.tap(find.text('My Deck'));
+    await tester.tap(find.text('My Deck').last); // the shelf row, not the ribbon
     await tester.pumpAndSettle();
     expect(find.text('2'), findsNWidgets(3)); // total + due + reviewed all 2
 
@@ -485,7 +509,7 @@ void main() {
         deckRepository: _FixedDeckRepository(<Deck>[deck]),
         reviewStateRepository: states);
 
-    await tester.tap(find.text('Mid Deck'));
+    await tester.tap(find.text('Mid Deck').last); // the shelf row, not the ribbon
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start review'));
     await tester.pumpAndSettle();
@@ -553,8 +577,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Imported Z'), findsNothing);
-    // Demo decks remain.
-    expect(find.text('Japanese Starter Deck'), findsOneWidget);
+    // Demo decks remain (in the ribbon and/or the shelf row).
+    expect(find.text('Japanese Starter Deck'), findsWidgets);
   });
 
   testWidgets('Empty due queue shows the all-caught-up state',
@@ -617,7 +641,7 @@ void main() {
         deckRepository: _FixedDeckRepository(<Deck>[deck]),
         reviewStateRepository: states);
 
-    await tester.tap(find.text('Mixed Deck'));
+    await tester.tap(find.text('Mixed Deck').last); // the shelf row, not the ribbon
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start review'));
     await tester.pumpAndSettle();

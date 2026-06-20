@@ -6,6 +6,7 @@ import '../../app/theme/app_theme_config.dart';
 import '../../app/theme/card_theme_config.dart';
 import '../../app/theme/theme_controller.dart';
 import '../../app/theme/theme_registry.dart';
+import '../../core/widgets/decko_app_bar.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_card.dart';
 import '../../core/widgets/section_header.dart';
@@ -24,7 +25,7 @@ class ThemeGalleryScreen extends StatelessWidget {
     final ThemeController controller = DeckoApp.themeOf(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Theme gallery')),
+      appBar: const DeckoAppBar(title: 'Theme gallery'),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(DeckoSpacing.pagePadding),

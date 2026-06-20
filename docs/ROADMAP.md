@@ -93,6 +93,14 @@ Small, intentionally-postponed improvements captured so they are not lost.
 - **Review-state storage at scale.** Per-card review state is a per-deck JSON
   blob in shared_preferences, flushed on session exit. Very large libraries
   will want a real DB behind `ReviewStateRepository`. (DEC-011.)
+- ~~**App shell + Home/Import crowding.**~~ DONE (MVP_008.5, DEC-017): added the
+  reusable `DeckoAppBar`, made Home study-first (the `StudyRibbon` hero + compact
+  `DeckRow` shelf + dashed Import row), moved the marketing promise grid to the
+  empty state only, and kept Import on its own screen.
+- **Lossless Anki source — inspect UI.** The lossless source is now preserved on
+  import (MVP_009 data layer, DEC-016), but the deck-detail "View imported source"
+  affordance and named-field/template tests are still pending — the remaining
+  slice of MVP_009 before note-type-aware rendering (MVP_010).
 
 ## I2 — APKG Import Beta
 

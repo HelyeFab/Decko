@@ -391,3 +391,68 @@ All app icons use **`font_awesome_flutter`** (free tier) rendered with `FaIcon`;
 - One coherent icon style; new icons should be `FontAwesomeIcons.*` + `FaIcon`.
 - `FaIconData` ≠ `IconData`, so icon params/lists use `FaIconData`.
 - Centre fixed-size icon chips/badges explicitly.
+
+## DEC-016: Lossless Anki source preserved alongside each imported deck
+
+Date: 2026-06-20
+Status: Accepted
+
+### Context
+
+Decko's importer is positional/template-blind: it maps Anki fields by index and collapses a note's multiple card templates (e.g. Listening/Reading/Production) into identical Decko cards. Before we can render note-type-aware cards (MVP_010), the full Anki source must survive import — named fields with raw + plain values, tags, model/field/template definitions, and card→note→template links — not just the simplified study card.
+
+### Decision
+
+- A framework-light domain model (`ImportedAnkiSource`: models, notes with named `ImportedAnkiField`s + tags, and `ImportedAnkiCardSource` links) captures the lossless source.
+- During import the adapter parses `col.models`, names each note field by ordinal, records per-field media references, and links each card to its template ordinal.
+- Persistence is a JSON file **per deck** under `<appSupport>/decko_source/<deckId>.json` via an `ImportedSourceStore` interface (`FileImportedSourceStore`) — kept off `shared_preferences` because the source can be several MB for a large deck; loaded on demand, removed when the deck is deleted.
+- The simplified study card is still derived as before; the source sits beside it. No rendering, scheduling, or review changes.
+
+### Consequences
+
+- Note-type-aware rendering (MVP_010) has the data it needs without re-importing.
+- Larger on-disk footprint per imported deck (one JSON blob); acceptable and isolated to local app-support storage.
+- Inspect UI for the preserved source is still pending (the remaining slice of MVP_009).
+
+## DEC-017: Reusable app shell, and Home separated from the Import workflow
+
+Date: 2026-06-20
+Status: Accepted
+
+### Context
+
+Home (the deck library) had grown into a single crowded page — branding, decks, import CTAs, and a marketing "Why you'll love Decko" promise grid all competed for the same space — and every screen hand-rolled its own `AppBar`. Decko's promise ("Import your deck. Study it beautifully.") asks for a calmer, more intentional structure.
+
+### Decision
+
+- **Shared chrome:** `DeckoAppBar` (a `PreferredSizeWidget`) gives one app-bar pattern — a `wordmark` register for Home and a `title` register for sub-screens — adopted across Home, Import, Deck Detail, Progress, and Themes so chrome never drifts back to stock Material.
+- **Home = study-first (Direction A):** the hero is the next study action — a `StudyRibbon` with a stacked-flashcard motif naming the resume deck (the one with the most cards waiting) and its ready count, softening to a calm "all caught up" state when nothing is due. Below it a compact deck shelf (`DeckRow`) with live per-deck "to study" badges, then a quiet dashed Import row. Live counts come from `DueQueue.build` over persisted review state and refresh on return from a session.
+- **Import = its own screen:** the pick → preview → keep/fresh flow stays on `/import`; Home only links to it. The product promise grid now lives **only** in Home's empty state.
+
+### Consequences
+
+- Home answers "what can I study, what decks do I have, how do I import" and nothing more; a learner with decks sees decks, not a brochure.
+- One app-bar/shell pattern to evolve; new screens reuse `DeckoAppBar`.
+- The resume deck and badges depend on review state, so Home does a small per-deck state read on load (and on return from study).
+
+## DEC-018: Floating bottom nav over a StatefulShellRoute (Home/Import/Progress/Settings)
+
+Date: 2026-06-20
+Status: Accepted
+
+### Context
+
+Primary destinations were reached from app-bar action icons on Home, which doesn't scale and buries Import/Progress/Settings. The product owner asked for a floating nav bar carrying Home, Import, Progress, and Settings (the theme gallery).
+
+### Decision
+
+- **Navigation:** a `StatefulShellRoute.indexedStack` with four branches (`/`, `/import`, `/progress`, `/settings`) behind `DeckoShell`, so each tab keeps its own navigation stack and the bar persists. Tab switches use `navigationShell.goBranch` (re-tapping the active tab pops it to root).
+- **Full-screen routes:** **deck detail** is a sub-route of the Home branch (keeps the bar; Back returns to Home), while the **review session** is pushed on the **root** navigator (`parentNavigatorKey`) so study plays full-screen without the bar.
+- **The bar:** `DeckoBottomNav` — a rounded, elevated, *floating* bar (margin + shadow), never the stock edge-to-edge `NavigationBar`. The active destination expands into a labelled primary pill; the others stay quiet icons. Every item has a tooltip/semantics label.
+- **Settings tab** currently hosts the existing theme gallery (renamed destination, same screen); Import is now a first-class tab and resets to idle after a successful import (it persists in the shell). Home's app-bar action icons were removed; its Import ghost row now switches to the Import tab.
+
+### Consequences
+
+- Import/Progress/Settings are always one tap away; tab state survives switching.
+- Deck detail shows the bar (a content screen within Home); only review is immersive.
+- Going forward, new top-level destinations are added as shell branches; transient/full-screen flows attach to the root navigator.

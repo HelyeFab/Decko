@@ -215,6 +215,51 @@ re-inventing equivalents.
   direction (rounded, elevated, active-tab-labelled) — would need a
   `StatefulShellRoute` refactor; tracked in ROADMAP Deferred Notes, not built.
 
+### Added in MVP_008.5 (app shell + Home/Import separation, DEC-017)
+
+- **`DeckoAppBar`** (`core/widgets/decko_app_bar.dart`) — the shared app-bar
+  pattern. `DeckoAppBar.wordmark(actions:)` stamps the Decko wordmark (Home);
+  `DeckoAppBar(title:, actions:)` shows a screen title (sub-screens). Flat
+  (`scrolledUnderElevation: 0`, no surface tint) so chrome stays calm. Adopted by
+  Home, Import, Deck Detail, Progress, and Themes. Use it instead of a bare
+  `AppBar`.
+- **`StudyRibbon`** (`features/deck_library/widgets/study_ribbon.dart`) — Home's
+  hero and signature element: a **stacked-flashcard** band (offset card edges
+  peeking behind a gradient face) naming the **resume deck** (most cards waiting)
+  and its ready count, with a pill **Study** button. Softens to a quiet
+  "all caught up" surface when nothing is due. The one bold element on Home;
+  everything around it stays quiet.
+- **`DeckRow`** (`features/deck_library/widgets/deck_row.dart`) — the compact deck
+  shelf row: icon, name, `N cards · Imported/Demo`, and a live **to-study badge**
+  (filled primary pill when cards wait, a quiet check when caught up). Replaces the
+  large `DeckTile` on Home. Imported rows remain swipe-to-delete via `Dismissible`
+  + `DeckoConfirmDialog`.
+- **`DottedOutline`** (in `deck_library_screen.dart`) — a rounded dashed border
+  (`CustomPainter`) used for the calm "Import a deck" ghost row at the foot of the
+  shelf.
+- **Home hierarchy** — ribbon → "Your decks" shelf → dashed Import row. Live
+  per-deck counts come from `DueQueue.build` over persisted review state and
+  refresh when returning from a session. The product **promise grid lives only in
+  Home's empty state** now, never crowding a populated Home.
+
+### Added in MVP_008.5b (floating bottom nav, DEC-018)
+
+- **`DeckoBottomNav`** (`core/widgets/decko_bottom_nav.dart`) — the floating
+  primary navigation: a rounded, elevated bar that hovers with a margin (never
+  stock edge-to-edge `NavigationBar`). The **active** destination expands into a
+  labelled primary pill; the rest are quiet `onSurfaceVariant` icons. Takes
+  `items` / `currentIndex` / `onSelect`; every item has a tooltip + selected
+  semantics. Default tabs: Home (`house`), Import (`fileImport`), Progress
+  (`chartLine`), Settings (`gear`).
+- **`DeckoShell`** (`app/decko_shell.dart`) — hosts a `StatefulNavigationShell`
+  (the four-branch `StatefulShellRoute.indexedStack`) as the body with
+  `DeckoBottomNav` as the `bottomNavigationBar`. Re-tapping the active tab pops
+  that branch to its root. **Deck detail** lives inside the Home branch (bar stays,
+  Back → Home); the **review session** is pushed on the root navigator so it plays
+  full-screen over the bar.
+- Home's app-bar action icons were removed (those destinations are now tabs); the
+  Home Import affordances switch to the Import tab via `context.go`.
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

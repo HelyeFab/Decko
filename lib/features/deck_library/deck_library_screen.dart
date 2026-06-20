@@ -7,102 +7,114 @@ import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/constants/decko_strings.dart';
+import '../../core/widgets/decko_app_bar.dart';
 import '../../core/widgets/decko_confirm_dialog.dart';
 import '../../core/widgets/decko_snackbar.dart';
 import '../../core/widgets/promise_tile.dart';
 import '../../core/widgets/section_header.dart';
 import '../../domain/deck.dart';
-import 'widgets/deck_tile.dart';
+import '../../domain/due_queue.dart';
+import '../../domain/repositories/review_state_repository.dart';
+import '../../domain/review_card_state.dart';
+import 'widgets/deck_row.dart';
 import 'widgets/empty_library_card.dart';
+import 'widgets/study_ribbon.dart';
 
-/// Decko's home: the deck library.
+/// Decko's home (MVP_008.5, Direction A — "Study ribbon").
 ///
-/// Renders the local decks from the [DeckRepository]. When the repository has
-/// no decks the MVP_001 empty state is shown as a fallback. Theme gallery and
-/// progress remain reachable from the app bar.
-class DeckLibraryScreen extends StatelessWidget {
+/// Home answers three questions and nothing more: what can I study now, what
+/// decks do I have, and how do I import another. The hero is the next study
+/// action; the deck list is a calm shelf; Import is a quiet ghost row. The
+/// import workflow lives on its own screen (DEC-017). The product promise grid
+/// only appears in the empty state, so a learner with decks sees decks.
+class DeckLibraryScreen extends StatefulWidget {
   const DeckLibraryScreen({super.key});
 
-  static const List<FaIconData> _promiseIcons = <FaIconData>[
-    FontAwesomeIcons.clock,
-    FontAwesomeIcons.palette,
-    FontAwesomeIcons.fire,
-    FontAwesomeIcons.puzzlePiece,
-  ];
+  @override
+  State<DeckLibraryScreen> createState() => _DeckLibraryScreenState();
+}
+
+class _DeckLibraryScreenState extends State<DeckLibraryScreen> {
+  /// deckId -> cards available to study now. Null entry = still loading.
+  Future<Map<String, int>>? _counts;
+  String _signature = '';
+
+  Future<Map<String, int>> _loadCounts(
+      List<Deck> decks, ReviewStateRepository repo) async {
+    final DateTime now = DateTime.now();
+    final Map<String, int> out = <String, int>{};
+    for (final Deck deck in decks) {
+      final List<ReviewCardState> states = await repo.getStatesForDeck(deck.id);
+      final Map<String, ReviewCardState> byId = <String, ReviewCardState>{
+        for (final ReviewCardState s in states) s.itemId: s,
+      };
+      out[deck.id] = DueQueue.build(deck.items, byId, now).length;
+    }
+    return out;
+  }
+
+  /// Builds the counts future once per distinct deck set; recomputed on demand
+  /// (e.g. after a session) via [_reload].
+  void _ensureCounts(List<Deck> decks, ReviewStateRepository repo) {
+    final String sig = decks.map((Deck d) => d.id).join(',');
+    if (sig != _signature || _counts == null) {
+      _signature = sig;
+      _counts = _loadCounts(decks, repo);
+    }
+  }
+
+  void _reload(List<Deck> decks, ReviewStateRepository repo) {
+    if (!mounted) return;
+    final Future<Map<String, int>> next = _loadCounts(decks, repo);
+    setState(() {
+      _counts = next;
+    });
+  }
+
+  /// Opens a route, then refreshes the live counts when it returns so the
+  /// ribbon and badges reflect any study that happened.
+  Future<void> _pushThenReload(
+      String location, List<Deck> decks, ReviewStateRepository repo) async {
+    await context.push(location);
+    _reload(decks, repo);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final DeckStore store = DeckoApp.deckStoreOf(context);
+    final ReviewStateRepository reviewState = DeckoApp.reviewStateOf(context);
 
-    void openImport() => context.push(DeckoRoutes.import);
+    // Import lives on its own tab now; the Home affordances switch to it.
+    void openImport() => context.go(DeckoRoutes.import);
 
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: DeckoSpacing.pagePadding,
-        title: Text(
-          DeckoStrings.wordmark,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: theme.colorScheme.primary,
-            letterSpacing: -0.5,
-          ),
-        ),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Theme gallery',
-            icon: const FaIcon(FontAwesomeIcons.palette),
-            onPressed: () => context.push(DeckoRoutes.themes),
-          ),
-          IconButton(
-            tooltip: 'Progress',
-            icon: const FaIcon(FontAwesomeIcons.chartLine),
-            onPressed: () => context.push(DeckoRoutes.progress),
-          ),
-          const SizedBox(width: DeckoSpacing.sm),
-        ],
-      ),
+      appBar: const DeckoAppBar.wordmark(),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: store,
           builder: (BuildContext context, _) {
             final List<Deck> decks = store.getDecks();
-            final bool hasDecks = decks.isNotEmpty;
-            void openDemo() => context.push(
-                  hasDecks
-                      ? DeckoRoutes.deck(decks.first.id)
-                      : DeckoRoutes.import,
-                );
+            _ensureCounts(decks, reviewState);
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(
-                DeckoSpacing.pagePadding,
-                DeckoSpacing.sm,
-                DeckoSpacing.pagePadding,
-                DeckoSpacing.xxxl,
-              ),
-              children: <Widget>[
-                Text(
-                  DeckoStrings.tagline,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: DeckoSpacing.xl),
-                if (!hasDecks)
-                  EmptyLibraryCard(onImport: openImport, onDemo: openDemo)
-                else
-                  _DeckList(
-                      decks: decks, onImport: openImport, onDemo: openDemo),
-                const SizedBox(height: DeckoSpacing.xxl),
-                const SectionHeader(
-                  title: 'Why you’ll love Decko',
-                  subtitle: 'Everything coming to your study sessions.',
-                ),
-                const SizedBox(height: DeckoSpacing.lg),
-                _PromiseGrid(icons: _promiseIcons),
-              ],
+            if (decks.isEmpty) {
+              return _EmptyHome(onImport: openImport, onDemo: openImport);
+            }
+
+            return FutureBuilder<Map<String, int>>(
+              future: _counts,
+              builder: (BuildContext context,
+                  AsyncSnapshot<Map<String, int>> snap) {
+                final Map<String, int>? counts = snap.data;
+                return _PopulatedHome(
+                  decks: decks,
+                  counts: counts,
+                  onOpenDeck: (Deck d) => _pushThenReload(
+                      DeckoRoutes.deck(d.id), decks, reviewState),
+                  onStudy: (Deck d) => _pushThenReload(
+                      DeckoRoutes.deckReview(d.id), decks, reviewState),
+                  onImport: openImport,
+                );
+              },
             );
           },
         ),
@@ -111,56 +123,89 @@ class DeckLibraryScreen extends StatelessWidget {
   }
 }
 
-class _DeckList extends StatelessWidget {
-  const _DeckList({
+/// Home with at least one deck: ribbon hero, deck shelf, import ghost row.
+class _PopulatedHome extends StatelessWidget {
+  const _PopulatedHome({
     required this.decks,
+    required this.counts,
+    required this.onOpenDeck,
+    required this.onStudy,
     required this.onImport,
-    required this.onDemo,
   });
 
   final List<Deck> decks;
+  final Map<String, int>? counts;
+  final ValueChanged<Deck> onOpenDeck;
+  final ValueChanged<Deck> onStudy;
   final VoidCallback onImport;
-  final VoidCallback onDemo;
+
+  /// The deck to resume: the one with the most cards waiting. Falls back to the
+  /// first deck so the caught-up ribbon still has a sensible target.
+  Deck get _resumeTarget {
+    if (counts == null) return decks.first;
+    Deck best = decks.first;
+    int bestCount = counts![best.id] ?? 0;
+    for (final Deck d in decks) {
+      final int c = counts![d.id] ?? 0;
+      if (c > bestCount) {
+        best = d;
+        bestCount = c;
+      }
+    }
+    return best;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final Deck target = _resumeTarget;
+    final int targetCount = counts?[target.id] ?? 0;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        DeckoSpacing.pagePadding,
+        DeckoSpacing.lg,
+        DeckoSpacing.pagePadding,
+        DeckoSpacing.xxxl,
+      ),
       children: <Widget>[
+        StudyRibbon(
+          target: target,
+          cardsToStudy: targetCount,
+          onStudy: () => onStudy(target),
+        ),
+        const SizedBox(height: DeckoSpacing.xxl),
         const SectionHeader(
           title: 'Your decks',
-          subtitle: 'Pick a deck to start studying.',
+          subtitle: 'Pick a deck to study or review.',
         ),
         const SizedBox(height: DeckoSpacing.lg),
         for (final Deck deck in decks) ...<Widget>[
-          _DeckListItem(deck: deck),
+          _DeckListItem(
+            deck: deck,
+            toStudy: counts?[deck.id],
+            onOpen: () => onOpenDeck(deck),
+          ),
           const SizedBox(height: DeckoSpacing.md),
         ],
         const SizedBox(height: DeckoSpacing.sm),
-        FilledButton.icon(
-          onPressed: onImport,
-          icon: const FaIcon(FontAwesomeIcons.plus),
-          label: const Text(DeckoStrings.importCta),
-        ),
-        const SizedBox(height: DeckoSpacing.md),
-        OutlinedButton.icon(
-          onPressed: onDemo,
-          icon: const FaIcon(FontAwesomeIcons.play),
-          label: const Text(DeckoStrings.demoCta),
-        ),
+        _ImportGhostRow(onTap: onImport),
       ],
     );
   }
 }
 
-/// A deck row in the library. Imported decks can be swiped left to delete
-/// (with confirmation); demo decks are not deletable.
+/// A deck row on Home. Imported decks can be swiped left to delete (with
+/// confirmation); demo decks are not deletable.
 class _DeckListItem extends StatelessWidget {
-  const _DeckListItem({required this.deck});
+  const _DeckListItem({
+    required this.deck,
+    required this.toStudy,
+    required this.onOpen,
+  });
 
   final Deck deck;
-
-  void _open(BuildContext context) => context.push(DeckoRoutes.deck(deck.id));
+  final int? toStudy;
+  final VoidCallback onOpen;
 
   Future<bool> _confirmDelete(BuildContext context) {
     return DeckoConfirmDialog.show(
@@ -184,10 +229,11 @@ class _DeckListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DeckTile tile = DeckTile(deck: deck, onTap: () => _open(context));
-    if (!deck.isImported) return tile;
+    final DeckRow row =
+        DeckRow(deck: deck, toStudy: toStudy, onTap: onOpen);
+    if (!deck.isImported) return row;
 
-    final scheme = Theme.of(context).colorScheme;
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Dismissible(
       key: ValueKey<String>('deck-${deck.id}'),
       direction: DismissDirection.endToStart,
@@ -200,10 +246,102 @@ class _DeckListItem extends StatelessWidget {
           color: scheme.errorContainer,
           borderRadius: BorderRadius.circular(DeckoRadii.lg),
         ),
-        child: FaIcon(FontAwesomeIcons.trashCan,
-            color: scheme.onErrorContainer),
+        child:
+            FaIcon(FontAwesomeIcons.trashCan, color: scheme.onErrorContainer),
       ),
-      child: tile,
+      child: row,
+    );
+  }
+}
+
+/// The calm, quiet import affordance at the foot of the shelf.
+class _ImportGhostRow extends StatelessWidget {
+  const _ImportGhostRow({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        onTap: onTap,
+        child: DottedOutline(
+          color: scheme.outline,
+          radius: DeckoRadii.lg,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DeckoSpacing.lg,
+              vertical: DeckoSpacing.lg,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                FaIcon(FontAwesomeIcons.plus,
+                    size: 15, color: scheme.primary),
+                const SizedBox(width: DeckoSpacing.sm),
+                Text(
+                  DeckoStrings.importCta,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Home before any deck exists: the inviting empty card plus the product
+/// promise grid (the only place the marketing grid still lives, MVP_008.5).
+class _EmptyHome extends StatelessWidget {
+  const _EmptyHome({required this.onImport, required this.onDemo});
+
+  final VoidCallback onImport;
+  final VoidCallback onDemo;
+
+  static const List<FaIconData> _promiseIcons = <FaIconData>[
+    FontAwesomeIcons.clock,
+    FontAwesomeIcons.palette,
+    FontAwesomeIcons.fire,
+    FontAwesomeIcons.puzzlePiece,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        DeckoSpacing.pagePadding,
+        DeckoSpacing.sm,
+        DeckoSpacing.pagePadding,
+        DeckoSpacing.xxxl,
+      ),
+      children: <Widget>[
+        Text(
+          DeckoStrings.tagline,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: DeckoSpacing.xl),
+        EmptyLibraryCard(onImport: onImport, onDemo: onDemo),
+        const SizedBox(height: DeckoSpacing.xxl),
+        const SectionHeader(
+          title: 'Why you’ll love Decko',
+          subtitle: 'Everything coming to your study sessions.',
+        ),
+        const SizedBox(height: DeckoSpacing.lg),
+        _PromiseGrid(icons: _promiseIcons),
+      ],
     );
   }
 }
@@ -236,4 +374,63 @@ class _PromiseGrid extends StatelessWidget {
       },
     );
   }
+}
+
+/// A rounded dashed border used by the import ghost row.
+class DottedOutline extends StatelessWidget {
+  const DottedOutline({
+    super.key,
+    required this.child,
+    required this.color,
+    required this.radius,
+  });
+
+  final Widget child;
+  final Color color;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(color: color, radius: radius),
+      child: child,
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  _DashedBorderPainter({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final RRect rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final Path path = Path()..addRRect(rrect);
+
+    const double dash = 6;
+    const double gap = 5;
+    for (final ui in path.computeMetrics()) {
+      double distance = 0;
+      while (distance < ui.length) {
+        canvas.drawPath(
+          ui.extractPath(distance, distance + dash),
+          paint,
+        );
+        distance += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.radius != radius;
 }

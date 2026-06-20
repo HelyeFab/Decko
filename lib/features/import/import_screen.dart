@@ -10,6 +10,7 @@ import '../../app/deck_store.dart';
 import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
 import '../../core/constants/decko_spacing.dart';
+import '../../core/widgets/decko_app_bar.dart';
 import '../../core/widgets/decko_snackbar.dart';
 import '../../core/widgets/section_header.dart';
 import '../../data/import/anki_apkg_import_adapter.dart';
@@ -96,6 +97,13 @@ class _ImportScreenState extends State<ImportScreen> {
           ReviewCardState.fromLearningItem(deck.id, item),
       ]);
       if (!mounted) return;
+      // Reset this tab to idle — it persists in the shell, so the next visit
+      // should start fresh rather than re-showing the import we just finished.
+      setState(() {
+        _phase = _Phase.idle;
+        _bytes = null;
+        _preview = null;
+      });
       // Shown on the app-level messenger, so it appears once we're on the library.
       DeckoSnackbar.showSuccess(context, 'Imported “${deck.name}”.');
       GoRouter.of(context).go(DeckoRoutes.home);
@@ -119,7 +127,7 @@ class _ImportScreenState extends State<ImportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Import a deck')),
+      appBar: const DeckoAppBar(title: 'Import a deck'),
       body: SafeArea(child: _body()),
     );
   }

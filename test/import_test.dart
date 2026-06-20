@@ -96,18 +96,15 @@ Uint8List _buildApkg({
     for (int i = 0; i < cards.length; i++) {
       final _CardSpec c = cards[i];
       final int nid = 100 + i;
-      final String flds =
-          c.fields?.join(_fs) ?? '${c.front}$_fs${c.back}$_fs${c.field2}';
+      final String flds = '${c.front}$_fs${c.back}$_fs${c.field2}';
       db.execute(
         'INSERT INTO notes (id, guid, mid, flds, tags) VALUES (?, ?, ?, ?, ?);',
-        <Object?>[nid, 'guid-$nid', c.mid ?? _defaultModelId, flds, c.tags],
+        <Object?>[nid, 'guid-$nid', _defaultModelId, flds, ''],
       );
       db.execute(
         'INSERT INTO cards (id, nid, did, ord, queue, type, due, ivl, reps, '
-        'lapses, factor) VALUES (?, ?, 1, ?, ?, ?, 0, ?, ?, 0, ?);',
-        <Object?>[
-          200 + i, nid, c.ord, c.queue, c.type, c.ivl, c.reps, c.factor,
-        ],
+        'lapses, factor) VALUES (?, ?, 1, 0, ?, ?, 0, ?, ?, 0, ?);',
+        <Object?>[200 + i, nid, c.queue, c.type, c.ivl, c.reps, c.factor],
       );
     }
   } finally {
@@ -142,10 +139,6 @@ class _CardSpec {
     this.front = 'front',
     this.back = 'back',
     this.field2 = '今日は良い天気です。',
-    this.fields,
-    this.mid,
-    this.ord = 0,
-    this.tags = '',
   });
   final int type;
   final int queue;
@@ -155,16 +148,6 @@ class _CardSpec {
   final String front;
   final String back;
   final String field2;
-
-  /// When set, these named field values are used verbatim (joined by 0x1F)
-  /// instead of front/back/field2 — used by the named-field MVP_009 tests.
-  final List<String>? fields;
-
-  /// Overrides for the lossless source: note type id, card-template ordinal,
-  /// and space-separated Anki tags.
-  final String? mid;
-  final int ord;
-  final String tags;
 }
 
 void main() {

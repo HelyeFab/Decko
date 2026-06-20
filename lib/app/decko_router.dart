@@ -9,17 +9,16 @@ import '../features/progress/progress_screen.dart';
 import '../features/review/review_session_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
 import 'decko_app.dart';
+import 'decko_shell.dart';
 
 /// Centralised route helpers so navigation calls stay typo-proof.
 abstract final class DeckoRoutes {
   static const String home = '/';
   static const String import = '/import';
-  static const String themes = '/themes';
   static const String progress = '/progress';
 
-  /// Orphan route with no deck context — redirects to the library so the user
-  /// can pick a deck first.
-  static const String review = '/review';
+  /// The Settings tab (currently the theme gallery).
+  static const String settings = '/settings';
 
   /// Deck detail for the deck with [id].
   static String deck(String id) => '/deck/$id';
@@ -28,56 +27,76 @@ abstract final class DeckoRoutes {
   static String deckReview(String id) => '/deck/$id/review';
 }
 
+/// Root navigator key — deck/review routes attach here so they cover the shell.
+final GlobalKey<NavigatorState> _rootNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'root');
+
 /// The app's GoRouter configuration.
 ///
-/// Sub-screens are pushed over the deck library so the system back button
-/// returns to the hub. Deck-scoped routes resolve the [Deck] from the
-/// [DeckRepository] in the app scope; an unknown id falls back gracefully.
+/// The four primary destinations (Home, Import, Progress, Settings) live in a
+/// [StatefulShellRoute.indexedStack] behind the floating [DeckoShell] nav bar,
+/// each keeping its own navigation state. Deck detail is pushed inside the Home
+/// branch (so the bar stays and Back returns to Home); the review session is
+/// pushed on the **root** navigator so it plays full-screen over the bar.
+/// Deck-scoped routes resolve the [Deck] from the [DeckRepository]; an unknown
+/// id falls back gracefully.
 GoRouter buildDeckoRouter() {
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: DeckoRoutes.home,
     routes: <RouteBase>[
-      GoRoute(
-        path: DeckoRoutes.home,
-        builder: (_, _) => const DeckLibraryScreen(),
-        routes: <RouteBase>[
-          GoRoute(
-            path: 'import',
-            builder: (_, _) => const ImportScreen(),
-          ),
-          GoRoute(
-            // No deck context here — send the user to the library to choose.
-            path: 'review',
-            redirect: (_, _) => DeckoRoutes.home,
-          ),
-          GoRoute(
-            path: 'themes',
-            builder: (_, _) => const ThemeGalleryScreen(),
-          ),
-          GoRoute(
-            path: 'progress',
-            builder: (_, _) => const ProgressScreen(),
-          ),
-          GoRoute(
-            path: 'deck/:deckId',
-            builder: (BuildContext context, GoRouterState state) {
-              final Deck? deck = _resolveDeck(context, state);
-              return deck == null
-                  ? const _DeckNotFound()
-                  : DeckDetailScreen(deck: deck);
-            },
-            routes: <RouteBase>[
-              GoRoute(
-                path: 'review',
-                builder: (BuildContext context, GoRouterState state) {
-                  final Deck? deck = _resolveDeck(context, state);
-                  return deck == null
-                      ? const _DeckNotFound()
-                      : ReviewSessionScreen(deck: deck);
-                },
-              ),
-            ],
-          ),
+      StatefulShellRoute.indexedStack(
+        builder: (BuildContext context, GoRouterState state,
+                StatefulNavigationShell navigationShell) =>
+            DeckoShell(navigationShell: navigationShell),
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(routes: <RouteBase>[
+            GoRoute(
+              path: DeckoRoutes.home,
+              builder: (_, _) => const DeckLibraryScreen(),
+              routes: <RouteBase>[
+                GoRoute(
+                  path: 'deck/:deckId',
+                  builder: (BuildContext context, GoRouterState state) {
+                    final Deck? deck = _resolveDeck(context, state);
+                    return deck == null
+                        ? const _DeckNotFound()
+                        : DeckDetailScreen(deck: deck);
+                  },
+                  routes: <RouteBase>[
+                    GoRoute(
+                      path: 'review',
+                      parentNavigatorKey: _rootNavigatorKey,
+                      builder: (BuildContext context, GoRouterState state) {
+                        final Deck? deck = _resolveDeck(context, state);
+                        return deck == null
+                            ? const _DeckNotFound()
+                            : ReviewSessionScreen(deck: deck);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ]),
+          StatefulShellBranch(routes: <RouteBase>[
+            GoRoute(
+              path: DeckoRoutes.import,
+              builder: (_, _) => const ImportScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: <RouteBase>[
+            GoRoute(
+              path: DeckoRoutes.progress,
+              builder: (_, _) => const ProgressScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: <RouteBase>[
+            GoRoute(
+              path: DeckoRoutes.settings,
+              builder: (_, _) => const ThemeGalleryScreen(),
+            ),
+          ]),
         ],
       ),
     ],

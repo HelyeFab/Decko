@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/decko_app.dart';
 import '../../app/decko_router.dart';
+import '../../core/widgets/decko_app_bar.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/section_header.dart';
 import '../../domain/deck.dart';
@@ -62,7 +63,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
     final int remaining = deck.itemCount - preview.length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(deck.name)),
+      appBar: DeckoAppBar(title: deck.name),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(DeckoSpacing.pagePadding),

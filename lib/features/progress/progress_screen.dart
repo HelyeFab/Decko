@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../app/decko_app.dart';
+import '../../core/widgets/decko_app_bar.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/achievement_badge.dart';
 import '../../core/widgets/section_header.dart';
@@ -33,7 +34,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Your progress')),
+      appBar: const DeckoAppBar(title: 'Your progress'),
       body: SafeArea(
         child: FutureBuilder<ProgressSnapshot>(
           future: _future,
