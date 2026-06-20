@@ -116,6 +116,17 @@ Small, intentionally-postponed improvements captured so they are not lost.
   Themes); deck detail has a "Deck options" entry. FSRS/progress untouched.
   Daily limits are per-session for now. Next: MVP_012 — Advanced Deck Option
   Profiles (option groups shared across decks).
+- **Anki parity: daily limits must become true daily limits.** MVP_011 stores
+  new/review limits but currently applies them as per-session caps only. For a
+  close 1:1 Anki experience, Decko must track cards studied today by deck/profile,
+  reset at the correct day boundary, and ensure reopening the app later the same
+  day does not grant a fresh allowance. Treat this as scheduling debt, not UI
+  polish.
+- **Anki parity: bury siblings must be enforced, not only stored.** MVP_011 stores
+  the bury-siblings preference, but the due queue does not yet bury related cards
+  from the same note. For Anki-like behaviour, effective options must drive queue
+  filtering so sibling new/review cards are hidden until tomorrow after one card
+  from the note is studied. This must preserve FSRS state and never delete cards.
 
 ## I2 — APKG Import Beta
 
