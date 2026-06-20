@@ -12,7 +12,9 @@ import '../../domain/import/deck_import_info.dart';
 import '../../domain/import/deck_import_preview.dart';
 import '../../domain/import/imported_card_progress.dart';
 import '../../domain/import/imported_card_state.dart';
+import '../../domain/import/source/imported_anki_source.dart';
 import '../../domain/learning_item.dart';
+import '../../domain/repositories/imported_source_store.dart';
 import '../../domain/repositories/media_store.dart';
 
 /// Imports a (legacy, uncompressed) Anki `.apkg` package.
@@ -50,6 +52,7 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     required bool keepProgress,
     required DateTime importedAt,
     MediaStore? mediaStore,
+    ImportedSourceStore? sourceStore,
   }) async {
     final _Parsed parsed = _parse(bytes);
     final bool keep = keepProgress && parsed.hasProgressData;
@@ -85,6 +88,10 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     final String deckId = 'anki-${importedAt.millisecondsSinceEpoch}';
     if (mediaStore != null && parsed.mediaMap.isNotEmpty) {
       await _extractMedia(parsed, deckId, mediaStore);
+    }
+    // Preserve the lossless Anki source alongside the deck (DEC-016).
+    if (sourceStore != null) {
+      await sourceStore.saveSource(_sourceFor(parsed, deckId));
     }
 
     return Deck(
@@ -162,32 +169,58 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       archive.findFile('collection.anki2');
 
   _Parsed _readCollection(Database db, Archive archive) {
-    final ResultSet col = db.select('SELECT crt, decks FROM col LIMIT 1');
+    final ResultSet col = db.select('SELECT crt, decks, models FROM col LIMIT 1');
     final int crt = col.isEmpty ? 0 : (col.first['crt'] as int? ?? 0);
     final Map<String, String> deckNames = _deckNames(db, col);
+    final Map<String, ImportedAnkiModel> models = _parseModels(col);
 
-    // note id -> fields. Anki joins fields with the unit-separator (0x1F).
+    // note id -> fields; also build the lossless source notes.
     final String fieldSeparator = String.fromCharCode(0x1f);
     final Map<int, List<String>> fields = <int, List<String>>{};
+    final Map<int, String> noteModelId = <int, String>{};
+    final List<ImportedAnkiNote> sourceNotes = <ImportedAnkiNote>[];
     int audioRefs = 0;
     int imageRefs = 0;
-    for (final Row r in db.select('SELECT id, flds FROM notes')) {
+    for (final Row r in db.select('SELECT id, guid, mid, flds, tags FROM notes')) {
+      final int id = r['id'] as int;
       final String flds = r['flds'] as String;
-      fields[r['id'] as int] = flds.split(fieldSeparator);
+      final List<String> values = flds.split(fieldSeparator);
+      fields[id] = values;
+      final String mid = '${r['mid']}';
+      noteModelId[id] = mid;
       audioRefs += countAudioRefs(flds);
       imageRefs += countImageRefs(flds);
+      sourceNotes.add(
+          _sourceNote(id, r['guid'] as String?, mid, r['tags'] as String?,
+              values, models[mid]));
     }
 
     final List<_Card> cards = <_Card>[];
+    final List<ImportedAnkiCardSource> cardSources = <ImportedAnkiCardSource>[];
     final Set<int> deckIds = <int>{};
     for (final Row r in db.select(
-      'SELECT id, nid, did, queue, type, due, ivl, reps, lapses, factor '
+      'SELECT id, nid, did, ord, queue, type, due, ivl, reps, lapses, factor '
       'FROM cards',
     )) {
       final int nid = r['nid'] as int;
       final List<String> f = fields[nid] ?? const <String>[];
       deckIds.add(r['did'] as int);
-      cards.add(_Card.fromRow(r, f, crt));
+      final _Card card = _Card.fromRow(r, f, crt);
+      cards.add(card);
+
+      final int ord = r['ord'] as int? ?? 0;
+      final ImportedAnkiModel? model = models[noteModelId[nid]];
+      cardSources.add(ImportedAnkiCardSource(
+        sourceCardId: '${r['id']}',
+        sourceNoteId: '$nid',
+        sourceDeckId: '',
+        templateOrdinal: ord,
+        templateName: model?.templateByOrdinal(ord)?.name,
+        queueState: card.state.name,
+        due: r['due'] as int? ?? 0,
+        reps: card.reps,
+        lapses: card.lapses,
+      ));
     }
 
     if (cards.isEmpty) {
@@ -218,8 +251,92 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       mediaMap: _readMediaMap(archive),
       audioRefs: audioRefs,
       imageRefs: imageRefs,
+      models: models.values.toList(),
+      sourceNotes: sourceNotes,
+      cardSources: cardSources,
     );
   }
+
+  /// Builds a lossless [ImportedAnkiNote] from a note's raw field values,
+  /// naming each field via the model's ordinal-ordered field names.
+  ImportedAnkiNote _sourceNote(int id, String? guid, String mid, String? tags,
+      List<String> values, ImportedAnkiModel? model) {
+    final List<String> names = model?.fieldNames ?? const <String>[];
+    final List<ImportedAnkiField> srcFields = <ImportedAnkiField>[
+      for (int i = 0; i < values.length; i++)
+        ImportedAnkiField(
+          name: i < names.length ? names[i] : 'Field ${i + 1}',
+          ordinal: i,
+          rawValue: values[i],
+          plainTextValue: stripMedia(_cleanField(values[i])),
+          mediaReferences: _mediaRefs(values[i]),
+        ),
+    ];
+    return ImportedAnkiNote(
+      sourceNoteId: '$id',
+      sourceGuid: guid ?? '',
+      sourceModelId: mid,
+      modelName: model?.name ?? 'Unknown',
+      deckId: '',
+      fields: srcFields,
+      tags: (tags ?? '').trim().split(RegExp(r'\s+'))
+          .where((String t) => t.isNotEmpty)
+          .toList(),
+    );
+  }
+
+  /// Parses `col.models` (legacy schema) into models with fields + templates.
+  Map<String, ImportedAnkiModel> _parseModels(ResultSet col) {
+    final String json =
+        col.isEmpty ? '{}' : (col.first['models'] as String? ?? '{}');
+    final Map<String, ImportedAnkiModel> out = <String, ImportedAnkiModel>{};
+    try {
+      final Map<String, dynamic> decoded =
+          jsonDecode(json) as Map<String, dynamic>;
+      decoded.forEach((String id, dynamic v) {
+        if (v is! Map) return;
+        final List<dynamic> flds = (v['flds'] as List<dynamic>?) ?? <dynamic>[];
+        final List<dynamic> tmpls =
+            (v['tmpls'] as List<dynamic>?) ?? <dynamic>[];
+        out[id] = ImportedAnkiModel(
+          id: id,
+          name: v['name'] as String? ?? 'Note type',
+          fieldNames: flds
+              .map((dynamic f) => (f as Map)['name'] as String? ?? '')
+              .toList(),
+          templates: <ImportedAnkiCardTemplate>[
+            for (final dynamic t in tmpls)
+              if (t is Map)
+                ImportedAnkiCardTemplate(
+                  sourceModelId: id,
+                  ordinal: (t['ord'] as int?) ?? 0,
+                  name: t['name'] as String? ?? 'Card',
+                  questionTemplate: t['qfmt'] as String? ?? '',
+                  answerTemplate: t['afmt'] as String? ?? '',
+                ),
+          ],
+        );
+      });
+    } catch (_) {/* leave empty */}
+    return out;
+  }
+
+  List<MediaReference> _mediaRefs(String raw) => <MediaReference>[
+        for (final AnkiSegment seg in parseAnkiContent(raw))
+          if (seg is AudioSegment)
+            MediaReference(fileName: seg.fileName, kind: MediaKind.audio)
+          else if (seg is ImageSegment)
+            MediaReference(fileName: seg.fileName, kind: MediaKind.image),
+      ];
+
+  /// The lossless source for a freshly imported deck.
+  ImportedAnkiSource _sourceFor(_Parsed parsed, String deckId) =>
+      ImportedAnkiSource(
+        deckId: deckId,
+        models: parsed.models,
+        notes: parsed.sourceNotes,
+        cardSources: parsed.cardSources,
+      );
 
   /// Reads the package's `media` mapping (numbered payload -> original name).
   Map<String, String> _readMediaMap(Archive archive) {
@@ -292,6 +409,9 @@ class _Parsed {
     required this.mediaMap,
     required this.audioRefs,
     required this.imageRefs,
+    required this.models,
+    required this.sourceNotes,
+    required this.cardSources,
   });
 
   final String deckName;
@@ -303,6 +423,9 @@ class _Parsed {
   final Map<String, String> mediaMap;
   final int audioRefs;
   final int imageRefs;
+  final List<ImportedAnkiModel> models;
+  final List<ImportedAnkiNote> sourceNotes;
+  final List<ImportedAnkiCardSource> cardSources;
 }
 
 class _Card {

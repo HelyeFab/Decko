@@ -87,6 +87,7 @@ class _ImportScreenState extends State<ImportScreen> {
         keepProgress: keepProgress,
         importedAt: DateTime.now(),
         mediaStore: DeckoApp.mediaOf(context),
+        sourceStore: DeckoApp.sourceOf(context),
       );
       await store.addImportedDeck(deck);
       // Seed per-card review state (keeps imported Anki progress, or starts new).

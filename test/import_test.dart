@@ -38,38 +38,76 @@ class _FakeMediaStore implements MediaStore {
       saved.removeWhere((String k, _) => k.startsWith('$deckId/'));
 }
 
+/// A default note type ("Basic") with three positional fields and one card
+/// template — enough for the legacy positional tests. MVP_009 tests pass their
+/// own [modelsJson] to exercise named fields and multiple card templates.
+const String _defaultModelId = '1500000000';
+String _defaultModelsJson() => jsonEncode(<String, dynamic>{
+      _defaultModelId: <String, dynamic>{
+        'name': 'Basic',
+        'flds': <Map<String, Object>>[
+          <String, Object>{'name': 'Front', 'ord': 0},
+          <String, Object>{'name': 'Back', 'ord': 1},
+          <String, Object>{'name': 'Field2', 'ord': 2},
+        ],
+        'tmpls': <Map<String, Object>>[
+          <String, Object>{
+            'name': 'Card 1',
+            'ord': 0,
+            'qfmt': '{{Front}}',
+            'afmt': '{{Back}}',
+          },
+        ],
+      },
+    });
+
 /// Builds a `.apkg` (zip with a `collection.anki21` SQLite DB) from card specs.
 /// Each card spec: [type, queue, reps, ivl, factor], with fields front/back/ex.
+///
+/// [modelsJson] is the raw `col.models` blob; when null a default Basic note
+/// type is used. Each [_CardSpec] may override its model id, template ordinal,
+/// tags, and supply named field values directly (MVP_009).
 Uint8List _buildApkg({
   required String deckName,
   required List<_CardSpec> cards,
   Map<String, List<int>> media = const <String, List<int>>{},
+  String? modelsJson,
 }) {
   final Directory tmp = Directory.systemTemp.createTempSync('decko_fixture');
   final String path = '${tmp.path}/collection.anki21';
   final Database db = sqlite3.open(path);
   try {
     db.execute('CREATE TABLE col (id INTEGER PRIMARY KEY, crt INTEGER, '
-        'decks TEXT);');
-    db.execute('CREATE TABLE notes (id INTEGER PRIMARY KEY, flds TEXT);');
+        'decks TEXT, models TEXT);');
+    db.execute('CREATE TABLE notes (id INTEGER PRIMARY KEY, guid TEXT, '
+        'mid INTEGER, flds TEXT, tags TEXT);');
     db.execute('CREATE TABLE cards (id INTEGER PRIMARY KEY, nid INTEGER, '
-        'did INTEGER, queue INTEGER, type INTEGER, due INTEGER, ivl INTEGER, '
-        'reps INTEGER, lapses INTEGER, factor INTEGER);');
+        'did INTEGER, ord INTEGER, queue INTEGER, type INTEGER, due INTEGER, '
+        'ivl INTEGER, reps INTEGER, lapses INTEGER, factor INTEGER);');
 
     db.execute(
-      'INSERT INTO col (id, crt, decks) VALUES (1, 1600000000, ?);',
-      <Object?>['{"1":{"name":"$deckName"},"2":{"name":"Default"}}'],
+      'INSERT INTO col (id, crt, decks, models) VALUES (1, 1600000000, ?, ?);',
+      <Object?>[
+        '{"1":{"name":"$deckName"},"2":{"name":"Default"}}',
+        modelsJson ?? _defaultModelsJson(),
+      ],
     );
 
     for (int i = 0; i < cards.length; i++) {
       final _CardSpec c = cards[i];
       final int nid = 100 + i;
-      db.execute('INSERT INTO notes (id, flds) VALUES (?, ?);',
-          <Object?>[nid, '${c.front}$_fs${c.back}$_fs${c.field2}']);
+      final String flds =
+          c.fields?.join(_fs) ?? '${c.front}$_fs${c.back}$_fs${c.field2}';
       db.execute(
-        'INSERT INTO cards (id, nid, did, queue, type, due, ivl, reps, '
-        'lapses, factor) VALUES (?, ?, 1, ?, ?, 0, ?, ?, 0, ?);',
-        <Object?>[200 + i, nid, c.queue, c.type, c.ivl, c.reps, c.factor],
+        'INSERT INTO notes (id, guid, mid, flds, tags) VALUES (?, ?, ?, ?, ?);',
+        <Object?>[nid, 'guid-$nid', c.mid ?? _defaultModelId, flds, c.tags],
+      );
+      db.execute(
+        'INSERT INTO cards (id, nid, did, ord, queue, type, due, ivl, reps, '
+        'lapses, factor) VALUES (?, ?, 1, ?, ?, ?, 0, ?, ?, 0, ?);',
+        <Object?>[
+          200 + i, nid, c.ord, c.queue, c.type, c.ivl, c.reps, c.factor,
+        ],
       );
     }
   } finally {
@@ -104,6 +142,10 @@ class _CardSpec {
     this.front = 'front',
     this.back = 'back',
     this.field2 = '今日は良い天気です。',
+    this.fields,
+    this.mid,
+    this.ord = 0,
+    this.tags = '',
   });
   final int type;
   final int queue;
@@ -113,6 +155,16 @@ class _CardSpec {
   final String front;
   final String back;
   final String field2;
+
+  /// When set, these named field values are used verbatim (joined by 0x1F)
+  /// instead of front/back/field2 — used by the named-field MVP_009 tests.
+  final List<String>? fields;
+
+  /// Overrides for the lossless source: note type id, card-template ordinal,
+  /// and space-separated Anki tags.
+  final String? mid;
+  final int ord;
+  final String tags;
 }
 
 void main() {
