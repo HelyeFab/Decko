@@ -1,12 +1,55 @@
 # Decko Memory
 
 ## Last updated
-2026-06-12
+2026-06-20
 
 ## Current stage
-MVP_008 complete: Anki media import + rendering (audio + images). Awaiting approval.
+MVP_009 complete: lossless Anki note import + field preservation, with a
+"View imported source" inspect screen. Pushed to main (commits f991f02 +
+8b3b3e7). Next: MVP_010 (note-type-aware card mapping). 60 tests, analyze clean.
 
-## Last completed (MVP_008)
+## Last completed (MVP_009 — lossless Anki source, DEC-016)
+- Import now preserves the FULL Anki source before deriving the simplified
+  Decko study card. Domain: `ImportedAnkiSource` (models, notes, cardSources)
+  in `lib/domain/import/source/`; `ImportedAnkiNote`/`ImportedAnkiField`
+  (name, ordinal, rawValue, plainTextValue, mediaReferences),
+  `ImportedAnkiModel` (fieldNames + templates), `ImportedAnkiCardTemplate`
+  (ordinal, name, q/a), `ImportedAnkiCardSource` (card→note→template link).
+- Persistence: `ImportedSourceStore` interface + `FileImportedSourceStore`
+  (one JSON file per deck under app-support; off shared_preferences for size).
+  Wired through DeckImportAdapter → DeckoApp.sourceOf → import screen; deck
+  delete removes the stored source.
+- Adapter parses `col.models` (field names + templates by ordinal), names note
+  fields, records per-field media refs, links cards to template ordinals; saves
+  source on import. The review card is still derived by the existing positional
+  mapping (NOT yet note-type-aware — that's MVP_010).
+- Inspect UI: `ImportedSourceScreen` (`features/imported_source/`), reached from
+  a "View imported source" tile on deck detail (imported only), route
+  `/deck/:id/source`. Decko-styled: summary, note-type field/template chips,
+  cards-by-template breakdown, sample note's fields + tags + media pips. Empty
+  state for pre-feature/demo decks.
+- Tests: rich `_buildSourceApkg` fixture (named fields, multi-template models,
+  capturing store) → field name/ordinal/raw, tags, per-field media refs, model +
+  Listening/Reading/Production template identity, card→template linking; widget
+  test inspects preserved source from deck detail.
+- KNOWN: a 3-template note still yields 3 lookalike study cards (the 3× / 17987
+  inflation). Fixing it is MVP_010, which consumes this preserved source.
+
+## Earlier (MVP_008.5 — app shell, study-first Home, floating nav; DEC-017/018)
+- `DeckoAppBar` (`core/widgets/`): one app-bar pattern — `.wordmark` on Home,
+  titled on sub-screens; adopted across Home/Import/Deck Detail/Progress/Settings.
+- Home reworked to "study ribbon" (Direction A): `StudyRibbon` hero (stacked-
+  flashcard motif naming the resume deck + ready count, "all caught up" when
+  none due) + compact `DeckRow` shelf with live per-deck to-study badges
+  (`DueQueue` over review state, refreshed on return) + dashed Import row. The
+  marketing promise grid now lives ONLY in the empty state.
+- Floating bottom nav: `DeckoBottomNav` (rounded, elevated, content-hugging
+  active pill flush with the bar) over a `StatefulShellRoute.indexedStack` —
+  Home/Import/Progress/Settings(theme gallery). Deck detail sits in the Home
+  branch (bar stays, Back→Home); review session is pushed full-screen on the
+  root navigator. Import resets to idle after a successful import.
+
+## Earlier (MVP_008)
 - Deps: path_provider, audioplayers (DEC-014).
 - `MediaStore` interface + `FileMediaStore` (app support dir /decko_media/<deckId>/<file>; injectable baseDir for tests). Exposed via DeckoApp.mediaOf.
 - Importer: reads package `media` map, extracts every payload to MediaStore under original name (single decode; one file at a time); preview reports mediaFiles/audioRefs/imageRefs.
@@ -104,11 +147,19 @@ MVP_008 complete: Anki media import + rendering (audio + images). Awaiting appro
 - Persistent per-card ReviewCardState + due queue + write-back (DEC-011).
 - Furigana preserved as 漢字[かな], toggleable ruby (DEC-012).
 - Scheduling: FSRS-5 policy, pure Dart, default weights, behind the seam (DEC-013).
+- Anki media imported to local files, rendered by a field-content parser (DEC-014).
+- Iconography uses Font Awesome free, via FaIcon/FaIconData (DEC-015).
+- Anki imports preserve a lossless source note layer before mapping to Decko cards (DEC-016).
+- Reusable app shell (DeckoAppBar) + Home separated from the Import workflow (DEC-017).
+- Floating bottom nav over a StatefulShellRoute (Home/Import/Progress/Settings) (DEC-018).
 
 ## What is still placeholder
 - FSRS uses DEFAULT weights (no per-user training) and no intra-day learning steps — FSRS-style, not Anki parity.
 - Modern zstd `.anki21b` not supported (legacy export only).
-- Import ignores media (image/audio) and templates; multi-deck packages collapse; field mapping heuristic.
+- Media IS imported/rendered (MVP_008) and the full source IS preserved (MVP_009),
+  BUT the review card is still derived by positional mapping — NOT note-type-aware.
+  A 3-template note (Listening/Reading/Production) still makes 3 lookalike cards
+  (the 3× inflation). MVP_010 fixes this using the preserved templates/fields.
 - Demo deck content still from `MockDecks` (but their review state now persists once studied).
 - Review-state storage = per-deck JSON blob in shared_preferences (flush on session exit); large libraries want a DB later.
 
@@ -116,9 +167,13 @@ MVP_008 complete: Anki media import + rendering (audio + images). Awaiting appro
 - Selected app theme; progress snapshot (MVP_004).
 - Imported decks incl. cards + provenance (MVP_005).
 - Per-card review state incl. FSRS stability/difficulty (MVP_006/007); due decrements & survives restart.
+- Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-Awaiting approval. Per MVP_007 brief, next candidates (MVP_008): media import (audio/images), modern .anki21b support, or floating bottom-nav UI (StatefulShellRoute). Do not start without approval.
+MVP_010 — Note-Type-Aware Decko Card Mapping. Use the preserved source
+fields/templates (MVP_009, DEC-016) to render Listening/Reading/Production and
+audio-/image-first cards distinctly, collapsing the 3× template inflation.
+The user has asked to start this as the next build.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).
