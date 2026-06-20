@@ -4,9 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../domain/deck.dart';
 import '../features/deck_detail/deck_detail_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
+import '../features/deck_options/deck_options_screen.dart';
 import '../features/import/import_screen.dart';
 import '../features/imported_source/imported_source_screen.dart';
 import '../features/progress/progress_screen.dart';
+import '../features/settings/global_study_options_screen.dart';
+import '../features/settings/settings_hub_screen.dart';
 import '../features/review/review_session_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
 import 'decko_app.dart';
@@ -18,8 +21,14 @@ abstract final class DeckoRoutes {
   static const String import = '/import';
   static const String progress = '/progress';
 
-  /// The Settings tab (currently the theme gallery).
+  /// The Settings tab (a hub).
   static const String settings = '/settings';
+
+  /// Global study defaults, under Settings.
+  static const String studyDefaults = '/settings/study';
+
+  /// Theme gallery, under Settings.
+  static const String themes = '/settings/themes';
 
   /// Deck detail for the deck with [id].
   static String deck(String id) => '/deck/$id';
@@ -29,6 +38,9 @@ abstract final class DeckoRoutes {
 
   /// Imported-source inspector for the deck with [id].
   static String deckSource(String id) => '/deck/$id/source';
+
+  /// Per-deck study options for the deck with [id].
+  static String deckOptions(String id) => '/deck/$id/options';
 }
 
 /// Root navigator key — deck/review routes attach here so they cover the shell.
@@ -88,6 +100,16 @@ GoRouter buildDeckoRouter() {
                                 deckId: deck.id, deckName: deck.name);
                       },
                     ),
+                    GoRoute(
+                      path: 'options',
+                      builder: (BuildContext context, GoRouterState state) {
+                        final Deck? deck = _resolveDeck(context, state);
+                        return deck == null
+                            ? const _DeckNotFound()
+                            : DeckOptionsScreen(
+                                deckId: deck.id, deckName: deck.name);
+                      },
+                    ),
                   ],
                 ),
               ],
@@ -108,7 +130,17 @@ GoRouter buildDeckoRouter() {
           StatefulShellBranch(routes: <RouteBase>[
             GoRoute(
               path: DeckoRoutes.settings,
-              builder: (_, _) => const ThemeGalleryScreen(),
+              builder: (_, _) => const SettingsHubScreen(),
+              routes: <RouteBase>[
+                GoRoute(
+                  path: 'study',
+                  builder: (_, _) => const GlobalStudyOptionsScreen(),
+                ),
+                GoRoute(
+                  path: 'themes',
+                  builder: (_, _) => const ThemeGalleryScreen(),
+                ),
+              ],
             ),
           ]),
         ],

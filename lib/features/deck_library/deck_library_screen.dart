@@ -224,6 +224,7 @@ class _DeckListItem extends StatelessWidget {
     DeckoApp.reviewStateOf(context).resetDeckStates(deck.id);
     DeckoApp.mediaOf(context).deleteMediaForDeck(deck.id);
     DeckoApp.sourceOf(context).deleteSourceForDeck(deck.id);
+    DeckoApp.studyOptionsOf(context).deleteDeckOptions(deck.id);
     DeckoSnackbar.showInfo(context, 'Deleted “${deck.name}”.');
   }
 

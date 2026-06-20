@@ -149,11 +149,20 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: DeckoSpacing.xl),
+            _DeckActionTile(
+              icon: FontAwesomeIcons.sliders,
+              title: 'Deck options',
+              subtitle: 'Daily limits, audio, images, and readings',
+              onTap: () => context.push(DeckoRoutes.deckOptions(deck.id)),
+            ),
             if (deck.isImported) ...<Widget>[
-              const SizedBox(height: DeckoSpacing.xl),
-              _ImportedSourceTile(
-                onTap: () =>
-                    context.push(DeckoRoutes.deckSource(deck.id)),
+              const SizedBox(height: DeckoSpacing.md),
+              _DeckActionTile(
+                icon: FontAwesomeIcons.layerGroup,
+                title: 'View imported source',
+                subtitle: 'Original Anki fields, tags, and card templates',
+                onTap: () => context.push(DeckoRoutes.deckSource(deck.id)),
               ),
             ],
           ],
@@ -163,10 +172,18 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
   }
 }
 
-/// A quiet entry point to the preserved Anki source for an imported deck.
-class _ImportedSourceTile extends StatelessWidget {
-  const _ImportedSourceTile({required this.onTap});
+/// A quiet, tappable row linking to a deck-scoped screen.
+class _DeckActionTile extends StatelessWidget {
+  const _DeckActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
+  final FaIconData icon;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
@@ -187,24 +204,19 @@ class _ImportedSourceTile extends StatelessWidget {
           ),
           child: Row(
             children: <Widget>[
-              FaIcon(FontAwesomeIcons.layerGroup,
-                  size: 18, color: scheme.primary),
+              FaIcon(icon, size: 18, color: scheme.primary),
               const SizedBox(width: DeckoSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      'View imported source',
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
+                    Text(title,
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 2),
-                    Text(
-                      'Original Anki fields, tags, and card templates',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
+                    Text(subtitle,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant)),
                   ],
                 ),
               ),

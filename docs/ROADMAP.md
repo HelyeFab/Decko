@@ -107,9 +107,15 @@ Small, intentionally-postponed improvements captured so they are not lost.
   Listening / Reading / Production presentations (audio-first / text / English-
   prompt) instead of 3× lookalikes, with a quiet mode eyebrow on the card and
   mapping rationale in the inspect screen. `LearningItem.id` is unchanged so
-  progress/FSRS are safe; simple decks fall back to generic. Next: learner
-  control — MVP_011 (Study Options & Deck Overrides), then MVP_012 (Advanced
-  Deck Option Profiles).
+  progress/FSRS are safe; simple decks fall back to generic.
+- ~~**Study options & deck overrides.**~~ DONE (MVP_011, DEC-020): two-level
+  options (global `StudyOptions` + nullable per-deck `DeckStudyOptions` →
+  `EffectiveStudyOptions`), persisted via `StudyOptionsRepository`. Per-session
+  queue caps (new/review/max), audio autoplay, image-display timing, and
+  per-deck furigana preference. Settings tab is now a hub (Study defaults ·
+  Themes); deck detail has a "Deck options" entry. FSRS/progress untouched.
+  Daily limits are per-session for now. Next: MVP_012 — Advanced Deck Option
+  Profiles (option groups shared across decks).
 
 ## I2 — APKG Import Beta
 

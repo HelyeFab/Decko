@@ -8,12 +8,14 @@ import '../data/mock_deck_repository.dart';
 import '../data/shared_prefs_progress_repository.dart';
 import '../data/shared_prefs_review_state_repository.dart';
 import '../data/shared_prefs_settings_repository.dart';
+import '../data/shared_prefs_study_options_repository.dart';
 import '../domain/repositories/deck_repository.dart';
 import '../domain/repositories/imported_source_store.dart';
 import '../domain/repositories/media_store.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/review_state_repository.dart';
 import '../domain/repositories/settings_repository.dart';
+import '../domain/repositories/study_options_repository.dart';
 import 'deck_store.dart';
 import 'decko_router.dart';
 import 'furigana_controller.dart';
@@ -37,6 +39,7 @@ class DeckoApp extends StatefulWidget {
     this.reviewStateRepository = const SharedPrefsReviewStateRepository(),
     this.mediaStore = const FileMediaStore(),
     this.importedSourceStore = const FileImportedSourceStore(),
+    this.studyOptionsRepository = const SharedPrefsStudyOptionsRepository(),
   });
 
   final DeckRepository deckRepository;
@@ -45,6 +48,7 @@ class DeckoApp extends StatefulWidget {
   final ReviewStateRepository reviewStateRepository;
   final MediaStore mediaStore;
   final ImportedSourceStore importedSourceStore;
+  final StudyOptionsRepository studyOptionsRepository;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -69,6 +73,9 @@ class DeckoApp extends StatefulWidget {
 
   static ImportedSourceStore sourceOf(BuildContext context) =>
       _scopeOf(context).importedSourceStore;
+
+  static StudyOptionsRepository studyOptionsOf(BuildContext context) =>
+      _scopeOf(context).studyOptionsRepository;
 
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
@@ -116,6 +123,7 @@ class _DeckoAppState extends State<DeckoApp> {
       reviewStateRepository: widget.reviewStateRepository,
       mediaStore: widget.mediaStore,
       importedSourceStore: widget.importedSourceStore,
+      studyOptionsRepository: widget.studyOptionsRepository,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -141,6 +149,7 @@ class _DeckoScope extends InheritedWidget {
     required this.reviewStateRepository,
     required this.mediaStore,
     required this.importedSourceStore,
+    required this.studyOptionsRepository,
     required super.child,
   });
 
@@ -151,6 +160,7 @@ class _DeckoScope extends InheritedWidget {
   final ReviewStateRepository reviewStateRepository;
   final MediaStore mediaStore;
   final ImportedSourceStore importedSourceStore;
+  final StudyOptionsRepository studyOptionsRepository;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -160,5 +170,6 @@ class _DeckoScope extends InheritedWidget {
       progressRepository != oldWidget.progressRepository ||
       reviewStateRepository != oldWidget.reviewStateRepository ||
       mediaStore != oldWidget.mediaStore ||
-      importedSourceStore != oldWidget.importedSourceStore;
+      importedSourceStore != oldWidget.importedSourceStore ||
+      studyOptionsRepository != oldWidget.studyOptionsRepository;
 }

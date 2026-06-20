@@ -22,6 +22,7 @@ class DeckoCard extends StatefulWidget {
     required this.style,
     this.revealed = false,
     this.showFurigana = true,
+    this.showFrontImage = true,
   });
 
   final LearningItem item;
@@ -29,6 +30,10 @@ class DeckoCard extends StatefulWidget {
   final CardThemeStyle style;
   final bool revealed;
   final bool showFurigana;
+
+  /// When false, the question-side image is hidden (image-display "after
+  /// reveal"); the back always shows it.
+  final bool showFrontImage;
 
   @override
   State<DeckoCard> createState() => _DeckoCardState();
@@ -63,6 +68,7 @@ class _DeckoCardState extends State<DeckoCard>
       deckId: widget.deckId,
       style: widget.style,
       furigana: widget.showFurigana,
+      showImage: widget.showFrontImage,
     );
     final Widget back = _AnswerFace(
       item: widget.item,
@@ -143,12 +149,14 @@ class _PromptFace extends StatelessWidget {
     required this.deckId,
     required this.style,
     required this.furigana,
+    required this.showImage,
   });
 
   final LearningItem item;
   final String deckId;
   final CardThemeStyle style;
   final bool furigana;
+  final bool showImage;
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +174,7 @@ class _PromptFace extends StatelessWidget {
             item.front,
             deckId: deckId,
             showFurigana: furigana,
+            showImages: showImage,
             align: TextAlign.center,
             baseStyle: theme.textTheme.displaySmall
                 ?.copyWith(fontWeight: FontWeight.w600, color: onSurface),

@@ -481,3 +481,26 @@ Import built one `LearningItem` per Anki card via a **positional** mapper that i
 - The mapper is heuristic and extensible (add template/field synonyms over time); it doesn't aim for full Anki template fidelity.
 - Re-import is needed for already-imported decks to pick up modes (mapping runs at import time).
 - Furigana display stays globally toggled (not hidden per-face); deferred refinement.
+
+## DEC-020: Two-level study options (global defaults + per-deck overrides)
+
+Date: 2026-06-20
+Status: Accepted
+
+### Context
+
+Decko had no way to shape study behaviour: large imported decks dumped every due/new card into one session, and audio/image/furigana behaviour was fixed. Anki users expect a default they can override per deck.
+
+### Decision
+
+- **Domain (`lib/domain/study_options/`, framework-light):** `StudyOptions` (global defaults), `DeckStudyOptions` (all fields nullable = "use global", plus a deck-only `FuriganaPreference`), and `EffectiveStudyOptions.resolve(global, deck)` where a deck override wins per-field and unset fields fall back to global. Enums: `AudioAutoplayMode {off, beforeQuestion, afterReveal}`, `ImageDisplayMode {withQuestion, afterReveal}`, `FuriganaPreference {useGlobal, alwaysShow, alwaysHide}`.
+- **Persistence:** `StudyOptionsRepository` + `SharedPrefsStudyOptionsRepository` — global under one key, each deck's overrides under a per-deck key (loaded on demand, removed with the deck). Exposed via `DeckoApp.studyOptionsOf`.
+- **Queue caps (per-session):** `DueQueue.build` gains optional `maxNew` / `maxReview` / `maxSession`; the review session builds the limited queue from the deck's effective options. Caps only trim *which* cards enter a session — no card state changes, so imported progress / FSRS are untouched. "Per day" is currently enforced per session (no intra-day carryover) — a documented simplification.
+- **Media + readings:** the review session autoplays the question/answer audio per `AudioAutoplayMode`; `DeckoCard.showFrontImage` hides the question-side image when `ImageDisplayMode.afterReveal`; furigana shows per `EffectiveStudyOptions.resolveShowFurigana(globalToggle)`, layering the deck preference over the preserved global toggle.
+- **UI:** the Settings tab became a hub (Study defaults · Themes · global furigana); a `GlobalStudyOptionsScreen` and a per-deck `DeckOptionsScreen` (each row: "Using global: X" + Override) reached from a "Deck options" tile on deck detail. Human wording, not Anki jargon.
+
+### Consequences
+
+- Sessions are bounded; learners control new/review pace, audio, images, and readings globally or per deck; everything persists.
+- FSRS maths and the global furigana toggle are unchanged.
+- Daily limits are per-session for now (no daily-count rollover); deck option groups shared across decks are deferred to MVP_012.

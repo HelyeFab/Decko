@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import '../../app/decko_router.dart';
 import '../../app/furigana_controller.dart';
 import '../../app/theme/card_theme_config.dart';
 import '../../core/constants/decko_spacing.dart';
+import '../../core/content/anki_content.dart';
 import '../../core/widgets/decko_card.dart';
 import '../../data/fsrs_scheduling_policy.dart';
 import '../../data/simple_review_scheduler.dart';
@@ -20,6 +22,8 @@ import '../../domain/review_rating.dart';
 import '../../domain/review_scheduling_policy.dart';
 import '../../domain/review_session.dart';
 import '../../domain/review_session_result.dart';
+import '../../domain/repositories/study_options_repository.dart';
+import '../../domain/study_options/study_options.dart';
 import 'widgets/rating_button_row.dart';
 import 'widgets/session_summary.dart';
 
@@ -51,6 +55,12 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   final Map<String, ReviewCardState> _states = <String, ReviewCardState>{};
   final Map<String, ReviewCardState> _changed = <String, ReviewCardState>{};
 
+  /// Effective study options for this deck (caps + media + furigana). Falls
+  /// back to defaults until loaded.
+  EffectiveStudyOptions _options =
+      EffectiveStudyOptions.resolve(StudyOptions.defaults, null);
+  final AudioPlayer _autoplayer = AudioPlayer();
+
   ReviewSession? _session;
   bool _loading = true;
   bool _revealed = false;
@@ -71,12 +81,16 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   @override
   void dispose() {
     _flush(); // best-effort for non-button exits (e.g. system back)
+    _autoplayer.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    // Capture the repo before awaiting so we don't use context across the gap.
+    final StudyOptionsRepository optionsRepo = DeckoApp.studyOptionsOf(context);
     final List<ReviewCardState> stored =
         await _repo!.getStatesForDeck(widget.deck.id);
+    _options = await optionsRepo.getEffectiveOptions(widget.deck.id);
     _states
       ..clear()
       ..addEntries(stored.map((s) => MapEntry<String, ReviewCardState>(
@@ -86,16 +100,64 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       _session = _buildSession();
       _loading = false;
     });
+    _autoplayQuestion();
   }
 
   ReviewSession _buildSession() {
-    final List<LearningItem> queue =
-        DueQueue.build(widget.deck.items, _states, DateTime.now());
+    // Per-session caps (MVP_011): never dump a whole large deck into one
+    // session; state is untouched — only which cards enter the queue.
+    final List<LearningItem> queue = DueQueue.build(
+      widget.deck.items,
+      _states,
+      DateTime.now(),
+      maxNew: _options.newCardsPerDay,
+      maxReview: _options.reviewCardsPerDay,
+      maxSession: _options.maxSessionCards,
+    );
     return ReviewSession(
         deckId: widget.deck.id, items: List<LearningItem>.unmodifiable(queue));
   }
 
-  void _reveal() => setState(() => _revealed = true);
+  void _reveal() {
+    setState(() => _revealed = true);
+    _autoplayAnswer();
+  }
+
+  /// Plays the first audio on the question side when a card appears, if the
+  /// deck's autoplay mode asks for it.
+  void _autoplayQuestion() {
+    if (_options.audioAutoplayMode != AudioAutoplayMode.beforeQuestion) return;
+    final LearningItem? item = _session?.currentItem;
+    if (item != null) _play(_firstAudio(item.front));
+  }
+
+  /// Plays the answer-side audio after the reveal, if configured.
+  void _autoplayAnswer() {
+    if (_options.audioAutoplayMode != AudioAutoplayMode.afterReveal) return;
+    final LearningItem? item = _session?.currentItem;
+    if (item == null) return;
+    _play(_firstAudio(item.back) ??
+        _firstAudio(item.example ?? '') ??
+        _firstAudio(item.front));
+  }
+
+  String? _firstAudio(String field) {
+    for (final AnkiSegment seg in parseAnkiContent(field)) {
+      if (seg is AudioSegment) return seg.fileName;
+    }
+    return null;
+  }
+
+  Future<void> _play(String? fileName) async {
+    if (fileName == null) return;
+    final String? path =
+        await DeckoApp.mediaOf(context).resolveMedia(widget.deck.id, fileName);
+    if (path == null || !mounted) return;
+    try {
+      await _autoplayer.stop();
+      await _autoplayer.play(DeviceFileSource(path));
+    } catch (_) {/* autoplay is best-effort */}
+  }
 
   void _rate(ReviewRating rating) {
     final ReviewSession session = _session!;
@@ -116,7 +178,17 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       );
       _revealed = false;
     });
-    if (_session!.isComplete) _onComplete();
+    if (_session!.isComplete) {
+      _onComplete();
+    } else {
+      _autoplayQuestion();
+    }
+  }
+
+  void _toggleReveal() {
+    final bool next = !_revealed;
+    setState(() => _revealed = next);
+    if (next) _autoplayAnswer();
   }
 
   void _onComplete() {
@@ -229,16 +301,21 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
               child: SingleChildScrollView(
                 child: GestureDetector(
                   // Tap to flip either way (front ⇄ back).
-                  onTap: () => setState(() => _revealed = !_revealed),
+                  onTap: _toggleReveal,
                   child: ValueListenableBuilder<bool>(
                     valueListenable: DeckoApp.furiganaOf(context),
-                    builder: (BuildContext context, bool furigana, _) {
+                    builder: (BuildContext context, bool globalFurigana, _) {
+                      final bool showFront =
+                          _options.imageDisplayMode == ImageDisplayMode.withQuestion ||
+                              _revealed;
                       return DeckoCard(
                         item: session.currentItem!,
                         deckId: widget.deck.id,
                         style: _cardStyle,
                         revealed: _revealed,
-                        showFurigana: furigana,
+                        showFurigana:
+                            _options.resolveShowFurigana(globalFurigana),
+                        showFrontImage: showFront,
                       );
                     },
                   ),

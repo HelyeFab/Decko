@@ -4,9 +4,31 @@
 2026-06-20
 
 ## Current stage
-MVP_010 complete: note-type-aware card mapping — Listening/Reading/Production
-cards derived from the MVP_009 preserved source (was 3× lookalikes). Next:
-MVP_011 (Study Options & Deck Overrides). 72 tests, analyze clean.
+MVP_011 complete: study options & deck overrides — global defaults + per-deck
+overrides → effective options; per-session queue caps; audio autoplay; image
+display timing; per-deck furigana. Settings tab is now a hub. Next: MVP_012
+(Advanced Deck Option Profiles). 85 tests, analyze clean.
+
+## Last completed (MVP_011 — study options & deck overrides, DEC-020)
+- Domain (`lib/domain/study_options/`): `StudyOptions` (global), `DeckStudyOptions`
+  (nullable overrides + deck-only `FuriganaPreference`), `EffectiveStudyOptions.
+  resolve(global, deck)` (deck wins per-field, else global). Enums
+  AudioAutoplayMode/ImageDisplayMode/FuriganaPreference.
+- `StudyOptionsRepository` + `SharedPrefsStudyOptionsRepository` (global key +
+  per-deck key; deleted with deck). `DeckoApp.studyOptionsOf`.
+- `DueQueue.build` gained optional maxNew/maxReview/maxSession; review session
+  builds the capped queue from effective options. Caps only trim which cards
+  enter a session — state/FSRS untouched. "Per day" = per session for now.
+- Review session: autoplay per AudioAutoplayMode (own AudioPlayer, parses
+  front/back [sound:]); `DeckoCard.showFrontImage` hides question image when
+  ImageDisplayMode.afterReveal; furigana via resolveShowFurigana(globalToggle).
+- UI: Settings tab → `SettingsHubScreen` (Study defaults · Themes · furigana);
+  theme gallery moved to /settings/themes. `GlobalStudyOptionsScreen`
+  (/settings/study) + `DeckOptionsScreen` (/deck/:id/options) from a "Deck
+  options" tile on deck detail. Reusable controls in
+  features/settings/widgets/option_controls.dart.
+- Tests: 11 pure (resolution, furigana, serialization, queue caps) + 2 widget
+  (open+persist deck override; review respects max-session). 85 total.
 
 ## Last completed (MVP_010 — note-type-aware card mapping, DEC-019)
 - `NoteTypeAwareCardMapper` (`lib/domain/import/`, pure): ImportedAnkiSource +
@@ -176,6 +198,7 @@ MVP_011 (Study Options & Deck Overrides). 72 tests, analyze clean.
 - Reusable app shell (DeckoAppBar) + Home separated from the Import workflow (DEC-017).
 - Floating bottom nav over a StatefulShellRoute (Home/Import/Progress/Settings) (DEC-018).
 - Note-type-aware card mapping from the preserved source; positional fallback (DEC-019).
+- Two-level study options (global + per-deck overrides → effective); per-session caps (DEC-020).
 
 ## What is still placeholder
 - FSRS uses DEFAULT weights (no per-user training) and no intra-day learning steps — FSRS-style, not Anki parity.
@@ -194,10 +217,11 @@ MVP_011 (Study Options & Deck Overrides). 72 tests, analyze clean.
 - Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-MVP_011 — Study Options and Deck Overrides (brief:
-.agent/mvp_briefs/MVP_011_STUDY_OPTIONS_AND_DECK_OVERRIDES.md). Then MVP_012 —
-Advanced Deck Option Profiles. These build on the note-type understanding from
-MVP_010 (audio-first / image-first / card limits / bury siblings, etc.).
+MVP_012 — Advanced Deck Option Profiles (brief:
+.agent/mvp_briefs/MVP_012_ADVANCED_DECK_OPTION_PROFILES.md): option groups/
+profiles shared across multiple decks, building on MVP_011's per-deck options.
+Bury-siblings is currently a stored flag but not yet enforced in the queue —
+a candidate to wire up.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).

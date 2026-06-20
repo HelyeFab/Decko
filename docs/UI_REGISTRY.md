@@ -290,6 +290,26 @@ re-inventing equivalents.
   `NoteTypeAwareCardMapper`, not new card widgets — the two-sided flip card is
   unchanged.
 
+### Added in MVP_011 (study options, DEC-020)
+
+- **Settings hub** — the Settings tab is now `SettingsHubScreen`: tiles for
+  "Study defaults" and "Themes" (theme gallery moved to `/settings/themes`) plus
+  the global furigana switch. Tile pattern = icon medallion + title + subtitle +
+  chevron on a rounded `cardColor` surface.
+- **Option controls** (`features/settings/widgets/option_controls.dart`),
+  reusable across the global and deck screens:
+  - `SettingsSection` — small-caps section label (+ optional subtitle) over a
+    rounded surface of divider-separated rows.
+  - `StepperRow` — label + round −/＋ buttons + value (integer options).
+  - `ChoiceRow<T>` — label over a wrap of single-select pill chips (enums).
+  - `SwitchRow` — label (+ subtitle) with a trailing `Switch`.
+- **Deck-options override pattern** — each deck option shows a `SwitchRow`
+  ("Using global: X" when off); flipping it on reveals the control set to the
+  current global value. Furigana uses a 3-way `ChoiceRow` (Use global / Always
+  show / Always hide). Reached from a "Deck options" tile on deck detail.
+- The deck-detail action tiles (Deck options, View imported source) share one
+  `_DeckActionTile` row idiom.
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

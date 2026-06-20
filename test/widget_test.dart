@@ -23,6 +23,8 @@ import 'dart:typed_data';
 import 'package:decko/domain/import/source/imported_anki_source.dart';
 import 'package:decko/domain/repositories/imported_source_store.dart';
 import 'package:decko/domain/repositories/media_store.dart';
+import 'package:decko/domain/repositories/study_options_repository.dart';
+import 'package:decko/domain/study_options/study_options.dart';
 import 'package:decko/domain/repositories/review_state_repository.dart';
 import 'package:decko/domain/repositories/settings_repository.dart';
 import 'package:decko/domain/review_card_state.dart';
@@ -151,6 +153,27 @@ class _InMemorySourceStore implements ImportedSourceStore {
       _byDeck.remove(deckId);
 }
 
+class _InMemoryStudyOptionsRepository implements StudyOptionsRepository {
+  StudyOptions global = StudyOptions.defaults;
+  final Map<String, DeckStudyOptions> deckOptions = <String, DeckStudyOptions>{};
+  @override
+  Future<StudyOptions> getGlobalOptions() async => global;
+  @override
+  Future<void> saveGlobalOptions(StudyOptions options) async => global = options;
+  @override
+  Future<DeckStudyOptions?> getDeckOptions(String deckId) async =>
+      deckOptions[deckId];
+  @override
+  Future<void> saveDeckOptions(String deckId, DeckStudyOptions options) async =>
+      deckOptions[deckId] = options;
+  @override
+  Future<void> deleteDeckOptions(String deckId) async =>
+      deckOptions.remove(deckId);
+  @override
+  Future<EffectiveStudyOptions> getEffectiveOptions(String deckId) async =>
+      EffectiveStudyOptions.resolve(global, deckOptions[deckId]);
+}
+
 Future<void> _pumpApp(
   WidgetTester tester, {
   DeckRepository? deckRepository,
@@ -159,6 +182,7 @@ Future<void> _pumpApp(
   ReviewStateRepository? reviewStateRepository,
   MediaStore? mediaStore,
   ImportedSourceStore? importedSourceStore,
+  StudyOptionsRepository? studyOptionsRepository,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   tester.view.physicalSize = const Size(420, 2400);
@@ -175,6 +199,8 @@ Future<void> _pumpApp(
           reviewStateRepository ?? const SharedPrefsReviewStateRepository(),
       mediaStore: mediaStore ?? _InMemoryMediaStore(),
       importedSourceStore: importedSourceStore ?? _InMemorySourceStore(),
+      studyOptionsRepository:
+          studyOptionsRepository ?? _InMemoryStudyOptionsRepository(),
     ),
   );
   await tester.pumpAndSettle();
@@ -285,6 +311,8 @@ void main() {
 
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Themes')); // Settings hub → theme gallery
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Decko Dark'));
     await tester.pumpAndSettle();
     expect(_appBrightness(tester), Brightness.dark);
@@ -328,6 +356,9 @@ void main() {
     await _pumpApp(tester);
 
     await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Study defaults'), findsOneWidget); // hub
+    await tester.tap(find.text('Themes'));
     await tester.pumpAndSettle();
     expect(find.text('App themes'), findsOneWidget);
     expect(find.text('Card themes'), findsOneWidget);
@@ -526,6 +557,68 @@ void main() {
     expect(find.text('Sentence'), findsWidgets);
     expect(find.text('n5'), findsOneWidget); // preserved tag
     expect(find.text('1. Listening'), findsOneWidget); // template identity
+  });
+
+  testWidgets('Deck options open from deck detail and persist an override',
+      (WidgetTester tester) async {
+    const Deck deck = Deck(
+      id: 'opt',
+      name: 'Opt Deck',
+      description: 'd',
+      items: <LearningItem>[
+        LearningItem(id: 'a', front: 'a', back: 'a'),
+        LearningItem(id: 'b', front: 'b', back: 'b'),
+      ],
+    );
+    final _InMemoryStudyOptionsRepository options =
+        _InMemoryStudyOptionsRepository();
+
+    await _pumpApp(tester,
+        deckRepository: const _FixedDeckRepository(<Deck>[deck]),
+        studyOptionsRepository: options);
+
+    await tester.tap(find.text('Opt Deck').last); // shelf row → deck detail
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Deck options'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Options for Opt Deck'), findsOneWidget);
+    expect(find.text('Using global: 20'), findsOneWidget); // new cards/day
+
+    // Turn on the "New cards per day" override (the first switch).
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+
+    expect(options.deckOptions['opt']?.newCardsPerDay, 20); // persisted
+  });
+
+  testWidgets('Review session respects a small max-session limit',
+      (WidgetTester tester) async {
+    const Deck deck = Deck(
+      id: 'cap',
+      name: 'Cap Deck',
+      description: 'd',
+      items: <LearningItem>[
+        LearningItem(id: 'a', front: 'a', back: 'a'),
+        LearningItem(id: 'b', front: 'b', back: 'b'),
+        LearningItem(id: 'c', front: 'c', back: 'c'),
+      ],
+    );
+    final _InMemoryStudyOptionsRepository options =
+        _InMemoryStudyOptionsRepository()
+          ..global = const StudyOptions(maxSessionCards: 1);
+
+    await _pumpApp(tester,
+        deckRepository: const _FixedDeckRepository(<Deck>[deck]),
+        studyOptionsRepository: options);
+
+    await tester.tap(find.text('Cap Deck').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start review'));
+    await tester.pumpAndSettle();
+
+    // Three cards available, but the session is capped to one.
+    expect(find.text('Card 1 of 1'), findsOneWidget);
   });
 
   testWidgets('Due today decrements after reviewing due cards',

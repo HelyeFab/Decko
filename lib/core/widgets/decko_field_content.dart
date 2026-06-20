@@ -19,6 +19,7 @@ class DeckoFieldContent extends StatelessWidget {
     super.key,
     required this.deckId,
     this.showFurigana = true,
+    this.showImages = true,
     this.baseStyle,
     this.align = TextAlign.start,
   });
@@ -26,6 +27,10 @@ class DeckoFieldContent extends StatelessWidget {
   final String field;
   final String deckId;
   final bool showFurigana;
+
+  /// When false, image segments are skipped (e.g. hide the question-side image
+  /// until reveal). Audio and text are unaffected.
+  final bool showImages;
   final TextStyle? baseStyle;
   final TextAlign align;
 
@@ -62,6 +67,7 @@ class DeckoFieldContent extends StatelessWidget {
           flush();
           blocks.add(_AudioButton(deckId: deckId, fileName: fileName));
         case ImageSegment(:final String fileName):
+          if (!showImages) break;
           flush();
           blocks.add(Padding(
             padding: const EdgeInsets.symmetric(vertical: DeckoSpacing.sm),
