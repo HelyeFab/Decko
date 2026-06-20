@@ -127,6 +127,13 @@ Small, intentionally-postponed improvements captured so they are not lost.
   from the same note. For Anki-like behaviour, effective options must drive queue
   filtering so sibling new/review cards are hidden until tomorrow after one card
   from the note is studied. This must preserve FSRS state and never delete cards.
+- **Future game mode: Bunburu sentence builder.** The existing `HelyeFab/bunburu`
+  Flutter app should be considered a planned Decko-native game mode after the
+  Anki-parity foundations are trustworthy. It should not be bolted on as a
+  separate toy layer; it should consume Decko's preserved/imported sentence data
+  (`Sentence`, `Sentence-Kana`, `Sentence-English`, `Sentence Audio`) and route
+  outcomes through Decko's progress/achievement layer without corrupting FSRS due
+  scheduling.
 
 ## I2 — APKG Import Beta
 
@@ -161,6 +168,10 @@ See: `docs/import-progress.md`
 - Matching game
 - Cloze deletion
 - Listening mode
+- Bunburu sentence builder mode: adapt the existing `HelyeFab/bunburu` cube-ordering
+  sentence game into Decko after Anki-parity scheduling is solid. It should be
+  powered by imported sentence fields and integrate with Decko progress and
+  achievements while keeping normal review scheduling separate.
 
 ## I5 — FSRS Production Scheduler
 
