@@ -35,6 +35,7 @@ import 'package:decko/core/widgets/decko_card.dart';
 import 'package:decko/domain/review_card_mode.dart';
 import 'package:decko/domain/review_session_result.dart';
 import 'package:decko/features/import/widgets/import_preview_panel.dart';
+import 'package:decko/features/deck_library/widgets/study_ribbon.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
   const _EmptyDeckRepository();
@@ -306,6 +307,32 @@ void main() {
     expect(find.text('Why you’ll love Decko'), findsNothing);
   });
 
+  testWidgets('Multiple decks render a swipeable study rolodex',
+      (WidgetTester tester) async {
+    const _FixedDeckRepository repo = _FixedDeckRepository(<Deck>[
+      Deck(
+          id: 'd1',
+          name: 'Alpha Deck',
+          description: 'd',
+          items: <LearningItem>[LearningItem(id: 'a', front: 'a', back: 'a')]),
+      Deck(
+          id: 'd2',
+          name: 'Beta Deck',
+          description: 'd',
+          items: <LearningItem>[LearningItem(id: 'b', front: 'b', back: 'b')]),
+    ]);
+    await _pumpApp(tester, deckRepository: repo);
+
+    // One persistent header over a vertical-flip rolodex of deck cards.
+    expect(find.text('CONTINUE STUDYING'), findsOneWidget);
+    expect(find.byType(StudyRolodex), findsOneWidget);
+
+    // Flipping the rolodex vertically (drag up) doesn't throw.
+    await tester.drag(find.byType(StudyRolodex), const Offset(0, -220));
+    await tester.pumpAndSettle();
+    expect(find.byType(StudyRolodex), findsOneWidget);
+  });
+
   testWidgets('Empty Home keeps the inviting promise grid',
       (WidgetTester tester) async {
     await _pumpApp(tester, deckRepository: const _EmptyDeckRepository());
@@ -397,7 +424,7 @@ void main() {
     await _pumpApp(tester,
         deckRepository: const _FixedDeckRepository(<Deck>[empty]));
 
-    await tester.tap(find.text('Empty Deck'));
+    await tester.tap(find.text('Empty Deck').last); // shelf row (also in hero)
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start review'));
     await tester.pumpAndSettle();
@@ -979,7 +1006,7 @@ void main() {
         deckRepository: _FixedDeckRepository(<Deck>[deck]),
         reviewStateRepository: states);
 
-    await tester.tap(find.text('Future Deck'));
+    await tester.tap(find.text('Future Deck').last); // shelf row (also in hero)
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start review'));
     await tester.pumpAndSettle();

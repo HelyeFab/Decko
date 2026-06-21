@@ -139,26 +139,19 @@ class _PopulatedHome extends StatelessWidget {
   final ValueChanged<Deck> onStudy;
   final VoidCallback onImport;
 
-  /// The deck to resume: the one with the most cards waiting. Falls back to the
-  /// first deck so the caught-up ribbon still has a sensible target.
-  Deck get _resumeTarget {
-    if (counts == null) return decks.first;
-    Deck best = decks.first;
-    int bestCount = counts![best.id] ?? 0;
-    for (final Deck d in decks) {
-      final int c = counts![d.id] ?? 0;
-      if (c > bestCount) {
-        best = d;
-        bestCount = c;
-      }
-    }
-    return best;
+  /// Decks as study entries, ordered most-ready first so the resume deck leads
+  /// the rolodex; ties keep the deck's existing order.
+  List<StudyEntry> get _entries {
+    final List<StudyEntry> entries = <StudyEntry>[
+      for (final Deck d in decks) (deck: d, count: counts?[d.id] ?? 0),
+    ];
+    entries.sort((StudyEntry a, StudyEntry b) => b.count.compareTo(a.count));
+    return entries;
   }
 
   @override
   Widget build(BuildContext context) {
-    final Deck target = _resumeTarget;
-    final int targetCount = counts?[target.id] ?? 0;
+    final List<StudyEntry> entries = _entries;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -168,11 +161,14 @@ class _PopulatedHome extends StatelessWidget {
         DeckoSpacing.xxxl,
       ),
       children: <Widget>[
-        StudyRibbon(
-          target: target,
-          cardsToStudy: targetCount,
-          onStudy: () => onStudy(target),
-        ),
+        if (entries.length == 1)
+          StudyRibbon(
+            target: entries.first.deck,
+            cardsToStudy: entries.first.count,
+            onStudy: () => onStudy(entries.first.deck),
+          )
+        else
+          StudyRolodex(entries: entries, onStudy: onStudy),
         const SizedBox(height: DeckoSpacing.xxl),
         const SectionHeader(
           title: 'Your decks',
