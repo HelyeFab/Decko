@@ -43,6 +43,7 @@ dependencies:
   path_provider: ^2.1.5
   audioplayers: ^6.7.1
   font_awesome_flutter: ^11.0.0
+  zstandard: ^1.5.0
 
 dev_dependencies:
   flutter_test:

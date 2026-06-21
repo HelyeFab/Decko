@@ -4,12 +4,30 @@
 2026-06-20
 
 ## Current stage
-MVP_012 complete: advanced deck option profiles — reusable profiles
-(global/default → profile → deck override) + the two Anki-parity items now done:
-TRUE daily limits (per-deck daily counts, day boundary) and ENFORCED sibling
-burying in the queue. New-card order added (Advanced). FSRS/progress untouched
-(adversarial review confirmed). Next: .anki21b import or review analytics.
-100 tests, analyze clean.
+MVP_013 complete: import compatibility hardening — modern `.apkg`
+(`collection.anki21b`, zstd) is now actually imported (decompress → existing
+pipeline), best-effort modern media, structured ImportDiagnostics, specific
+failure messages. ⚠️ Adds a CocoaPods requirement for iOS (zstandard plugin, no
+SPM) — NOT installed here, so `flutter run` on iOS needs `brew install
+cocoapods`; analyze/test fine on host. 111 tests, analyze clean.
+
+## Last completed (MVP_013 — import compatibility hardening, DEC-022)
+- Modern collection: detect `collection.anki21b` → zstd-decompress (injectable
+  `ZstdDecoder` + `ZstandardDecoder` native plugin) → existing SQLite reader
+  (same schema). `LearningItem.id = anki-card-<cardId>` preserved; FSRS/progress
+  untouched. `_parse` is now async.
+- Modern media: zstd payloads + zstd `MediaEntries` protobuf index, hand-parsed
+  (name only) in `lib/data/import/media_entries.dart`, best-effort + graceful.
+- `ImportDiagnostics` (format/collection/counts/warnings/blockingError) in
+  `lib/domain/import/`; surfaced in ImportPreviewPanel. Specific user errors
+  (no collection, undecodable modern, corrupted, missing tables) — no raw SQLite.
+- Adapter takes `AnkiApkgImportAdapter({zstd})`; tests inject identity/failing
+  fakes. Fixtures gained a `modern` flag (collection.anki21b + protobuf media).
+- Tests: 9 import-hardening (legacy diagnostics, modern import+format, modern
+  media, undecodable→clear, no-collection, missing-tables, missing-manifest
+  warning, unfamiliar fields, garbage) + 1 preview-diagnostics widget. 111 total.
+- DEFERRED/NOTE: media protobuf is name-only best-effort; CocoaPods install
+  pending for on-device verification.
 
 ## Last completed (MVP_012 — advanced deck option profiles, DEC-021)
 - Profiles: `StudyOptionProfile {id,name,options,isDefault}` (synthetic default
@@ -225,6 +243,7 @@ burying in the queue. New-card order added (Advanced). FSRS/progress untouched
 - Note-type-aware card mapping from the preserved source; positional fallback (DEC-019).
 - Two-level study options (global + per-deck overrides → effective); per-session caps (DEC-020).
 - Study option profiles (global→profile→deck), TRUE daily limits, enforced sibling burying (DEC-021).
+- Modern .anki21b (zstd) import + ImportDiagnostics + specific failure messages; CocoaPods now needed for iOS (DEC-022).
 
 ## What is still placeholder
 - FSRS uses DEFAULT weights (no per-user training) and no intra-day learning steps — FSRS-style, not Anki parity.
@@ -243,11 +262,12 @@ burying in the queue. New-card order added (Advanced). FSRS/progress untouched
 - Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-No brief queued. Likely next candidates (from the MVP_012 brief's "Likely next
-MVP"): modern `.anki21b` (zstd) import support; review history & analytics;
-broader UX polish. Smaller follow-ups noted in ROADMAP: desired retention + max
-interval (FSRS-policy plumbing), import-aware profile suggestions, finer-grained
-(new vs review) sibling burying.
+Install CocoaPods (`brew install cocoapods`) to build/run on iOS and verify
+modern `.apkg` import on a real device with a real modern deck. Then per the
+MVP_013 brief: MVP_014 — Decko Progress & Light Gamification Polish (or a
+remaining Anki import-compat pass). Smaller follow-ups in ROADMAP: desired
+retention + max interval (FSRS plumbing), import-aware profile suggestions,
+finer-grained sibling burying, full media protobuf parsing.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).

@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../../core/constants/decko_spacing.dart';
 import '../../../domain/import/deck_import_preview.dart';
+import '../../../domain/import/import_diagnostics.dart';
 
 /// Shows what an import adapter found and lets the user choose how to import.
 ///
@@ -26,6 +27,8 @@ class ImportPreviewPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool hasProgress = preview.hasProgressData;
+    final ImportDiagnostics? diag = preview.diagnostics;
+    final List<String> warnings = diag?.warnings ?? preview.notes;
 
     return ListView(
       padding: const EdgeInsets.all(DeckoSpacing.pagePadding),
@@ -82,18 +85,24 @@ class ImportPreviewPanel extends StatelessWidget {
                   _Stat(
                       label: 'Media files', value: '${preview.mediaFiles}'),
                 ],
+                if (diag != null) ...<Widget>[
+                  _Stat(
+                      label: 'Collection',
+                      value: diag.collectionFile ?? 'Unknown'),
+                  if (diag.models > 0)
+                    _Stat(label: 'Note types', value: '${diag.models}'),
+                  if (diag.templates > 0)
+                    _Stat(
+                        label: 'Card templates',
+                        value: '${diag.templates}'),
+                ],
               ],
             ),
           ),
         ),
-        for (final String note in preview.notes) ...<Widget>[
+        if (warnings.isNotEmpty) ...<Widget>[
           const SizedBox(height: DeckoSpacing.md),
-          Text(
-            note,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          _Warnings(warnings: warnings),
         ],
         const SizedBox(height: DeckoSpacing.xl),
         if (hasProgress) ...<Widget>[
@@ -138,6 +147,52 @@ class ImportPreviewPanel extends StatelessWidget {
         const SizedBox(height: DeckoSpacing.md),
         TextButton(onPressed: onCancel, child: const Text('Cancel')),
       ],
+    );
+  }
+}
+
+/// Non-blocking import warnings in a soft, attention-getting block.
+class _Warnings extends StatelessWidget {
+  const _Warnings({required this.warnings});
+
+  final List<String> warnings;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(DeckoSpacing.lg),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(DeckoRadii.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          for (int i = 0; i < warnings.length; i++) ...<Widget>[
+            if (i > 0) const SizedBox(height: DeckoSpacing.sm),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: FaIcon(FontAwesomeIcons.triangleExclamation,
+                      size: 13, color: scheme.onTertiaryContainer),
+                ),
+                const SizedBox(width: DeckoSpacing.sm),
+                Expanded(
+                  child: Text(
+                    warnings[i],
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: scheme.onTertiaryContainer),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

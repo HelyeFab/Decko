@@ -22,9 +22,25 @@ import 'package:decko/domain/import/deck_import_adapter.dart';
 import 'package:decko/domain/import/deck_import_info.dart';
 import 'package:decko/domain/import/deck_import_preview.dart';
 import 'package:decko/domain/import/imported_card_state.dart';
+import 'package:decko/domain/import/import_diagnostics.dart';
 import 'package:decko/domain/import/source/imported_anki_source.dart';
+import 'package:decko/domain/import/zstd_decoder.dart';
 import 'package:decko/domain/repositories/imported_source_store.dart';
 import 'package:decko/domain/review_card_mode.dart';
+
+/// A no-op zstd decoder for host tests — returns input unchanged, so modern
+/// fixtures whose payloads are left raw "decompress" to themselves.
+class _IdentityZstd implements ZstdDecoder {
+  @override
+  Future<Uint8List> decode(Uint8List input) async => input;
+}
+
+/// A zstd decoder that always fails — simulates an undecodable modern package.
+class _FailingZstd implements ZstdDecoder {
+  @override
+  Future<Uint8List> decode(Uint8List input) async =>
+      throw const ZstdDecodeException('cannot decode');
+}
 
 final String _fs = String.fromCharCode(0x1f); // Anki field separator
 
@@ -220,14 +236,44 @@ String _modelJson(
   });
 }
 
+/// Encodes a minimal Anki `MediaEntries` protobuf (just `name` per entry) so
+/// modern-package fixtures can be built without a protobuf dependency.
+Uint8List _encodeMediaEntries(List<String> names) {
+  void writeVarint(BytesBuilder b, int v) {
+    while (v >= 0x80) {
+      b.addByte((v & 0x7f) | 0x80);
+      v >>= 7;
+    }
+    b.addByte(v);
+  }
+
+  final BytesBuilder out = BytesBuilder();
+  for (final String name in names) {
+    final List<int> nameBytes = utf8.encode(name);
+    final BytesBuilder entry = BytesBuilder()..addByte(0x0A); // field 1, len
+    writeVarint(entry, nameBytes.length);
+    entry.add(nameBytes);
+    final Uint8List entryBytes = entry.toBytes();
+    out.addByte(0x0A); // MediaEntries field 1 (entries), len
+    writeVarint(out, entryBytes.length);
+    out.add(entryBytes);
+  }
+  return out.toBytes();
+}
+
 /// Builds a `.apkg` with full control over the model, notes (named fields +
 /// tags + model id), and cards (note id + template ordinal) — for source tests.
+/// When [modern] is true, the collection is named `collection.anki21b` and the
+/// media manifest is a `MediaEntries` protobuf (payloads left raw, so an
+/// identity zstd decoder round-trips them).
 Uint8List _buildSourceApkg({
   required String deckName,
   required String modelsJson,
   required List<_SrcNote> notes,
   required List<_SrcCard> cards,
   Map<String, List<int>> media = const <String, List<int>>{},
+  bool modern = false,
+  bool includeMediaManifest = true,
 }) {
   final Directory tmp = Directory.systemTemp.createTempSync('decko_src_fixture');
   final String path = '${tmp.path}/collection.anki21';
@@ -265,17 +311,25 @@ Uint8List _buildSourceApkg({
   final Uint8List dbBytes = File(path).readAsBytesSync();
   tmp.deleteSync(recursive: true);
 
+  final String collectionName =
+      modern ? 'collection.anki21b' : 'collection.anki21';
   final Map<String, String> mediaMap = <String, String>{};
+  final List<String> orderedNames = <String>[];
   final Archive archive = Archive()
-    ..addFile(ArchiveFile('collection.anki21', dbBytes.length, dbBytes));
+    ..addFile(ArchiveFile(collectionName, dbBytes.length, dbBytes));
   int n = 0;
   media.forEach((String name, List<int> bytes) {
     archive.addFile(ArchiveFile('$n', bytes.length, bytes));
     mediaMap['$n'] = name;
+    orderedNames.add(name);
     n++;
   });
-  final List<int> mediaJson = jsonEncode(mediaMap).codeUnits;
-  archive.addFile(ArchiveFile('media', mediaJson.length, mediaJson));
+  if (includeMediaManifest) {
+    final List<int> manifest = modern
+        ? _encodeMediaEntries(orderedNames)
+        : jsonEncode(mediaMap).codeUnits;
+    archive.addFile(ArchiveFile('media', manifest.length, manifest));
+  }
   return Uint8List.fromList(ZipEncoder().encode(archive));
 }
 
@@ -660,6 +714,163 @@ void main() {
           keepProgress: false, importedAt: DateTime(2026, 6, 20));
       expect(deck.items.every((i) => i.mode == ReviewCardMode.generic), isTrue);
       expect(deck.items.first.front, '食べる'); // positional content preserved
+    });
+  });
+
+  group('import compatibility hardening (MVP_013)', () {
+    final DateTime when = DateTime(2026, 6, 21);
+
+    Uint8List basicDeck({bool modern = false, bool manifest = true}) =>
+        _buildSourceApkg(
+          deckName: 'Basic Deck',
+          modern: modern,
+          includeMediaManifest: manifest,
+          modelsJson:
+              _modelJson('m', 'Basic', <String>['Front', 'Back'], <String>['Card 1']),
+          notes: const <_SrcNote>[
+            _SrcNote(id: 100, mid: 'm', flds: <String>['hello', 'world']),
+          ],
+          cards: const <_SrcCard>[_SrcCard(id: 200, nid: 100, ord: 0)],
+        );
+
+    test('legacy package reports legacy format + counts in diagnostics',
+        () async {
+      final DeckImportPreview p = await adapter.preview(mixedDeck());
+      expect(p.diagnostics, isNotNull);
+      expect(p.diagnostics!.format, AnkiPackageFormat.legacy21);
+      expect(p.diagnostics!.collectionFile, 'collection.anki21');
+      expect(p.diagnostics!.cards, 3);
+      expect(p.diagnostics!.isBlocked, isFalse);
+    });
+
+    test('modern .anki21b collection imports and reports its format', () async {
+      final Uint8List bytes = basicDeck(modern: true);
+      final AnkiApkgImportAdapter modernAdapter =
+          AnkiApkgImportAdapter(zstd: _IdentityZstd());
+
+      final DeckImportPreview p = await modernAdapter.preview(bytes);
+      expect(p.diagnostics!.format, AnkiPackageFormat.modern21b);
+      expect(p.diagnostics!.collectionFile, 'collection.anki21b');
+      expect(p.totalCards, 1);
+
+      final Deck deck = await modernAdapter.importDeck(bytes,
+          keepProgress: false, importedAt: when);
+      expect(deck.items, hasLength(1));
+      expect(deck.items.first.id, 'anki-card-200'); // stable identity
+    });
+
+    test('modern media manifest (protobuf) + payloads extract via the decoder',
+        () async {
+      final Uint8List bytes = _buildSourceApkg(
+        deckName: 'Modern Media',
+        modern: true,
+        modelsJson:
+            _modelJson('m', 'Basic', <String>['Front', 'Back'], <String>['Card 1']),
+        notes: const <_SrcNote>[
+          _SrcNote(id: 100, mid: 'm', flds: <String>['[sound:a.mp3]', 'b']),
+        ],
+        cards: const <_SrcCard>[_SrcCard(id: 200, nid: 100, ord: 0)],
+        media: const <String, List<int>>{'a.mp3': <int>[1, 2, 3]},
+      );
+      final _FakeMediaStore store = _FakeMediaStore();
+      final AnkiApkgImportAdapter modernAdapter =
+          AnkiApkgImportAdapter(zstd: _IdentityZstd());
+
+      final Deck deck = await modernAdapter.importDeck(bytes,
+          keepProgress: false, importedAt: when, mediaStore: store);
+      expect(store.saved.keys, contains('${deck.id}/a.mp3'));
+    });
+
+    test('a modern package that cannot be decompressed fails clearly, no crash',
+        () async {
+      final Uint8List bytes = basicDeck(modern: true);
+      final AnkiApkgImportAdapter failing =
+          AnkiApkgImportAdapter(zstd: _FailingZstd());
+      await expectLater(
+        failing.preview(bytes),
+        throwsA(isA<UnsupportedPackageException>()),
+      );
+    });
+
+    test('a package with no collection database fails with a clear message',
+        () async {
+      final Archive archive = Archive()
+        ..addFile(ArchiveFile('media', 2, utf8.encode('{}')));
+      final Uint8List bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+      await expectLater(
+        adapter.preview(bytes),
+        throwsA(predicate((Object? e) =>
+            e is DeckImportException &&
+            e.message.contains('No Anki collection'))),
+      );
+    });
+
+    test('a collection missing Anki tables fails with a clear, non-SQLite message',
+        () async {
+      final Directory tmp = Directory.systemTemp.createTempSync('decko_bad');
+      final String path = '${tmp.path}/c.sqlite';
+      final Database db = sqlite3.open(path);
+      db.execute('CREATE TABLE unrelated (id INTEGER);');
+      db.close();
+      final Uint8List dbBytes = File(path).readAsBytesSync();
+      tmp.deleteSync(recursive: true);
+      final Archive archive = Archive()
+        ..addFile(ArchiveFile('collection.anki21', dbBytes.length, dbBytes));
+      final Uint8List bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+
+      await expectLater(
+        adapter.preview(bytes),
+        throwsA(predicate((Object? e) =>
+            e is DeckImportException &&
+            e.message.contains('expected Anki tables') &&
+            !e.message.toLowerCase().contains('sqlite'))),
+      );
+    });
+
+    test('media referenced without a manifest still imports, with a warning',
+        () async {
+      final Uint8List bytes = _buildSourceApkg(
+        deckName: 'No Manifest',
+        includeMediaManifest: false,
+        modelsJson:
+            _modelJson('m', 'Basic', <String>['Front', 'Back'], <String>['Card 1']),
+        notes: const <_SrcNote>[
+          _SrcNote(id: 100, mid: 'm', flds: <String>['[sound:x.mp3]', 'b']),
+        ],
+        cards: const <_SrcCard>[_SrcCard(id: 200, nid: 100, ord: 0)],
+      );
+      final DeckImportPreview p = await adapter.preview(bytes);
+      expect(p.diagnostics!.hasMediaManifest, isFalse);
+      expect(
+          p.diagnostics!.warnings.any((String w) => w.contains('media may be unavailable')),
+          isTrue);
+      // Still studyable.
+      final Deck deck = await adapter.importDeck(bytes,
+          keepProgress: false, importedAt: when);
+      expect(deck.items, hasLength(1));
+    });
+
+    test('a note type with unfamiliar field names still imports (generic)',
+        () async {
+      final Uint8List bytes = _buildSourceApkg(
+        deckName: 'Weird',
+        modelsJson: _modelJson('m', 'Weird',
+            <String>['Blorp', 'Zxcv', 'Qwerty'], <String>['Card 1']),
+        notes: const <_SrcNote>[
+          _SrcNote(id: 100, mid: 'm', flds: <String>['a', 'b', 'c']),
+        ],
+        cards: const <_SrcCard>[_SrcCard(id: 200, nid: 100, ord: 0)],
+      );
+      final Deck deck = await adapter.importDeck(bytes,
+          keepProgress: false, importedAt: when);
+      expect(deck.items, hasLength(1));
+    });
+
+    test('garbage bytes still fail as a handled DeckImportException', () async {
+      await expectLater(
+        adapter.preview(Uint8List.fromList(<int>[9, 9, 9, 9, 9])),
+        throwsA(isA<DeckImportException>()),
+      );
     });
   });
 }

@@ -77,8 +77,12 @@ Small, intentionally-postponed improvements captured so they are not lost.
 - **Import: media (images/audio).** Import strips `[sound:…]` and `<img>` and
   doesn't extract media files, so audio is dropped and image-only cards import
   near-empty. Add media support later. (From MVP_005 testing.)
-- **Import: modern `.anki21b` (zstd).** Only the legacy uncompressed `.apkg` is
-  supported; modern exports are rejected with guidance. Decode zstd later. (DEC-010.)
+- ~~**Import: modern `.anki21b` (zstd).**~~ DONE (MVP_013, DEC-022): modern
+  `collection.anki21b` is zstd-decompressed (via the `zstandard` plugin behind an
+  injectable `ZstdDecoder`) and read by the existing pipeline; modern media
+  (zstd payloads + `MediaEntries` protobuf index) extracted best-effort. Added
+  `ImportDiagnostics` + specific failure messages. Note: adds a CocoaPods
+  requirement for iOS builds.
 - **Import: smarter field mapping.** Field→Decko mapping is heuristic
   (front/back positional, kana→reading, sentence→example). Note-type-aware
   mapping would import more decks cleanly. (From MVP_005 testing.)

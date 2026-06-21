@@ -1,3 +1,5 @@
+import 'import_diagnostics.dart';
+
 /// A read-only summary of what an import adapter found in a package, shown to
 /// the user before they confirm the import.
 ///
@@ -17,6 +19,7 @@ class DeckImportPreview {
     this.mediaFiles = 0,
     this.audioRefs = 0,
     this.imageRefs = 0,
+    this.diagnostics,
   });
 
   final String deckName;
@@ -39,6 +42,9 @@ class DeckImportPreview {
   final int mediaFiles;
   final int audioRefs;
   final int imageRefs;
+
+  /// Structured detection diagnostics (package format, counts, warnings).
+  final ImportDiagnostics? diagnostics;
 
   bool get hasMedia => mediaFiles > 0 || audioRefs > 0 || imageRefs > 0;
 }

@@ -18,6 +18,7 @@ import 'package:decko/domain/repositories/deck_repository.dart';
 import 'package:decko/domain/repositories/progress_repository.dart';
 import 'package:decko/domain/import/deck_import_info.dart';
 import 'package:decko/domain/import/deck_import_preview.dart';
+import 'package:decko/domain/import/import_diagnostics.dart';
 import 'dart:typed_data';
 
 import 'package:decko/domain/import/source/imported_anki_source.dart';
@@ -487,6 +488,45 @@ void main() {
     expect(find.text('Cards found'), findsOneWidget);
     expect(find.text('Keep Anki progress'), findsOneWidget);
     expect(find.text('Start fresh'), findsOneWidget);
+  });
+
+  testWidgets('Import preview surfaces diagnostics and warnings (MVP_013)',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(420, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ImportPreviewPanel(
+          preview: const DeckImportPreview(
+            deckName: 'Modern Deck',
+            totalCards: 5,
+            newCards: 5,
+            reviewedCards: 0,
+            suspendedCards: 0,
+            hasProgressData: false,
+            diagnostics: ImportDiagnostics(
+              format: AnkiPackageFormat.modern21b,
+              models: 2,
+              templates: 3,
+              warnings: <String>[
+                'Cards reference media but no media manifest was found — media may be unavailable.',
+              ],
+            ),
+          ),
+          onKeepProgress: () {},
+          onStartFresh: () {},
+          onCancel: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('collection.anki21b'), findsOneWidget); // collection file
+    expect(find.text('Note types'), findsOneWidget);
+    expect(find.text('Card templates'), findsOneWidget);
+    expect(find.textContaining('media may be unavailable'), findsOneWidget);
   });
 
   testWidgets('Import preview warns honestly when no progress is found',

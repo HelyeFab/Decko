@@ -11,13 +11,17 @@ import '../../domain/import/deck_import_adapter.dart';
 import '../../domain/import/deck_import_info.dart';
 import '../../domain/import/deck_import_preview.dart';
 import '../../domain/import/imported_card_progress.dart';
+import '../../domain/import/import_diagnostics.dart';
 import '../../domain/import/imported_card_state.dart';
 import '../../domain/import/note_type_aware_card_mapper.dart';
 import '../../domain/import/source/imported_anki_source.dart';
+import '../../domain/import/zstd_decoder.dart';
 import '../../domain/learning_item.dart';
 import '../../domain/repositories/imported_source_store.dart';
 import '../../domain/repositories/media_store.dart';
 import '../../domain/review_card_mode.dart';
+import 'media_entries.dart';
+import 'zstandard_decoder.dart';
 
 /// Imports a (legacy, uncompressed) Anki `.apkg` package.
 ///
@@ -27,13 +31,18 @@ import '../../domain/review_card_mode.dart';
 /// message (DEC-010). All parsing lives here, never in widgets, and every
 /// failure surfaces as a [DeckImportException] so the UI can stay friendly.
 class AnkiApkgImportAdapter implements DeckImportAdapter {
-  const AnkiApkgImportAdapter();
+  const AnkiApkgImportAdapter({this.zstd = const ZstandardDecoder()});
+
+  /// Decompresses modern `collection.anki21b` / media (MVP_013). Injectable so
+  /// host tests can supply a fake (the native plugin can't run in `flutter
+  /// test`).
+  final ZstdDecoder zstd;
 
   static const NoteTypeAwareCardMapper _mapper = NoteTypeAwareCardMapper();
 
   @override
   Future<DeckImportPreview> preview(Uint8List bytes) async {
-    final _Parsed parsed = _parse(bytes);
+    final _Parsed parsed = await _parse(bytes);
     return DeckImportPreview(
       deckName: parsed.deckName,
       totalCards: parsed.cards.length,
@@ -47,6 +56,7 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       mediaFiles: parsed.mediaMap.length,
       audioRefs: parsed.audioRefs,
       imageRefs: parsed.imageRefs,
+      diagnostics: parsed.diagnostics,
     );
   }
 
@@ -58,7 +68,7 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     MediaStore? mediaStore,
     ImportedSourceStore? sourceStore,
   }) async {
-    final _Parsed parsed = _parse(bytes);
+    final _Parsed parsed = await _parse(bytes);
     final bool keep = keepProgress && parsed.hasProgressData;
     final ImportProgressMode mode = !parsed.hasProgressData
         ? ImportProgressMode.unavailable
@@ -152,22 +162,29 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
   }
 
   /// Copies each package media payload to the [MediaStore] under its original
-  /// filename, one at a time so large decks don't balloon memory.
+  /// filename, one at a time so large decks don't balloon memory. Modern
+  /// packages store each payload zstd-compressed, so it's decompressed first.
+  /// A single bad/missing media file is skipped, never failing the import.
   Future<void> _extractMedia(
       _Parsed parsed, String deckId, MediaStore store) async {
     for (final MapEntry<String, String> e in parsed.mediaMap.entries) {
       final ArchiveFile? file = parsed.archive.findFile(e.key);
       if (file == null) continue;
       try {
-        await store.saveMedia(
-            deckId, e.value, Uint8List.fromList(file.content as List<int>));
+        Uint8List data = _bytesOf(file);
+        if (parsed.mediaCompressed) {
+          try {
+            data = await zstd.decode(data);
+          } catch (_) {/* fall back to raw bytes */}
+        }
+        await store.saveMedia(deckId, e.value, data);
       } catch (_) {/* skip a single bad media file rather than fail import */}
     }
   }
 
   // --- parsing ---------------------------------------------------------------
 
-  _Parsed _parse(Uint8List bytes) {
+  Future<_Parsed> _parse(Uint8List bytes) async {
     Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes);
@@ -177,33 +194,39 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       );
     }
 
-    final ArchiveFile? db = _findCollection(archive);
-    if (db == null) {
-      if (archive.findFile('collection.anki21b') != null) {
+    final AnkiPackageFormat format = _detectFormat(archive);
+    if (format == AnkiPackageFormat.unknown) {
+      throw const DeckImportException(
+        'No Anki collection database was found in this package.',
+      );
+    }
+
+    // Get the raw SQLite bytes, decompressing the modern zstd collection.
+    final Uint8List dbBytes;
+    if (format == AnkiPackageFormat.modern21b) {
+      try {
+        dbBytes = await zstd.decode(_bytesOf(archive.findFile('collection.anki21b')!));
+      } catch (_) {
         throw const UnsupportedPackageException(
-          'This deck uses Anki’s newer format. In Anki, export it with '
-          '“Support older Anki versions” enabled, then try again.',
+          'This package uses Anki’s newest format and Decko couldn’t '
+          'decompress it. Please re-export it from Anki and try again.',
         );
       }
-      throw const DeckImportException(
-        'Decko couldn’t find an Anki collection inside this package.',
-      );
+    } else {
+      dbBytes = _bytesOf(archive.findFile(format.collectionFile!)!);
     }
 
     final Directory tmp = Directory.systemTemp.createTempSync('decko_apkg');
     final File dbFile = File('${tmp.path}/collection.sqlite');
     Database? handle;
     try {
-      dbFile.writeAsBytesSync(db.content as List<int>);
+      dbFile.writeAsBytesSync(dbBytes);
       handle = sqlite3.open(dbFile.path);
-      return _readCollection(handle, archive);
+      return await _readCollection(handle, archive, format);
     } on DeckImportException {
       rethrow;
-    } catch (_) {
-      throw const DeckImportException(
-        'Decko couldn’t read this deck. It may be corrupted or use an '
-        'unsupported Anki format.',
-      );
+    } catch (e) {
+      throw DeckImportException(_friendlyDbError(e));
     } finally {
       handle?.close();
       try {
@@ -212,11 +235,34 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     }
   }
 
-  ArchiveFile? _findCollection(Archive archive) =>
-      archive.findFile('collection.anki21') ??
-      archive.findFile('collection.anki2');
+  AnkiPackageFormat _detectFormat(Archive archive) {
+    if (archive.findFile('collection.anki21b') != null) {
+      return AnkiPackageFormat.modern21b;
+    }
+    if (archive.findFile('collection.anki21') != null) {
+      return AnkiPackageFormat.legacy21;
+    }
+    if (archive.findFile('collection.anki2') != null) {
+      return AnkiPackageFormat.legacy2;
+    }
+    return AnkiPackageFormat.unknown;
+  }
 
-  _Parsed _readCollection(Database db, Archive archive) {
+  /// Turns a raw SQLite/parse error into a user-facing message — never exposes
+  /// SQLite internals as the primary message.
+  String _friendlyDbError(Object e) {
+    final String s = e.toString().toLowerCase();
+    if (s.contains('no such table') || s.contains('no such column')) {
+      return 'Decko opened this collection, but the expected Anki tables were '
+          'missing. The package may be from an unsupported Anki version.';
+    }
+    return 'This package appears to be corrupted or incomplete.';
+  }
+
+  Uint8List _bytesOf(ArchiveFile f) => Uint8List.fromList(f.content as List<int>);
+
+  Future<_Parsed> _readCollection(
+      Database db, Archive archive, AnkiPackageFormat format) async {
     final ResultSet col = db.select('SELECT crt, decks, models FROM col LIMIT 1');
     final int crt = col.isEmpty ? 0 : (col.first['crt'] as int? ?? 0);
     final Map<String, String> deckNames = _deckNames(db, col);
@@ -289,6 +335,26 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
         ? cards.where((c) => c.isDueToday).length
         : null;
 
+    final bool mediaCompressed = format == AnkiPackageFormat.modern21b;
+    final Map<String, String> mediaMap = await _readMediaMap(archive, format);
+
+    // Diagnostics + non-blocking warnings.
+    final List<String> warnings = <String>[...notes];
+    final bool mediaManifestPresent = archive.findFile('media') != null;
+    final int templateCount =
+        models.values.fold(0, (int s, ImportedAnkiModel m) => s + m.templates.length);
+    if (audioRefs + imageRefs > 0 && mediaMap.isEmpty) {
+      warnings.add(
+          'Cards reference media but no media manifest was found — media may be unavailable.');
+    }
+    final int missingPayloads = mediaMap.keys
+        .where((String k) => archive.findFile(k) == null)
+        .length;
+    if (missingPayloads > 0) {
+      warnings.add(
+          '$missingPayloads media file(s) listed in the manifest are missing from the package.');
+    }
+
     return _Parsed(
       deckName: deckName,
       cards: cards,
@@ -296,12 +362,24 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       approxDueToday: approxDue,
       notes: notes,
       archive: archive,
-      mediaMap: _readMediaMap(archive),
+      mediaMap: mediaMap,
+      mediaCompressed: mediaCompressed,
       audioRefs: audioRefs,
       imageRefs: imageRefs,
       models: models.values.toList(),
       sourceNotes: sourceNotes,
       cardSources: cardSources,
+      diagnostics: ImportDiagnostics(
+        format: format,
+        hasMediaManifest: mediaManifestPresent,
+        decks: deckIds.length,
+        notes: sourceNotes.length,
+        cards: cards.length,
+        models: models.length,
+        templates: templateCount,
+        mediaEntries: mediaMap.length,
+        warnings: warnings,
+      ),
     );
   }
 
@@ -387,9 +465,27 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       );
 
   /// Reads the package's `media` mapping (numbered payload -> original name).
-  Map<String, String> _readMediaMap(Archive archive) {
+  ///
+  /// Legacy packages use a JSON map; modern packages use a zstd-compressed
+  /// `MediaEntries` protobuf where the payload named `i` is the i-th entry.
+  Future<Map<String, String>> _readMediaMap(
+      Archive archive, AnkiPackageFormat format) async {
     final ArchiveFile? f = archive.findFile('media');
     if (f == null) return const <String, String>{};
+
+    if (format == AnkiPackageFormat.modern21b) {
+      try {
+        final Uint8List proto = await zstd.decode(_bytesOf(f));
+        final List<String> names = parseMediaEntryNames(proto);
+        return <String, String>{
+          for (int i = 0; i < names.length; i++)
+            if (names[i].isNotEmpty) '$i': names[i],
+        };
+      } catch (_) {
+        return const <String, String>{};
+      }
+    }
+
     try {
       final Map<String, dynamic> decoded =
           jsonDecode(utf8.decode(f.content as List<int>))
@@ -455,11 +551,13 @@ class _Parsed {
     required this.notes,
     required this.archive,
     required this.mediaMap,
+    required this.mediaCompressed,
     required this.audioRefs,
     required this.imageRefs,
     required this.models,
     required this.sourceNotes,
     required this.cardSources,
+    required this.diagnostics,
   });
 
   final String deckName;
@@ -469,11 +567,15 @@ class _Parsed {
   final List<String> notes;
   final Archive archive;
   final Map<String, String> mediaMap;
+
+  /// True when media payloads are zstd-compressed (modern packages).
+  final bool mediaCompressed;
   final int audioRefs;
   final int imageRefs;
   final List<ImportedAnkiModel> models;
   final List<ImportedAnkiNote> sourceNotes;
   final List<ImportedAnkiCardSource> cardSources;
+  final ImportDiagnostics diagnostics;
 }
 
 class _Card {

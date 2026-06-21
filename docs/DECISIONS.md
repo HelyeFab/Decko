@@ -527,3 +527,27 @@ MVP_011 gave global defaults + per-deck overrides but shipped two honest gaps: d
 - One source card still ↔ one Decko card; FSRS and imported progress are never reset (verified by an adversarial review) — options/limits/bury are pure queue filters + presentation.
 - Daily limits are now genuinely daily and survive app restarts the same day.
 - Known edge: bury "reserves" a note for a card that a later cap may drop, suppressing its new sibling for that build (Anki-consistent; revisit if finer parity is wanted). Finer-grained bury (separate new/review) and desired-retention/max-interval remain future work.
+
+## DEC-022: Modern Anki package support + import diagnostics
+
+Date: 2026-06-21
+Status: Accepted
+
+### Context
+
+Decko could only read legacy uncompressed `.apkg` exports (`collection.anki21`/`.anki2`) and rejected the modern zstd format with a "re-export" message. Real users hit that wall, and import failures were vague (sometimes surfacing raw SQLite errors). MVP_013 makes import trustworthy across real-world Anki packages.
+
+### Decision
+
+- **Modern format is now actually imported.** A package's collection is detected (`AnkiPackageFormat`: `legacy2` / `legacy21` / `modern21b` / `unknown`). For `collection.anki21b` the bytes are zstd-decompressed and handed to the **existing** SQLite reader — the schema is identical, so lossless source, note-type mapping, and FSRS all work unchanged. `LearningItem.id = anki-card-<cardId>` is preserved.
+- **zstd via an injected decoder.** `ZstdDecoder` (interface) + `ZstandardDecoder` (the native `zstandard` plugin). It's injectable so host `flutter test` uses a fake (the native plugin can't run in the Dart test VM); the app uses the real one. **This adds a CocoaPods requirement for iOS** (the plugin doesn't support SPM) — see consequences.
+- **Modern media, best-effort.** Modern media payloads are zstd-compressed and indexed by a zstd-compressed `MediaEntries` protobuf. Decko decompresses the index, hand-parses just the `name` field (a ~50-line reader, no protobuf dependency), and decompresses each payload. Anything that fails degrades gracefully — text cards always stay studyable.
+- **Structured diagnostics.** `ImportDiagnostics` (package format, collection file, decks/notes/cards/models/templates/media counts, warnings, blocking error) is produced during parse, surfaced in the import preview, and asserted in tests.
+- **Specific failure states** replace vague/raw-SQLite messages: no collection found, undecodable modern format, corrupted/incomplete, and "expected Anki tables were missing". Non-blocking issues (missing manifest, manifest entries missing from the zip) become warnings, not errors.
+
+### Consequences
+
+- Modern `.apkg` exports import without asking users to toggle "Support older Anki versions".
+- **CocoaPods is now required to build/run on iOS** (the `zstandard` plugin uses CocoaPods, not SPM). `flutter analyze`/`flutter test` are unaffected (host VM + fake decoder). Installing CocoaPods (`brew install cocoapods`) is a one-time dev-env step; on-device modern import is verified after that.
+- No re-import is required for already-imported decks; their ids/state are unchanged. This MVP doesn't migrate existing decks.
+- Media protobuf parsing is `name`-only and best-effort; exotic media-index variants degrade to "media unavailable" with a warning rather than failing the import.
