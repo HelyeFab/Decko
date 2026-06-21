@@ -4,10 +4,35 @@
 2026-06-20
 
 ## Current stage
-MVP_011 complete: study options & deck overrides — global defaults + per-deck
-overrides → effective options; per-session queue caps; audio autoplay; image
-display timing; per-deck furigana. Settings tab is now a hub. Next: MVP_012
-(Advanced Deck Option Profiles). 85 tests, analyze clean.
+MVP_012 complete: advanced deck option profiles — reusable profiles
+(global/default → profile → deck override) + the two Anki-parity items now done:
+TRUE daily limits (per-deck daily counts, day boundary) and ENFORCED sibling
+burying in the queue. New-card order added (Advanced). FSRS/progress untouched
+(adversarial review confirmed). Next: .anki21b import or review analytics.
+100 tests, analyze clean.
+
+## Last completed (MVP_012 — advanced deck option profiles, DEC-021)
+- Profiles: `StudyOptionProfile {id,name,options,isDefault}` (synthetic default
+  mirrors global); `DeckStudyOptions.profileId`; resolution global/default →
+  profile → deck override; dangling profileId → global fallback; default
+  protected from deletion. In study_options.dart + SharedPrefs repo.
+- TRUE daily limits: `DailyStudyCounts` (day/new/review/studiedNoteIds) +
+  `DailyStudyCountsRepository`/SharedPrefs + `DeckoApp.dailyCountsOf`. Review
+  session caps by remaining = limit − studiedToday; grade records PRE-grade
+  kind; persists on flush. Second same-day session keeps allowance; new day
+  resets (local-day boundary).
+- BURY siblings ENFORCED in `DueQueue.build` (filters only): drop notes studied
+  earlier today + one card per note per build. Note id from
+  importedProgress.sourceNoteId or preserved-source card→note map (review
+  `_loadNoteMap`). Demo decks no-op.
+- New-card order (deckOrder/random) behind a collapsed Advanced section.
+- UI: Settings hub "Study profiles" (StudyProfilesScreen + ProfileEditorScreen);
+  deck options profile selector + Advanced override; shared `StudyOptionsForm`.
+- DEFERRED (documented): desired retention + max interval (FSRS plumbing);
+  import-aware suggestions. Edge: bury reserves a note before caps.
+- Tests: 13 pure (resolution, profile repo + delete fallback, daily limits 2nd
+  session/reset, bury, new-card order) + 2 widget (daily counts honoured;
+  profile assignment). 100 total. Adversarial subagent review: safety holds.
 
 ## Last completed (MVP_011 — study options & deck overrides, DEC-020)
 - Domain (`lib/domain/study_options/`): `StudyOptions` (global), `DeckStudyOptions`
@@ -199,6 +224,7 @@ display timing; per-deck furigana. Settings tab is now a hub. Next: MVP_012
 - Floating bottom nav over a StatefulShellRoute (Home/Import/Progress/Settings) (DEC-018).
 - Note-type-aware card mapping from the preserved source; positional fallback (DEC-019).
 - Two-level study options (global + per-deck overrides → effective); per-session caps (DEC-020).
+- Study option profiles (global→profile→deck), TRUE daily limits, enforced sibling burying (DEC-021).
 
 ## What is still placeholder
 - FSRS uses DEFAULT weights (no per-user training) and no intra-day learning steps — FSRS-style, not Anki parity.
@@ -217,11 +243,11 @@ display timing; per-deck furigana. Settings tab is now a hub. Next: MVP_012
 - Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-MVP_012 — Advanced Deck Option Profiles (brief:
-.agent/mvp_briefs/MVP_012_ADVANCED_DECK_OPTION_PROFILES.md): option groups/
-profiles shared across multiple decks, building on MVP_011's per-deck options.
-Bury-siblings is currently a stored flag but not yet enforced in the queue —
-a candidate to wire up.
+No brief queued. Likely next candidates (from the MVP_012 brief's "Likely next
+MVP"): modern `.anki21b` (zstd) import support; review history & analytics;
+broader UX polish. Smaller follow-ups noted in ROADMAP: desired retention + max
+interval (FSRS-policy plumbing), import-aware profile suggestions, finer-grained
+(new vs review) sibling burying.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).

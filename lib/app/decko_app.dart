@@ -7,8 +7,10 @@ import '../data/file_media_store.dart';
 import '../data/mock_deck_repository.dart';
 import '../data/shared_prefs_progress_repository.dart';
 import '../data/shared_prefs_review_state_repository.dart';
+import '../data/shared_prefs_daily_study_counts_repository.dart';
 import '../data/shared_prefs_settings_repository.dart';
 import '../data/shared_prefs_study_options_repository.dart';
+import '../domain/repositories/daily_study_counts_repository.dart';
 import '../domain/repositories/deck_repository.dart';
 import '../domain/repositories/imported_source_store.dart';
 import '../domain/repositories/media_store.dart';
@@ -40,6 +42,8 @@ class DeckoApp extends StatefulWidget {
     this.mediaStore = const FileMediaStore(),
     this.importedSourceStore = const FileImportedSourceStore(),
     this.studyOptionsRepository = const SharedPrefsStudyOptionsRepository(),
+    this.dailyStudyCountsRepository =
+        const SharedPrefsDailyStudyCountsRepository(),
   });
 
   final DeckRepository deckRepository;
@@ -49,6 +53,7 @@ class DeckoApp extends StatefulWidget {
   final MediaStore mediaStore;
   final ImportedSourceStore importedSourceStore;
   final StudyOptionsRepository studyOptionsRepository;
+  final DailyStudyCountsRepository dailyStudyCountsRepository;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -76,6 +81,9 @@ class DeckoApp extends StatefulWidget {
 
   static StudyOptionsRepository studyOptionsOf(BuildContext context) =>
       _scopeOf(context).studyOptionsRepository;
+
+  static DailyStudyCountsRepository dailyCountsOf(BuildContext context) =>
+      _scopeOf(context).dailyStudyCountsRepository;
 
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
@@ -124,6 +132,7 @@ class _DeckoAppState extends State<DeckoApp> {
       mediaStore: widget.mediaStore,
       importedSourceStore: widget.importedSourceStore,
       studyOptionsRepository: widget.studyOptionsRepository,
+      dailyStudyCountsRepository: widget.dailyStudyCountsRepository,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -150,6 +159,7 @@ class _DeckoScope extends InheritedWidget {
     required this.mediaStore,
     required this.importedSourceStore,
     required this.studyOptionsRepository,
+    required this.dailyStudyCountsRepository,
     required super.child,
   });
 
@@ -161,6 +171,7 @@ class _DeckoScope extends InheritedWidget {
   final MediaStore mediaStore;
   final ImportedSourceStore importedSourceStore;
   final StudyOptionsRepository studyOptionsRepository;
+  final DailyStudyCountsRepository dailyStudyCountsRepository;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -171,5 +182,6 @@ class _DeckoScope extends InheritedWidget {
       reviewStateRepository != oldWidget.reviewStateRepository ||
       mediaStore != oldWidget.mediaStore ||
       importedSourceStore != oldWidget.importedSourceStore ||
-      studyOptionsRepository != oldWidget.studyOptionsRepository;
+      studyOptionsRepository != oldWidget.studyOptionsRepository ||
+      dailyStudyCountsRepository != oldWidget.dailyStudyCountsRepository;
 }

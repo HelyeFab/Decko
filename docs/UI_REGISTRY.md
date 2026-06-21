@@ -310,6 +310,25 @@ re-inventing equivalents.
 - The deck-detail action tiles (Deck options, View imported source) share one
   `_DeckActionTile` row idiom.
 
+### Added in MVP_012 (option profiles, DEC-021)
+
+- **`StudyOptionsForm`** (`features/settings/widgets/study_options_form.dart`) —
+  the shared editable options form (daily limits · media · collapsed **Advanced
+  scheduling** with new-card order + bury). Reused by the global "Study defaults"
+  screen and the profile editor, so there's one options form, not three.
+- **Advanced disclosure** — a small-caps "ADVANCED SCHEDULING" row that expands
+  to reveal advanced controls (progressive disclosure; defaults stay simple).
+- **Study profiles** — Settings hub gains a "Study profiles" tile →
+  `StudyProfilesScreen` (list with a Default badge; "New profile" → editor). A
+  user profile opens `ProfileEditorScreen` (rename `TextField` + `StudyOptionsForm`
+  + destructive delete via `DeckoConfirmDialog`); the Default profile opens the
+  global Study defaults instead.
+- **Deck profile assignment** — Deck options gains a "Study profile" `ChoiceRow`
+  at the top; override baselines read "Inherited: X" from the selected profile
+  (not just global), and an Advanced section adds the new-card-order override.
+- No new primitives — everything reuses `SettingsSection` / `StepperRow` /
+  `ChoiceRow` / `SwitchRow` from MVP_011.
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

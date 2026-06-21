@@ -504,3 +504,26 @@ Decko had no way to shape study behaviour: large imported decks dumped every due
 - Sessions are bounded; learners control new/review pace, audio, images, and readings globally or per deck; everything persists.
 - FSRS maths and the global furigana toggle are unchanged.
 - Daily limits are per-session for now (no daily-count rollover); deck option groups shared across decks are deferred to MVP_012.
+
+## DEC-021: Study option profiles + true daily limits + sibling burying
+
+Date: 2026-06-20
+Status: Accepted
+
+### Context
+
+MVP_011 gave global defaults + per-deck overrides but shipped two honest gaps: daily limits were per-session (reopening granted a fresh allowance) and bury-siblings was stored but not enforced. MVP_012 adds reusable profiles and closes both parity gaps — without touching FSRS or card identity.
+
+### Decision
+
+- **Profiles:** `StudyOptionProfile {id, name, options, isDefault}` — a reusable `StudyOptions` set. A synthetic "Default" profile mirrors the global options; user profiles are stored as a JSON list. `DeckStudyOptions` gains `profileId`. Resolution order is **global/default → assigned profile → deck override** (`getEffectiveOptions`: base = profile options when assigned else global; then per-field deck override). A deleted/dangling `profileId` falls back to global. The repository protects the default profile from deletion.
+- **True daily limits:** `DailyStudyCounts {day, newStudied, reviewStudied, studiedNoteIds}` per deck (`DailyStudyCountsRepository` + shared-prefs impl). The day boundary is the local calendar day (`year-month-day`); `forDay(today)` zeroes a stale record. The review session loads today's counts and caps the queue by **remaining = limit − studiedToday**, so a second same-day session keeps the reduced allowance and a new day resets it. Each grade records the card by its **pre-grade** kind (new vs review) and marks its note studied; counts persist on flush.
+- **Sibling burying (enforced):** when enabled, `DueQueue.build` filters (never mutates) — it drops cards whose source note was studied earlier today (`studiedNotesToday`) and keeps only the first card per note this build (review → learning → new order, so a due review beats a new sibling). Note identity comes from `importedProgress.sourceNoteId` or the preserved source's card→note links; cards with no known note are never buried. Demo decks (no source) are a no-op.
+- **Advanced (safe) options:** `NewCardOrder {deckOrder, random}` added, behind a collapsed "Advanced" section. Bury surfaced there too. **Deferred (documented blocker):** desired retention and maximum interval need FSRS-policy plumbing — not implemented to keep scheduler maths safe; import-aware profile suggestions also deferred.
+- **UI:** Settings hub gains "Study profiles" (list/create/edit/delete; default edits via Study defaults). Deck options gains a profile selector; override baselines reflect the selected profile ("Inherited: X"). A shared `StudyOptionsForm` powers the global + profile editors.
+
+### Consequences
+
+- One source card still ↔ one Decko card; FSRS and imported progress are never reset (verified by an adversarial review) — options/limits/bury are pure queue filters + presentation.
+- Daily limits are now genuinely daily and survive app restarts the same day.
+- Known edge: bury "reserves" a note for a card that a later cap may drop, suppressing its new sibling for that build (Anki-consistent; revisit if finer parity is wanted). Finer-grained bury (separate new/review) and desired-retention/max-interval remain future work.

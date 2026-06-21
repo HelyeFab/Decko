@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -22,7 +24,11 @@ import '../../domain/review_rating.dart';
 import '../../domain/review_scheduling_policy.dart';
 import '../../domain/review_session.dart';
 import '../../domain/review_session_result.dart';
+import '../../domain/repositories/daily_study_counts_repository.dart';
+import '../../domain/repositories/imported_source_store.dart';
 import '../../domain/repositories/study_options_repository.dart';
+import '../../domain/import/source/imported_anki_source.dart';
+import '../../domain/study_options/daily_study_counts.dart';
 import '../../domain/study_options/study_options.dart';
 import 'widgets/rating_button_row.dart';
 import 'widgets/session_summary.dart';
@@ -61,6 +67,13 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       EffectiveStudyOptions.resolve(StudyOptions.defaults, null);
   final AudioPlayer _autoplayer = AudioPlayer();
 
+  /// True daily limits + sibling burying (MVP_012).
+  DailyStudyCountsRepository? _countsRepo;
+  DailyStudyCounts _daily = DailyStudyCounts.empty(DateTime(2000));
+  bool _dailyDirty = false;
+  Map<String, String> _noteIdByItemId = const <String, String>{};
+  final Random _random = Random();
+
   ReviewSession? _session;
   bool _loading = true;
   bool _revealed = false;
@@ -86,11 +99,17 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   }
 
   Future<void> _load() async {
-    // Capture the repo before awaiting so we don't use context across the gap.
+    // Capture repos/stores before awaiting so we don't use context across gaps.
     final StudyOptionsRepository optionsRepo = DeckoApp.studyOptionsOf(context);
+    _countsRepo = DeckoApp.dailyCountsOf(context);
+    final ImportedSourceStore sourceStore = DeckoApp.sourceOf(context);
+    final DateTime now = DateTime.now();
+
     final List<ReviewCardState> stored =
         await _repo!.getStatesForDeck(widget.deck.id);
     _options = await optionsRepo.getEffectiveOptions(widget.deck.id);
+    _daily = await _countsRepo!.getCounts(widget.deck.id, now);
+    _noteIdByItemId = await _loadNoteMap(sourceStore);
     _states
       ..clear()
       ..addEntries(stored.map((s) => MapEntry<String, ReviewCardState>(
@@ -103,16 +122,41 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     _autoplayQuestion();
   }
 
+  /// Maps each item to its source Anki note id (for sibling burying): from
+  /// imported progress when present, else from the preserved source's card
+  /// links. Empty for decks with no Anki source (demo decks).
+  Future<Map<String, String>> _loadNoteMap(ImportedSourceStore store) async {
+    final Map<String, String> map = <String, String>{};
+    for (final LearningItem item in widget.deck.items) {
+      final String? nid = item.importedProgress?.sourceNoteId;
+      if (nid != null) map[item.id] = nid;
+    }
+    final ImportedAnkiSource? source =
+        await store.getSourceForDeck(widget.deck.id);
+    if (source != null) {
+      for (final ImportedAnkiCardSource c in source.cardSources) {
+        map.putIfAbsent('anki-card-${c.sourceCardId}', () => c.sourceNoteId);
+      }
+    }
+    return map;
+  }
+
   ReviewSession _buildSession() {
-    // Per-session caps (MVP_011): never dump a whole large deck into one
-    // session; state is untouched — only which cards enter the queue.
+    // Caps respect what's already been studied *today* (true daily limits,
+    // MVP_012); burying drops same-note siblings. State is never touched —
+    // only which cards enter the queue.
     final List<LearningItem> queue = DueQueue.build(
       widget.deck.items,
       _states,
       DateTime.now(),
-      maxNew: _options.newCardsPerDay,
-      maxReview: _options.reviewCardsPerDay,
+      maxNew: _daily.remainingNew(_options.newCardsPerDay),
+      maxReview: _daily.remainingReview(_options.reviewCardsPerDay),
       maxSession: _options.maxSessionCards,
+      newCardOrder: _options.newCardOrder,
+      random: _random,
+      noteIdByItemId: _noteIdByItemId,
+      studiedNotesToday: _daily.studiedNoteIds,
+      buryByNote: _options.burySiblingsUntilTomorrow,
     );
     return ReviewSession(
         deckId: widget.deck.id, items: List<LearningItem>.unmodifiable(queue));
@@ -166,6 +210,11 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
 
     final ReviewCardState current = _states[item.id] ??
         ReviewCardState.newCard(deckId: widget.deck.id, itemId: item.id);
+    // Count this card against today's allowance by its pre-grade kind, and mark
+    // its note studied (for burying) — before the policy mutates the state.
+    _daily = _daily.record(
+        isNew: current.isNew, noteId: _noteIdByItemId[item.id]);
+    _dailyDirty = true;
     final ReviewCardState next = widget.policy.next(current, rating, now);
     _states[item.id] = next;
     _changed[item.id] = next;
@@ -200,9 +249,15 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     _flush();
   }
 
-  /// Persists changed states, once. Awaited before leaving so the deck detail
-  /// reads fresh counts; also called best-effort from dispose.
+  /// Persists changed states + today's study counts, once. Awaited before
+  /// leaving so the deck detail reads fresh counts; also best-effort from
+  /// dispose. Daily counts persist so a second same-day session keeps the
+  /// remaining allowance (MVP_012).
   Future<void> _flush() async {
+    if (_dailyDirty && _countsRepo != null) {
+      _dailyDirty = false;
+      await _countsRepo!.saveCounts(widget.deck.id, _daily);
+    }
     if (_changed.isEmpty || _repo == null) return;
     final List<ReviewCardState> pending = _changed.values.toList();
     _changed.clear();

@@ -9,7 +9,9 @@ import '../features/import/import_screen.dart';
 import '../features/imported_source/imported_source_screen.dart';
 import '../features/progress/progress_screen.dart';
 import '../features/settings/global_study_options_screen.dart';
+import '../features/settings/profile_editor_screen.dart';
 import '../features/settings/settings_hub_screen.dart';
+import '../features/settings/study_profiles_screen.dart';
 import '../features/review/review_session_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
 import 'decko_app.dart';
@@ -26,6 +28,12 @@ abstract final class DeckoRoutes {
 
   /// Global study defaults, under Settings.
   static const String studyDefaults = '/settings/study';
+
+  /// Study profiles list, under Settings.
+  static const String studyProfiles = '/settings/profiles';
+
+  /// Editor for the user profile with [id].
+  static String profileEditor(String id) => '/settings/profiles/$id';
 
   /// Theme gallery, under Settings.
   static const String themes = '/settings/themes';
@@ -135,6 +143,18 @@ GoRouter buildDeckoRouter() {
                 GoRoute(
                   path: 'study',
                   builder: (_, _) => const GlobalStudyOptionsScreen(),
+                ),
+                GoRoute(
+                  path: 'profiles',
+                  builder: (_, _) => const StudyProfilesScreen(),
+                  routes: <RouteBase>[
+                    GoRoute(
+                      path: ':profileId',
+                      builder: (BuildContext context, GoRouterState state) =>
+                          ProfileEditorScreen(
+                              profileId: state.pathParameters['profileId']!),
+                    ),
+                  ],
                 ),
                 GoRoute(
                   path: 'themes',

@@ -5,7 +5,7 @@ import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_app_bar.dart';
 import '../../domain/repositories/study_options_repository.dart';
 import '../../domain/study_options/study_options.dart';
-import 'widgets/option_controls.dart';
+import 'widgets/study_options_form.dart';
 
 /// Global study defaults for every deck (MVP_011). Changes persist immediately.
 class GlobalStudyOptionsScreen extends StatefulWidget {
@@ -53,76 +53,7 @@ class _GlobalStudyOptionsScreenState extends State<GlobalStudyOptionsScreen> {
                   DeckoSpacing.xxxl,
                 ),
                 children: <Widget>[
-                  SettingsSection(
-                    title: 'Daily study limits',
-                    subtitle: 'Applied to each review session.',
-                    children: <Widget>[
-                      StepperRow(
-                        label: 'New cards per day',
-                        value: o.newCardsPerDay,
-                        max: 1000,
-                        onChanged: (int v) =>
-                            _update(o.copyWith(newCardsPerDay: v)),
-                      ),
-                      StepperRow(
-                        label: 'Reviews per day',
-                        value: o.reviewCardsPerDay,
-                        step: 25,
-                        max: 9999,
-                        onChanged: (int v) =>
-                            _update(o.copyWith(reviewCardsPerDay: v)),
-                      ),
-                      StepperRow(
-                        label: 'Maximum cards in one session',
-                        value: o.maxSessionCards,
-                        step: 10,
-                        max: 9999,
-                        onChanged: (int v) =>
-                            _update(o.copyWith(maxSessionCards: v)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: DeckoSpacing.xl),
-                  SettingsSection(
-                    title: 'Media',
-                    children: <Widget>[
-                      ChoiceRow<AudioAutoplayMode>(
-                        label: 'Play audio automatically',
-                        value: o.audioAutoplayMode,
-                        choices: const <(String, AudioAutoplayMode)>[
-                          ('Off', AudioAutoplayMode.off),
-                          ('On the question', AudioAutoplayMode.beforeQuestion),
-                          ('After the answer', AudioAutoplayMode.afterReveal),
-                        ],
-                        onChanged: (AudioAutoplayMode v) =>
-                            _update(o.copyWith(audioAutoplayMode: v)),
-                      ),
-                      ChoiceRow<ImageDisplayMode>(
-                        label: 'Show images',
-                        value: o.imageDisplayMode,
-                        choices: const <(String, ImageDisplayMode)>[
-                          ('Before answering', ImageDisplayMode.withQuestion),
-                          ('After the answer', ImageDisplayMode.afterReveal),
-                        ],
-                        onChanged: (ImageDisplayMode v) =>
-                            _update(o.copyWith(imageDisplayMode: v)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: DeckoSpacing.xl),
-                  SettingsSection(
-                    title: 'Related cards',
-                    children: <Widget>[
-                      SwitchRow(
-                        label: 'Bury related cards until tomorrow',
-                        subtitle:
-                            'Hold other cards from the same note for a day.',
-                        value: o.burySiblingsUntilTomorrow,
-                        onChanged: (bool v) =>
-                            _update(o.copyWith(burySiblingsUntilTomorrow: v)),
-                      ),
-                    ],
-                  ),
+                  StudyOptionsForm(options: o, onChanged: _update),
                 ],
               ),
       ),

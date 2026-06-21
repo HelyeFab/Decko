@@ -23,7 +23,9 @@ import 'dart:typed_data';
 import 'package:decko/domain/import/source/imported_anki_source.dart';
 import 'package:decko/domain/repositories/imported_source_store.dart';
 import 'package:decko/domain/repositories/media_store.dart';
+import 'package:decko/domain/repositories/daily_study_counts_repository.dart';
 import 'package:decko/domain/repositories/study_options_repository.dart';
+import 'package:decko/domain/study_options/daily_study_counts.dart';
 import 'package:decko/domain/study_options/study_options.dart';
 import 'package:decko/domain/repositories/review_state_repository.dart';
 import 'package:decko/domain/repositories/settings_repository.dart';
@@ -156,10 +158,46 @@ class _InMemorySourceStore implements ImportedSourceStore {
 class _InMemoryStudyOptionsRepository implements StudyOptionsRepository {
   StudyOptions global = StudyOptions.defaults;
   final Map<String, DeckStudyOptions> deckOptions = <String, DeckStudyOptions>{};
+  final List<StudyOptionProfile> profiles = <StudyOptionProfile>[];
+
+  StudyOptionProfile get _default => StudyOptionProfile(
+      id: StudyOptionProfile.defaultId,
+      name: 'Default',
+      options: global,
+      isDefault: true);
+
   @override
   Future<StudyOptions> getGlobalOptions() async => global;
   @override
   Future<void> saveGlobalOptions(StudyOptions options) async => global = options;
+
+  @override
+  Future<List<StudyOptionProfile>> listProfiles() async =>
+      <StudyOptionProfile>[_default, ...profiles];
+  @override
+  Future<StudyOptionProfile?> getProfile(String id) async {
+    if (id == StudyOptionProfile.defaultId) return _default;
+    for (final StudyOptionProfile p in profiles) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> saveProfile(StudyOptionProfile profile) async {
+    if (profile.isDefault) return;
+    final int i = profiles.indexWhere((StudyOptionProfile p) => p.id == profile.id);
+    if (i >= 0) {
+      profiles[i] = profile;
+    } else {
+      profiles.add(profile);
+    }
+  }
+
+  @override
+  Future<void> deleteProfile(String id) async =>
+      profiles.removeWhere((StudyOptionProfile p) => p.id == id);
+
   @override
   Future<DeckStudyOptions?> getDeckOptions(String deckId) async =>
       deckOptions[deckId];
@@ -169,9 +207,30 @@ class _InMemoryStudyOptionsRepository implements StudyOptionsRepository {
   @override
   Future<void> deleteDeckOptions(String deckId) async =>
       deckOptions.remove(deckId);
+
   @override
-  Future<EffectiveStudyOptions> getEffectiveOptions(String deckId) async =>
-      EffectiveStudyOptions.resolve(global, deckOptions[deckId]);
+  Future<EffectiveStudyOptions> getEffectiveOptions(String deckId) async {
+    final DeckStudyOptions? deck = deckOptions[deckId];
+    StudyOptions base = global;
+    final String? pid = deck?.profileId;
+    if (pid != null && pid != StudyOptionProfile.defaultId) {
+      final StudyOptionProfile? p = await getProfile(pid);
+      if (p != null) base = p.options;
+    }
+    return EffectiveStudyOptions.resolve(base, deck);
+  }
+}
+
+class _InMemoryDailyCountsRepository implements DailyStudyCountsRepository {
+  final Map<String, DailyStudyCounts> _byDeck = <String, DailyStudyCounts>{};
+  void seed(String deckId, DailyStudyCounts counts) =>
+      _byDeck[deckId] = counts;
+  @override
+  Future<DailyStudyCounts> getCounts(String deckId, DateTime today) async =>
+      (_byDeck[deckId] ?? DailyStudyCounts.empty(today)).forDay(today);
+  @override
+  Future<void> saveCounts(String deckId, DailyStudyCounts counts) async =>
+      _byDeck[deckId] = counts;
 }
 
 Future<void> _pumpApp(
@@ -183,6 +242,7 @@ Future<void> _pumpApp(
   MediaStore? mediaStore,
   ImportedSourceStore? importedSourceStore,
   StudyOptionsRepository? studyOptionsRepository,
+  DailyStudyCountsRepository? dailyStudyCountsRepository,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   tester.view.physicalSize = const Size(420, 2400);
@@ -201,6 +261,8 @@ Future<void> _pumpApp(
       importedSourceStore: importedSourceStore ?? _InMemorySourceStore(),
       studyOptionsRepository:
           studyOptionsRepository ?? _InMemoryStudyOptionsRepository(),
+      dailyStudyCountsRepository:
+          dailyStudyCountsRepository ?? _InMemoryDailyCountsRepository(),
     ),
   );
   await tester.pumpAndSettle();
@@ -583,13 +645,83 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Options for Opt Deck'), findsOneWidget);
-    expect(find.text('Using global: 20'), findsOneWidget); // new cards/day
+    expect(find.text('Inherited: 20'), findsOneWidget); // new cards/day baseline
 
     // Turn on the "New cards per day" override (the first switch).
     await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
 
     expect(options.deckOptions['opt']?.newCardsPerDay, 20); // persisted
+  });
+
+  testWidgets('Review session honours persisted daily new-card counts',
+      (WidgetTester tester) async {
+    const Deck deck = Deck(
+      id: 'daily',
+      name: 'Daily Deck',
+      description: 'd',
+      items: <LearningItem>[
+        LearningItem(id: 'a', front: 'a', back: 'a'),
+        LearningItem(id: 'b', front: 'b', back: 'b'),
+        LearningItem(id: 'c', front: 'c', back: 'c'),
+      ],
+    );
+    final _InMemoryStudyOptionsRepository options =
+        _InMemoryStudyOptionsRepository()
+          ..global = const StudyOptions(newCardsPerDay: 3);
+    // Two new cards already studied today → only one remains this session.
+    final _InMemoryDailyCountsRepository counts =
+        _InMemoryDailyCountsRepository()
+          ..seed(
+              'daily',
+              DailyStudyCounts(day: DailyStudyCounts.dayKey(DateTime.now()))
+                  .record(isNew: true)
+                  .record(isNew: true));
+
+    await _pumpApp(tester,
+        deckRepository: const _FixedDeckRepository(<Deck>[deck]),
+        studyOptionsRepository: options,
+        dailyStudyCountsRepository: counts);
+
+    await tester.tap(find.text('Daily Deck').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start review'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Card 1 of 1'), findsOneWidget); // 3 limit − 2 today = 1
+  });
+
+  testWidgets('Assigning a study profile updates the deck baseline',
+      (WidgetTester tester) async {
+    const Deck deck = Deck(
+      id: 'prof',
+      name: 'Prof Deck',
+      description: 'd',
+      items: <LearningItem>[LearningItem(id: 'a', front: 'a', back: 'a')],
+    );
+    final _InMemoryStudyOptionsRepository options =
+        _InMemoryStudyOptionsRepository()
+          ..profiles.add(const StudyOptionProfile(
+              id: 'fast',
+              name: 'Fast',
+              options: StudyOptions(newCardsPerDay: 5)));
+
+    await _pumpApp(tester,
+        deckRepository: const _FixedDeckRepository(<Deck>[deck]),
+        studyOptionsRepository: options);
+
+    await tester.tap(find.text('Prof Deck').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Deck options'));
+    await tester.pumpAndSettle();
+
+    // Default baseline first; pick the Fast profile chip.
+    expect(find.text('Inherited: 20'), findsOneWidget);
+    await tester.tap(find.text('Fast'));
+    await tester.pumpAndSettle();
+
+    expect(options.deckOptions['prof']?.profileId, 'fast');
+    expect(find.text('Inherited: 5'), findsOneWidget); // baseline now the profile
   });
 
   testWidgets('Review session respects a small max-session limit',

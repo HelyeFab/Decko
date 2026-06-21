@@ -114,19 +114,24 @@ Small, intentionally-postponed improvements captured so they are not lost.
   queue caps (new/review/max), audio autoplay, image-display timing, and
   per-deck furigana preference. Settings tab is now a hub (Study defaults ·
   Themes); deck detail has a "Deck options" entry. FSRS/progress untouched.
-  Daily limits are per-session for now. Next: MVP_012 — Advanced Deck Option
-  Profiles (option groups shared across decks).
-- **Anki parity: daily limits must become true daily limits.** MVP_011 stores
-  new/review limits but currently applies them as per-session caps only. For a
-  close 1:1 Anki experience, Decko must track cards studied today by deck/profile,
-  reset at the correct day boundary, and ensure reopening the app later the same
-  day does not grant a fresh allowance. Treat this as scheduling debt, not UI
-  polish.
-- **Anki parity: bury siblings must be enforced, not only stored.** MVP_011 stores
-  the bury-siblings preference, but the due queue does not yet bury related cards
-  from the same note. For Anki-like behaviour, effective options must drive queue
-  filtering so sibling new/review cards are hidden until tomorrow after one card
-  from the note is studied. This must preserve FSRS state and never delete cards.
+- ~~**Advanced deck option profiles.**~~ DONE (MVP_012, DEC-021): reusable
+  `StudyOptionProfile`s (global/default → profile → deck override), profile
+  management + deck assignment UI, plus the two parity items below. New-card
+  order added behind a collapsed Advanced section. Deferred (documented):
+  desired retention + maximum interval (need FSRS-policy plumbing) and
+  import-aware profile suggestions.
+- ~~**Anki parity: daily limits must become true daily limits.**~~ DONE
+  (MVP_012, DEC-021): `DailyStudyCounts` per deck tracks new/review consumed
+  today (local-day boundary); the review session caps by remaining = limit −
+  studiedToday, so a second same-day session keeps the reduced allowance and a
+  new day resets. Per-profile vs per-deck accounting and finer rollover edge
+  cases remain future polish.
+- ~~**Anki parity: bury siblings must be enforced, not only stored.**~~ DONE
+  (MVP_012, DEC-021): `DueQueue.build` buries (filters only, never mutates)
+  cards whose source note was studied earlier today and keeps one card per note
+  per build. Note identity from imported progress / preserved source. Edge:
+  bury reserves a note before caps apply (Anki-consistent); finer-grained
+  new-vs-review bury is future work.
 - **Future game mode: Bunburu sentence builder.** The existing `HelyeFab/bunburu`
   Flutter app should be considered a planned Decko-native game mode after the
   Anki-parity foundations are trustworthy. It should not be bolted on as a

@@ -14,6 +14,9 @@ enum ImageDisplayMode { withQuestion, afterReveal }
 /// A deck's furigana choice, layered over the global furigana toggle.
 enum FuriganaPreference { useGlobal, alwaysShow, alwaysHide }
 
+/// The order new cards are introduced in a session.
+enum NewCardOrder { deckOrder, random }
+
 /// Global study defaults that apply to every deck unless a deck overrides them.
 class StudyOptions {
   const StudyOptions({
@@ -23,6 +26,7 @@ class StudyOptions {
     this.audioAutoplayMode = AudioAutoplayMode.off,
     this.imageDisplayMode = ImageDisplayMode.withQuestion,
     this.burySiblingsUntilTomorrow = false,
+    this.newCardOrder = NewCardOrder.deckOrder,
   });
 
   final int newCardsPerDay;
@@ -31,6 +35,7 @@ class StudyOptions {
   final AudioAutoplayMode audioAutoplayMode;
   final ImageDisplayMode imageDisplayMode;
   final bool burySiblingsUntilTomorrow;
+  final NewCardOrder newCardOrder;
 
   static const StudyOptions defaults = StudyOptions();
 
@@ -41,6 +46,7 @@ class StudyOptions {
     AudioAutoplayMode? audioAutoplayMode,
     ImageDisplayMode? imageDisplayMode,
     bool? burySiblingsUntilTomorrow,
+    NewCardOrder? newCardOrder,
   }) {
     return StudyOptions(
       newCardsPerDay: newCardsPerDay ?? this.newCardsPerDay,
@@ -50,6 +56,7 @@ class StudyOptions {
       imageDisplayMode: imageDisplayMode ?? this.imageDisplayMode,
       burySiblingsUntilTomorrow:
           burySiblingsUntilTomorrow ?? this.burySiblingsUntilTomorrow,
+      newCardOrder: newCardOrder ?? this.newCardOrder,
     );
   }
 
@@ -60,6 +67,7 @@ class StudyOptions {
         'audioAutoplayMode': audioAutoplayMode.name,
         'imageDisplayMode': imageDisplayMode.name,
         'burySiblingsUntilTomorrow': burySiblingsUntilTomorrow,
+        'newCardOrder': newCardOrder.name,
       };
 
   static StudyOptions fromMap(Map<String, dynamic> m) => StudyOptions(
@@ -72,6 +80,51 @@ class StudyOptions {
             m['imageDisplayMode'], ImageDisplayMode.withQuestion),
         burySiblingsUntilTomorrow:
             m['burySiblingsUntilTomorrow'] as bool? ?? false,
+        newCardOrder: _enumByName(
+            NewCardOrder.values, m['newCardOrder'], NewCardOrder.deckOrder),
+      );
+}
+
+/// A reusable, named set of study options assignable to many decks (MVP_012).
+/// The synthetic "default" profile mirrors the global defaults.
+class StudyOptionProfile {
+  const StudyOptionProfile({
+    required this.id,
+    required this.name,
+    required this.options,
+    this.isDefault = false,
+  });
+
+  final String id;
+  final String name;
+  final StudyOptions options;
+  final bool isDefault;
+
+  /// The id of the built-in default profile (mirrors the global defaults).
+  static const String defaultId = 'default';
+
+  StudyOptionProfile copyWith({String? name, StudyOptions? options}) =>
+      StudyOptionProfile(
+        id: id,
+        name: name ?? this.name,
+        options: options ?? this.options,
+        isDefault: isDefault,
+      );
+
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'id': id,
+        'name': name,
+        'options': options.toMap(),
+        'isDefault': isDefault,
+      };
+
+  static StudyOptionProfile fromMap(Map<String, dynamic> m) =>
+      StudyOptionProfile(
+        id: m['id'] as String,
+        name: m['name'] as String? ?? 'Profile',
+        options:
+            StudyOptions.fromMap((m['options'] as Map).cast<String, dynamic>()),
+        isDefault: m['isDefault'] as bool? ?? false,
       );
 }
 
@@ -79,35 +132,43 @@ class StudyOptions {
 /// default". Furigana is deck-only (layered over the global toggle).
 class DeckStudyOptions {
   const DeckStudyOptions({
+    this.profileId,
     this.newCardsPerDay,
     this.reviewCardsPerDay,
     this.maxSessionCards,
     this.audioAutoplayMode,
     this.imageDisplayMode,
     this.burySiblingsUntilTomorrow,
+    this.newCardOrder,
     this.furiganaPreference = FuriganaPreference.useGlobal,
   });
 
+  /// The assigned profile, or null = the default/global options (MVP_012).
+  final String? profileId;
   final int? newCardsPerDay;
   final int? reviewCardsPerDay;
   final int? maxSessionCards;
   final AudioAutoplayMode? audioAutoplayMode;
   final ImageDisplayMode? imageDisplayMode;
   final bool? burySiblingsUntilTomorrow;
+  final NewCardOrder? newCardOrder;
   final FuriganaPreference furiganaPreference;
 
   static const DeckStudyOptions none = DeckStudyOptions();
 
   DeckStudyOptions copyWith({
+    Object? profileId = _unset,
     Object? newCardsPerDay = _unset,
     Object? reviewCardsPerDay = _unset,
     Object? maxSessionCards = _unset,
     Object? audioAutoplayMode = _unset,
     Object? imageDisplayMode = _unset,
     Object? burySiblingsUntilTomorrow = _unset,
+    Object? newCardOrder = _unset,
     FuriganaPreference? furiganaPreference,
   }) {
     return DeckStudyOptions(
+      profileId: profileId == _unset ? this.profileId : profileId as String?,
       newCardsPerDay: newCardsPerDay == _unset
           ? this.newCardsPerDay
           : newCardsPerDay as int?,
@@ -126,11 +187,15 @@ class DeckStudyOptions {
       burySiblingsUntilTomorrow: burySiblingsUntilTomorrow == _unset
           ? this.burySiblingsUntilTomorrow
           : burySiblingsUntilTomorrow as bool?,
+      newCardOrder: newCardOrder == _unset
+          ? this.newCardOrder
+          : newCardOrder as NewCardOrder?,
       furiganaPreference: furiganaPreference ?? this.furiganaPreference,
     );
   }
 
   Map<String, dynamic> toMap() => <String, dynamic>{
+        if (profileId != null) 'profileId': profileId,
         if (newCardsPerDay != null) 'newCardsPerDay': newCardsPerDay,
         if (reviewCardsPerDay != null) 'reviewCardsPerDay': reviewCardsPerDay,
         if (maxSessionCards != null) 'maxSessionCards': maxSessionCards,
@@ -139,10 +204,12 @@ class DeckStudyOptions {
         if (imageDisplayMode != null) 'imageDisplayMode': imageDisplayMode!.name,
         if (burySiblingsUntilTomorrow != null)
           'burySiblingsUntilTomorrow': burySiblingsUntilTomorrow,
+        if (newCardOrder != null) 'newCardOrder': newCardOrder!.name,
         'furiganaPreference': furiganaPreference.name,
       };
 
   static DeckStudyOptions fromMap(Map<String, dynamic> m) => DeckStudyOptions(
+        profileId: m['profileId'] as String?,
         newCardsPerDay: m['newCardsPerDay'] as int?,
         reviewCardsPerDay: m['reviewCardsPerDay'] as int?,
         maxSessionCards: m['maxSessionCards'] as int?,
@@ -155,6 +222,10 @@ class DeckStudyOptions {
             : _enumByName(ImageDisplayMode.values, m['imageDisplayMode'],
                 ImageDisplayMode.withQuestion),
         burySiblingsUntilTomorrow: m['burySiblingsUntilTomorrow'] as bool?,
+        newCardOrder: m['newCardOrder'] == null
+            ? null
+            : _enumByName(NewCardOrder.values, m['newCardOrder'],
+                NewCardOrder.deckOrder),
         furiganaPreference: _enumByName(FuriganaPreference.values,
             m['furiganaPreference'], FuriganaPreference.useGlobal),
       );
@@ -169,6 +240,7 @@ class EffectiveStudyOptions {
     required this.audioAutoplayMode,
     required this.imageDisplayMode,
     required this.burySiblingsUntilTomorrow,
+    required this.newCardOrder,
     required this.furiganaPreference,
   });
 
@@ -178,21 +250,25 @@ class EffectiveStudyOptions {
   final AudioAutoplayMode audioAutoplayMode;
   final ImageDisplayMode imageDisplayMode;
   final bool burySiblingsUntilTomorrow;
+  final NewCardOrder newCardOrder;
   final FuriganaPreference furiganaPreference;
 
-  /// Deck override wins where set; otherwise the global default is used.
+  /// Resolves global/default → (profile) → deck override. [base] is the global
+  /// defaults or, when a profile is assigned, the profile's options (MVP_012).
+  /// Deck override wins per-field; unset fields fall back to [base].
   factory EffectiveStudyOptions.resolve(
-    StudyOptions global,
+    StudyOptions base,
     DeckStudyOptions? deck,
   ) {
     return EffectiveStudyOptions(
-      newCardsPerDay: deck?.newCardsPerDay ?? global.newCardsPerDay,
-      reviewCardsPerDay: deck?.reviewCardsPerDay ?? global.reviewCardsPerDay,
-      maxSessionCards: deck?.maxSessionCards ?? global.maxSessionCards,
-      audioAutoplayMode: deck?.audioAutoplayMode ?? global.audioAutoplayMode,
-      imageDisplayMode: deck?.imageDisplayMode ?? global.imageDisplayMode,
+      newCardsPerDay: deck?.newCardsPerDay ?? base.newCardsPerDay,
+      reviewCardsPerDay: deck?.reviewCardsPerDay ?? base.reviewCardsPerDay,
+      maxSessionCards: deck?.maxSessionCards ?? base.maxSessionCards,
+      audioAutoplayMode: deck?.audioAutoplayMode ?? base.audioAutoplayMode,
+      imageDisplayMode: deck?.imageDisplayMode ?? base.imageDisplayMode,
       burySiblingsUntilTomorrow:
-          deck?.burySiblingsUntilTomorrow ?? global.burySiblingsUntilTomorrow,
+          deck?.burySiblingsUntilTomorrow ?? base.burySiblingsUntilTomorrow,
+      newCardOrder: deck?.newCardOrder ?? base.newCardOrder,
       furiganaPreference:
           deck?.furiganaPreference ?? FuriganaPreference.useGlobal,
     );

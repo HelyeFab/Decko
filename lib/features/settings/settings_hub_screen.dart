@@ -36,6 +36,13 @@ class SettingsHubScreen extends StatelessWidget {
             ),
             const SizedBox(height: DeckoSpacing.md),
             _SettingsTile(
+              icon: FontAwesomeIcons.solidStar,
+              title: 'Study profiles',
+              subtitle: 'Reusable settings shared across decks',
+              onTap: () => context.push(DeckoRoutes.studyProfiles),
+            ),
+            const SizedBox(height: DeckoSpacing.md),
+            _SettingsTile(
               icon: FontAwesomeIcons.palette,
               title: 'Themes',
               subtitle: 'App and card appearance',
