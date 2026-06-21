@@ -49,6 +49,8 @@ class SettingsHubScreen extends StatelessWidget {
               onTap: () => context.push(DeckoRoutes.themes),
             ),
             const SizedBox(height: DeckoSpacing.xl),
+            const _DailyGoalControl(),
+            const SizedBox(height: DeckoSpacing.md),
             ValueListenableBuilder<bool>(
               valueListenable: furigana,
               builder: (BuildContext context, bool on, _) {
@@ -103,6 +105,93 @@ class SettingsHubScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A motivational daily-goal stepper (MVP_015). Saves to settings; it never
+/// affects scheduling or the due queue.
+class _DailyGoalControl extends StatefulWidget {
+  const _DailyGoalControl();
+
+  @override
+  State<_DailyGoalControl> createState() => _DailyGoalControlState();
+}
+
+class _DailyGoalControlState extends State<_DailyGoalControl> {
+  static const int _min = 5;
+  static const int _max = 100;
+  static const int _step = 5;
+  int? _goal;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_goal == null) _load();
+  }
+
+  Future<void> _load() async {
+    final int g = await DeckoApp.settingsOf(context).getDailyGoal();
+    if (mounted) setState(() => _goal = g);
+  }
+
+  void _set(int next) {
+    final int clamped = next.clamp(_min, _max);
+    setState(() => _goal = clamped);
+    DeckoApp.settingsOf(context).saveDailyGoal(clamped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final int goal = _goal ?? 20;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DeckoSpacing.lg,
+        vertical: DeckoSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Daily goal', style: theme.textTheme.bodyLarge),
+                Text(
+                  'Cards to review each day — motivation only',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: goal > _min ? () => _set(goal - _step) : null,
+            icon: const FaIcon(FontAwesomeIcons.minus, size: 14),
+            tooltip: 'Decrease',
+          ),
+          SizedBox(
+            width: 44,
+            child: Text(
+              '$goal',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconButton(
+            onPressed: goal < _max ? () => _set(goal + _step) : null,
+            icon: const FaIcon(FontAwesomeIcons.plus, size: 14),
+            tooltip: 'Increase',
+          ),
+        ],
       ),
     );
   }

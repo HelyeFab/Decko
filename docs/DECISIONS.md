@@ -573,3 +573,25 @@ MVP_013 produced structured `ImportDiagnostics`, but the import UI still showed 
 - Import results are explainable and reassuring; warnings are grouped and humane, not alarming, and never hidden.
 - Diagnostics travel with the deck (small JSON on `DeckImportInfo`), so the report is revisitable; decks imported before this show a "no report" state.
 - Health derives from severity, so adding a finding automatically updates the summary — no separate status bookkeeping.
+
+## DEC-024: Light gamification is derived from progress and must not drive scheduling
+
+Date: 2026-06-21
+Status: Accepted
+
+### Context
+
+After the Anki-parity and import-trust foundations, Decko needs to feel more motivating without ever distorting review correctness. MVP_015 adds a daily goal, streak polish, a completion celebration, and a small achievement set — all on top of the existing `ProgressSnapshot`.
+
+### Decision
+
+- **Gamification is a read-only presentation layer over recorded progress.** XP, streak, daily goal, celebration, and achievements derive from `ProgressSnapshot` (+ a motivational daily goal). Nothing here decides what is due, mutates per-card state, or touches FSRS / the due queue / daily counters / sibling burying.
+- **Achievements are derived, not a separate economy.** A pure `achievementsFor(snapshot, dailyGoal)` returns earned/locked for a tiny starter set (First review, Daily goal, 3‑day streak, 100 cards). To keep streak/total achievements from un-earning, `ProgressSnapshot` gained a monotonic `longestStreakDays` (and total cards derives from XP). No new persistence beyond the existing snapshot, which back-fills `longestStreakDays` from `currentStreakDays` for old blobs (migration-safe).
+- **The daily goal is motivational, not an Anki limit.** Stored in `SettingsRepository` (default 20, configurable via a Settings stepper); it changes only the progress UI and celebration, never how many cards are scheduled.
+- **Celebration reads post-session state.** The review screen records the session, then loads the resulting snapshot + goal to show XP gained, daily-goal progress, and a streak acknowledgement in the summary — recording stays the single source; the summary just reflects it.
+
+### Consequences
+
+- Studying feels rewarding (goal ring, kinder streak, celebratory summary, badges) while review math is untouched — the safety constraints hold by construction.
+- Adding an achievement is a pure-function change; no scheduler coupling, no stored badge state to migrate.
+- Future game modes (e.g. Bunburu) can route outcomes through this same progress/achievement layer without becoming a scheduling dependency.

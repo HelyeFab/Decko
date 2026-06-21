@@ -357,6 +357,26 @@ re-inventing equivalents.
   labels.
 - Sub-screens are pushed over the deck library so back returns to the hub.
 
+### Added in MVP_015 (progress polish & light gamification, DEC-024)
+
+- **Daily-goal card** (`features/progress/progress_screen.dart` `_DailyGoalCard`)
+  — a circular progress ring (`CircularProgressIndicator`, rounded cap) with the
+  count in the centre, flipping to a celebratory `primaryContainer` "Daily goal
+  reached!" state with a check. Motivational only; never a scheduling limit.
+- **Kinder streak stat** — `_StatCard` gained an optional `footnote` line
+  (primary-coloured) used for encouraging streak status ("Counted today" /
+  "Study today to keep it" / "Study today to start one").
+- **Achievements grid** (`_AchievementsGrid`) — a `Wrap` of the existing
+  `AchievementBadge` (earned/locked) driven by the pure `achievementsFor`
+  (domain `achievement.dart`); icons mapped per achievement.
+- **Session reward chips** (`features/review/widgets/session_summary.dart`
+  `_RewardChips`) — pill chips for XP gained, daily-goal progress (highlighted
+  when reached), and streak, under the completion header. Optional fields, so the
+  summary degrades gracefully before progress is recorded.
+- **Daily-goal stepper** (`features/settings/settings_hub_screen.dart`
+  `_DailyGoalControl`) — a −/value/+ row in the Settings hub (5–100, step 5),
+  persisted to `SettingsRepository`.
+
 ## Accessibility Baseline
 
 All Decko UI work should consider:

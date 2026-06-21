@@ -49,6 +49,14 @@ Goal: prove the core promise.
 - Session summary
 - Simple achievements
 
+> DONE (MVP_015, DEC-024): progress polish & light-gamification foundation —
+> a motivational daily goal (Settings stepper, default 20), a daily-goal ring +
+> kinder streak on the Progress screen, an achievements grid from a pure
+> `achievementsFor` (First review / Daily goal / 3-day streak / 100 cards;
+> `ProgressSnapshot` gained a monotonic `longestStreakDays`), and a review
+> completion celebration (XP gained, goal progress, streak). All derived from
+> progress — no scheduler/FSRS/queue changes.
+
 ### I1.6 Persistence
 
 - Select persistence library

@@ -6,15 +6,16 @@ import '../../core/widgets/decko_app_bar.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/achievement_badge.dart';
 import '../../core/widgets/section_header.dart';
+import '../../domain/achievement.dart';
 import '../../domain/progress_snapshot.dart';
 import '../../domain/review_rating.dart';
 import '../../domain/review_session_result.dart';
 
-/// Decko's gamification screen, backed by the [ProgressRepository].
+/// Decko's progress & light-gamification screen, backed by the
+/// [ProgressRepository] + the motivational daily goal (MVP_015).
 ///
-/// XP, level, streak and "reviewed today" come from stored local progress (no
-/// mock values). Before any session it shows a warm empty state rather than
-/// pretending there is progress.
+/// Everything here is a presentation layer over recorded progress; it never
+/// drives scheduling. Before any session it shows a warm empty state.
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
 
@@ -22,13 +23,24 @@ class ProgressScreen extends StatefulWidget {
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
+typedef _ProgressData = ({ProgressSnapshot snapshot, int goal});
+
 class _ProgressScreenState extends State<ProgressScreen> {
-  Future<ProgressSnapshot>? _future;
+  Future<_ProgressData>? _future;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _future ??= DeckoApp.progressOf(context).getSnapshot();
+    _future ??= _load();
+  }
+
+  Future<_ProgressData> _load() async {
+    // Capture before awaiting so we don't use context across the gap.
+    final progressRepo = DeckoApp.progressOf(context);
+    final settingsRepo = DeckoApp.settingsOf(context);
+    final ProgressSnapshot snapshot = await progressRepo.getSnapshot();
+    final int goal = await settingsRepo.getDailyGoal();
+    return (snapshot: snapshot, goal: goal);
   }
 
   @override
@@ -36,19 +48,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Scaffold(
       appBar: const DeckoAppBar(title: 'Your progress'),
       body: SafeArea(
-        child: FutureBuilder<ProgressSnapshot>(
+        child: FutureBuilder<_ProgressData>(
           future: _future,
           builder: (BuildContext context,
-              AsyncSnapshot<ProgressSnapshot> async) {
+              AsyncSnapshot<_ProgressData> async) {
             if (!async.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final ProgressSnapshot snapshot = async.data!;
+            final _ProgressData d = async.data!;
             return ListView(
               padding: const EdgeInsets.all(DeckoSpacing.pagePadding),
-              children: snapshot.hasProgress
-                  ? _progressViews(snapshot)
-                  : _emptyViews(),
+              children: d.snapshot.hasProgress
+                  ? _progressViews(d.snapshot, d.goal)
+                  : _emptyViews(d.goal),
             );
           },
         ),
@@ -56,13 +68,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  List<Widget> _progressViews(ProgressSnapshot s) {
+  List<Widget> _progressViews(ProgressSnapshot s, int goal) {
     return <Widget>[
-      _LevelCard(
-        xp: s.totalXp,
-        level: s.currentLevel,
-        xpIntoLevel: s.xpIntoLevel,
-      ),
+      _DailyGoalCard(reviewed: s.cardsReviewedToday, goal: goal),
+      const SizedBox(height: DeckoSpacing.lg),
+      _LevelCard(xp: s.totalXp, level: s.currentLevel, xpIntoLevel: s.xpIntoLevel),
       const SizedBox(height: DeckoSpacing.lg),
       Row(
         children: <Widget>[
@@ -72,6 +82,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
               value: '${s.currentStreakDays} '
                   '${s.currentStreakDays == 1 ? 'day' : 'days'}',
               label: 'Current streak',
+              footnote: s.currentStreakDays == 0
+                  ? 'Study today to start one'
+                  : s.reviewedToday
+                      ? 'Counted today'
+                      : 'Study today to keep it',
             ),
           ),
           const SizedBox(width: DeckoSpacing.md),
@@ -79,7 +94,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             child: _StatCard(
               icon: FontAwesomeIcons.listCheck,
               value: '${s.cardsReviewedToday}',
-              label: 'Cards reviewed today',
+              label: 'Reviewed today',
             ),
           ),
         ],
@@ -96,21 +111,142 @@ class _ProgressScreenState extends State<ProgressScreen> {
         subtitle: 'Milestones you’ll unlock as you study.',
       ),
       const SizedBox(height: DeckoSpacing.lg),
-      _BadgeRow(snapshot: s),
+      _AchievementsGrid(statuses: achievementsFor(s, goal)),
     ];
   }
 
-  List<Widget> _emptyViews() {
+  List<Widget> _emptyViews(int goal) {
     return <Widget>[
       const _EmptyProgress(),
+      const SizedBox(height: DeckoSpacing.lg),
+      _DailyGoalCard(reviewed: 0, goal: goal),
       const SizedBox(height: DeckoSpacing.xxl),
       const SectionHeader(
         title: 'Achievements',
         subtitle: 'Milestones you’ll unlock as you study.',
       ),
       const SizedBox(height: DeckoSpacing.lg),
-      const _BadgeRow(snapshot: ProgressSnapshot.empty),
+      _AchievementsGrid(
+          statuses: achievementsFor(ProgressSnapshot.empty, goal)),
     ];
+  }
+}
+
+/// The motivational daily goal — a progress ring toward today's target, with a
+/// warm "reached" state. Not an Anki daily limit; purely presentation.
+class _DailyGoalCard extends StatelessWidget {
+  const _DailyGoalCard({required this.reviewed, required this.goal});
+
+  final int reviewed;
+  final int goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final bool done = goal > 0 && reviewed >= goal;
+    final double progress =
+        goal <= 0 ? 1 : (reviewed / goal).clamp(0, 1).toDouble();
+    final Color bg = done ? scheme.primaryContainer : theme.cardColor;
+    final Color onBg = done ? scheme.onPrimaryContainer : scheme.onSurface;
+
+    return Container(
+      padding: const EdgeInsets.all(DeckoSpacing.lg),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        border: done ? null : Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: <Widget>[
+          SizedBox(
+            height: 64,
+            width: 64,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                SizedBox(
+                  height: 64,
+                  width: 64,
+                  child: CircularProgressIndicator(
+                    value: progress,
+                    strokeWidth: 7,
+                    strokeCap: StrokeCap.round,
+                    backgroundColor: done
+                        ? scheme.onPrimaryContainer.withValues(alpha: 0.18)
+                        : scheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        done ? scheme.onPrimaryContainer : scheme.primary),
+                  ),
+                ),
+                if (done)
+                  FaIcon(FontAwesomeIcons.check,
+                      size: 22, color: scheme.onPrimaryContainer)
+                else
+                  Text(
+                    '$reviewed',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(color: onBg, fontWeight: FontWeight.w800),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeckoSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  done ? 'Daily goal reached!' : 'Daily goal',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(color: onBg, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  done
+                      ? 'Nice work — you studied $reviewed cards today.'
+                      : '$reviewed of $goal cards reviewed today',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: onBg.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The starter achievements as a 2-column grid of badges.
+class _AchievementsGrid extends StatelessWidget {
+  const _AchievementsGrid({required this.statuses});
+
+  final List<AchievementStatus> statuses;
+
+  static const Map<Achievement, FaIconData> _icons = <Achievement, FaIconData>{
+    Achievement.firstReview: FontAwesomeIcons.flag,
+    Achievement.dailyGoal: FontAwesomeIcons.bullseye,
+    Achievement.threeDayStreak: FontAwesomeIcons.fire,
+    Achievement.hundredCards: FontAwesomeIcons.trophy,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: DeckoSpacing.lg,
+      runSpacing: DeckoSpacing.lg,
+      alignment: WrapAlignment.spaceBetween,
+      children: <Widget>[
+        for (final AchievementStatus a in statuses)
+          AchievementBadge(
+            icon: _icons[a.achievement]!,
+            label: a.achievement.title,
+            earned: a.earned,
+          ),
+      ],
+    );
   }
 }
 
@@ -243,11 +379,15 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.label,
+    this.footnote,
   });
 
   final FaIconData icon;
   final String value;
   final String label;
+
+  /// An optional kind/encouraging line (e.g. streak status).
+  final String? footnote;
 
   @override
   Widget build(BuildContext context) {
@@ -272,6 +412,16 @@ class _StatCard extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            if (footnote != null) ...<Widget>[
+              const SizedBox(height: DeckoSpacing.xs),
+              Text(
+                footnote!,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -359,39 +509,3 @@ class _RatingCount extends StatelessWidget {
   }
 }
 
-class _BadgeRow extends StatelessWidget {
-  const _BadgeRow({required this.snapshot});
-
-  final ProgressSnapshot snapshot;
-
-  @override
-  Widget build(BuildContext context) {
-    final ReviewSessionResult? last = snapshot.lastSessionResult;
-    final bool perfectRound = last != null &&
-        last.totalCards > 0 &&
-        last.againCount == 0 &&
-        last.hardCount == 0;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        AchievementBadge(
-          icon: FontAwesomeIcons.flag,
-          label: 'First Review',
-          earned: snapshot.hasProgress,
-        ),
-        AchievementBadge(
-          icon: FontAwesomeIcons.medal,
-          label: 'Perfect Round',
-          earned: perfectRound,
-        ),
-        AchievementBadge(
-          icon: FontAwesomeIcons.fire,
-          label: 'Three Day Streak',
-          earned: snapshot.currentStreakDays >= 3,
-        ),
-      ],
-    );
-  }
-}

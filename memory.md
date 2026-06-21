@@ -1,15 +1,42 @@
 # Decko Memory
 
 ## Last updated
-2026-06-20
+2026-06-21
 
 ## Current stage
-MVP_014 complete: import validation & diagnostics UX — structured diagnostics
-became a calm trust experience (severity/category + derived ImportHealth, a
-reusable ImportHealthSummary shown in preview + a post-import result for decks
-with warnings + a persisted "Import report" on deck detail). No scheduler/FSRS/
-queue changes. CocoaPods now installed (1.16.2); app builds+runs on iOS sim.
-115 tests, analyze clean.
+MVP_015 complete: progress polish & light gamification foundation — a read-only
+motivation layer over progress (NO scheduler/FSRS/queue/daily-counter/burying
+changes). Daily goal (Settings stepper, default 20), a daily-goal ring + kinder
+streak + achievements grid on the Progress screen, and a review completion
+celebration (XP/goal/streak chips). 125 tests, analyze clean, builds on iOS sim.
+
+## Last completed (MVP_015 — progress polish & light gamification, DEC-024)
+- Data: ProgressSnapshot gained monotonic `longestStreakDays` (migration-safe
+  back-fill). Daily goal in SettingsRepository (default 20), exposed via
+  DeckoApp.settingsOf. `lib/domain/achievement.dart`: pure achievementsFor
+  (firstReview/dailyGoal/threeDayStreak/hundredCards), derived from snapshot.
+- Progress screen: `_DailyGoalCard` ring (celebratory "reached!" state), kinder
+  streak via `_StatCard.footnote`, `_AchievementsGrid`, level/latest kept.
+- Completion: SessionSummary `_RewardChips` (XP gained / goal progress / streak);
+  review session `_recordProgress` loads post snapshot+goal into the summary.
+- Settings hub: `_DailyGoalControl` stepper (5–100, step 5).
+- Tests: progress_gamification_test.dart (8) + 2 widget (progress celebrate,
+  summary chips). 125 total.
+
+## Last completed (MVP_014 — import diagnostics UX, DEC-023)
+- ImportDiagnostics upgraded: ImportDiagnostic {category, severity, message,
+  technicalDetail}, DiagnosticCategory/DiagnosticSeverity, derived ImportHealth
+  (healthy/usableWithWarnings/blocked). Serialized; persisted on DeckImportInfo
+  (via ImportedDeckStorage) so the report is revisitable.
+- ImportHealthSummary (features/import/widgets): status header + plain-language
+  metadata chips + grouped findings + collapsed "Technical details". Reused in
+  the import preview, the post-import RESULT phase (warnings only; clean imports
+  keep snackbar→Home), and ImportReportScreen (route /deck/:id/report, reached
+  from an "Import report" tile on deck detail).
+- Blocking/unsupported remain typed exceptions → import error state.
+- Tests: health summary healthy/warning/blocking + technical expansion +
+  deck-detail→report + reworked preview test.
+- NOTE: decks imported before MVP_014 have no stored diagnostics → "no report".
 
 ## Last completed (MVP_014 — import diagnostics UX, DEC-023)
 - ImportDiagnostics upgraded: ImportDiagnostic {category, severity, message,
@@ -278,12 +305,12 @@ queue changes. CocoaPods now installed (1.16.2); app builds+runs on iOS sim.
 - Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-No brief queued. Likely next (per MVP_014 brief): MVP_015 — Decko Progress &
-Light Gamification Polish, or a remaining Anki import-parity pass. To SEE the
-new import report on device, re-import a deck (existing decks predate stored
-diagnostics). Smaller follow-ups in ROADMAP: full media-protobuf parsing,
-desired retention + max interval (FSRS plumbing), import-aware profile
-suggestions, finer-grained sibling burying.
+No brief queued. Next per MVP_015 brief: MVP_016 — Bunburu Sentence Builder Mode
+(route outcomes through the MVP_015 progress/achievement layer; keep FSRS
+scheduling separate; power it from imported Sentence/Sentence-Kana/-English/Audio
+fields). Smaller follow-ups in ROADMAP: full media-protobuf parsing, desired
+retention + max interval (FSRS plumbing), import-aware profile suggestions,
+finer-grained sibling burying, achievement persistence if the derived set grows.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).

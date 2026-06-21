@@ -48,6 +48,7 @@ class SharedPrefsProgressRepository implements ProgressRepository {
       'totalXp': s.totalXp,
       'currentStreakDays': s.currentStreakDays,
       'cardsReviewedToday': s.cardsReviewedToday,
+      'longestStreakDays': s.longestStreakDays,
       'lastReviewedAt': s.lastReviewedAt?.toIso8601String(),
       'lastSessionResult': last == null
           ? null
@@ -71,6 +72,10 @@ class SharedPrefsProgressRepository implements ProgressRepository {
     return ProgressSnapshot(
       totalXp: (map['totalXp'] as int?) ?? 0,
       currentStreakDays: (map['currentStreakDays'] as int?) ?? 0,
+      // Back-fill for snapshots saved before longestStreak existed.
+      longestStreakDays: (map['longestStreakDays'] as int?) ??
+          (map['currentStreakDays'] as int?) ??
+          0,
       cardsReviewedToday: (map['cardsReviewedToday'] as int?) ?? 0,
       lastReviewedAt:
           lastReviewedAt == null ? null : DateTime.parse(lastReviewedAt),

@@ -37,6 +37,7 @@ import 'package:decko/domain/review_card_mode.dart';
 import 'package:decko/domain/review_session_result.dart';
 import 'package:decko/features/import/widgets/import_preview_panel.dart';
 import 'package:decko/features/import/widgets/import_health_summary.dart';
+import 'package:decko/features/review/widgets/session_summary.dart';
 import 'package:decko/features/deck_library/widgets/study_ribbon.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
@@ -66,6 +67,7 @@ class _FixedDeckRepository implements DeckRepository {
 class _InMemorySettings implements SettingsRepository {
   String? id;
   bool furigana = true;
+  int dailyGoal = 20;
   @override
   Future<String?> getSelectedAppThemeId() async => id;
   @override
@@ -74,6 +76,10 @@ class _InMemorySettings implements SettingsRepository {
   Future<bool> getShowFurigana() async => furigana;
   @override
   Future<void> saveShowFurigana(bool show) async => furigana = show;
+  @override
+  Future<int> getDailyGoal() async => dailyGoal;
+  @override
+  Future<void> saveDailyGoal(int goal) async => dailyGoal = goal;
 }
 
 /// In-memory progress with an injectable clock; writes land synchronously.
@@ -390,6 +396,68 @@ void main() {
     expect(find.textContaining('Complete your first review session'),
         findsOneWidget);
     expect(find.text('Your latest review'), findsNothing);
+    // The daily goal + achievements still appear, as motivation (MVP_015).
+    expect(find.textContaining('of 20 cards reviewed'), findsOneWidget);
+    expect(find.text('Achievements'), findsOneWidget);
+  });
+
+  testWidgets('Progress screen celebrates a met daily goal (MVP_015)',
+      (WidgetTester tester) async {
+    final _InMemoryProgress progress =
+        _InMemoryProgress(DateTime(2026, 6, 20, 10));
+    progress.snapshot = ProgressSnapshot(
+      totalXp: 1000,
+      currentStreakDays: 3,
+      longestStreakDays: 3,
+      cardsReviewedToday: 20,
+      lastReviewedAt: DateTime(2026, 6, 20, 10),
+      lastSessionResult: const ReviewSessionResult(
+        deckId: 'd',
+        totalCards: 5,
+        againCount: 0,
+        hardCount: 0,
+        goodCount: 5,
+        easyCount: 0,
+      ),
+    );
+    await _pumpApp(tester, progressRepository: progress);
+    await tester.tap(find.byTooltip('Progress'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Daily goal reached!'), findsOneWidget); // 20 of 20
+    expect(find.text('Achievements'), findsOneWidget);
+    expect(find.text('First review'), findsOneWidget); // achievement badge
+    expect(find.text('3-day streak'), findsOneWidget);
+  });
+
+  testWidgets('Session summary celebrates with reward chips (MVP_015)',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SessionSummary(
+          result: const ReviewSessionResult(
+            deckId: 'd',
+            totalCards: 5,
+            againCount: 0,
+            hardCount: 1,
+            goodCount: 3,
+            easyCount: 1,
+          ),
+          onBackToDeck: () {},
+          onReviewAgain: () {},
+          xpGained: 50,
+          streakDays: 3,
+          dailyReviewed: 20,
+          dailyGoal: 20,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Session complete'), findsOneWidget);
+    expect(find.text('+50 XP'), findsOneWidget);
+    expect(find.text('3 day streak'), findsOneWidget);
+    expect(find.text('Daily goal reached'), findsOneWidget);
   });
 
   testWidgets('Selected app theme persists across a restart',

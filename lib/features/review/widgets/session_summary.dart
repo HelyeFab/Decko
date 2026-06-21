@@ -13,11 +13,21 @@ class SessionSummary extends StatelessWidget {
     required this.result,
     required this.onBackToDeck,
     required this.onReviewAgain,
+    this.xpGained,
+    this.streakDays,
+    this.dailyReviewed,
+    this.dailyGoal,
   });
 
   final ReviewSessionResult result;
   final VoidCallback onBackToDeck;
   final VoidCallback onReviewAgain;
+
+  /// Light-gamification rewards (MVP_015). Null until progress is recorded.
+  final int? xpGained;
+  final int? streakDays;
+  final int? dailyReviewed;
+  final int? dailyGoal;
 
   static const Map<ReviewRating, Color> _accents = <ReviewRating, Color>{
     ReviewRating.again: Color(0xFFE5534B),
@@ -25,6 +35,8 @@ class SessionSummary extends StatelessWidget {
     ReviewRating.good: Color(0xFF3FA66A),
     ReviewRating.easy: Color(0xFF3F77E0),
   };
+
+  bool get _hasRewards => xpGained != null;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +68,15 @@ class SessionSummary extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            if (_hasRewards) ...<Widget>[
+              const SizedBox(height: DeckoSpacing.lg),
+              _RewardChips(
+                xpGained: xpGained,
+                streakDays: streakDays,
+                dailyReviewed: dailyReviewed,
+                dailyGoal: dailyGoal,
+              ),
+            ],
             const SizedBox(height: DeckoSpacing.xl),
             Card(
               child: Padding(
@@ -89,6 +110,86 @@ class SessionSummary extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The light-gamification rewards row: XP gained, daily-goal progress, streak.
+class _RewardChips extends StatelessWidget {
+  const _RewardChips({
+    required this.xpGained,
+    required this.streakDays,
+    required this.dailyReviewed,
+    required this.dailyGoal,
+  });
+
+  final int? xpGained;
+  final int? streakDays;
+  final int? dailyReviewed;
+  final int? dailyGoal;
+
+  @override
+  Widget build(BuildContext context) {
+    final int goal = dailyGoal ?? 0;
+    final int reviewed = dailyReviewed ?? 0;
+    final bool goalDone = goal > 0 && reviewed >= goal;
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: DeckoSpacing.sm,
+      runSpacing: DeckoSpacing.sm,
+      children: <Widget>[
+        if (xpGained != null && xpGained! > 0)
+          _Chip(icon: FontAwesomeIcons.bolt, label: '+$xpGained XP'),
+        if (goal > 0)
+          _Chip(
+            icon: goalDone
+                ? FontAwesomeIcons.solidCircleCheck
+                : FontAwesomeIcons.bullseye,
+            label: goalDone ? 'Daily goal reached' : '$reviewed / $goal today',
+            highlight: goalDone,
+          ),
+        if (streakDays != null && streakDays! > 0)
+          _Chip(
+            icon: FontAwesomeIcons.fire,
+            label: '$streakDays day streak',
+          ),
+      ],
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.icon, required this.label, this.highlight = false});
+
+  final FaIconData icon;
+  final String label;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final Color bg = highlight ? scheme.primaryContainer : scheme.surfaceContainerHighest;
+    final Color fg = highlight ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DeckoSpacing.md,
+        vertical: DeckoSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(DeckoRadii.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          FaIcon(icon, size: 13, color: fg),
+          const SizedBox(width: DeckoSpacing.sm),
+          Text(label,
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: fg, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }

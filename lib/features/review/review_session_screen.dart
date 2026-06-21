@@ -22,6 +22,7 @@ import '../../domain/repositories/review_state_repository.dart';
 import '../../domain/review_card_state.dart';
 import '../../domain/review_rating.dart';
 import '../../domain/review_scheduling_policy.dart';
+import '../../domain/progress_snapshot.dart';
 import '../../domain/review_session.dart';
 import '../../domain/review_session_result.dart';
 import '../../domain/repositories/daily_study_counts_repository.dart';
@@ -80,6 +81,10 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   bool _recorded = false;
   bool _initialised = false;
   CardThemeStyle _cardStyle = CardThemeStyle.minimal;
+
+  /// Post-session progress for the completion celebration (MVP_015).
+  ProgressSnapshot? _postSnapshot;
+  int _dailyGoal = 20;
 
   @override
   void didChangeDependencies() {
@@ -245,8 +250,24 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     _recorded = true;
     final ReviewSessionResult result =
         widget.scheduler.completeSession(_session!);
-    DeckoApp.progressOf(context).recordSessionResult(result);
+    _recordProgress(result);
     _flush();
+  }
+
+  /// Records the session, then loads the post-session snapshot + daily goal so
+  /// the summary can celebrate (XP / streak / goal). Presentation only — never
+  /// touches scheduling (MVP_015).
+  Future<void> _recordProgress(ReviewSessionResult result) async {
+    final progressRepo = DeckoApp.progressOf(context);
+    final settingsRepo = DeckoApp.settingsOf(context);
+    await progressRepo.recordSessionResult(result);
+    final ProgressSnapshot snap = await progressRepo.getSnapshot();
+    final int goal = await settingsRepo.getDailyGoal();
+    if (!mounted) return;
+    setState(() {
+      _postSnapshot = snap;
+      _dailyGoal = goal;
+    });
   }
 
   /// Persists changed states + today's study counts, once. Awaited before
@@ -269,6 +290,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       _session = _buildSession();
       _revealed = false;
       _recorded = false;
+      _postSnapshot = null;
     });
   }
 
@@ -330,10 +352,18 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
             );
     }
     if (session.isComplete) {
+      final ReviewSessionResult result =
+          widget.scheduler.completeSession(session);
+      final ProgressSnapshot? post = _postSnapshot;
       return SessionSummary(
-        result: widget.scheduler.completeSession(session),
+        result: result,
         onBackToDeck: _leave,
         onReviewAgain: _restart,
+        xpGained:
+            post == null ? null : result.totalCards * ProgressSnapshot.xpPerCard,
+        streakDays: post?.currentStreakDays,
+        dailyReviewed: post?.cardsReviewedToday,
+        dailyGoal: post == null ? null : _dailyGoal,
       );
     }
     return _reviewingBody(session);

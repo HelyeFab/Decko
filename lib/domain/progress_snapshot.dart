@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'review_session_result.dart';
 
 /// A small local snapshot of the learner's progress.
@@ -10,6 +12,7 @@ class ProgressSnapshot {
   const ProgressSnapshot({
     this.totalXp = 0,
     this.currentStreakDays = 0,
+    this.longestStreakDays = 0,
     this.cardsReviewedToday = 0,
     this.lastReviewedAt,
     this.lastSessionResult,
@@ -23,9 +26,26 @@ class ProgressSnapshot {
 
   final int totalXp;
   final int currentStreakDays;
+
+  /// The best streak ever reached — monotonic, so streak achievements stay
+  /// earned even after the current streak breaks (MVP_015).
+  final int longestStreakDays;
   final int cardsReviewedToday;
   final DateTime? lastReviewedAt;
   final ReviewSessionResult? lastSessionResult;
+
+  /// Total cards reviewed across all time (derived from XP).
+  int get totalCardsReviewed => totalXp ~/ xpPerCard;
+
+  /// Whether a review has already been recorded today.
+  bool get reviewedToday => cardsReviewedToday > 0;
+
+  /// Progress toward a motivational daily [goal] in [0, 1].
+  double dailyGoalProgress(int goal) =>
+      goal <= 0 ? 1 : (cardsReviewedToday / goal).clamp(0, 1).toDouble();
+
+  /// Whether today's motivational [goal] has been met.
+  bool dailyGoalMet(int goal) => goal > 0 && cardsReviewedToday >= goal;
 
   /// Levels are 100 XP each, starting at level 1.
   int get currentLevel => totalXp ~/ 100 + 1;
@@ -62,6 +82,7 @@ class ProgressSnapshot {
     return ProgressSnapshot(
       totalXp: totalXp + gainedXp,
       currentStreakDays: streak,
+      longestStreakDays: math.max(longestStreakDays, streak),
       cardsReviewedToday:
           sameDay ? cardsReviewedToday + result.totalCards : result.totalCards,
       lastReviewedAt: now,

@@ -85,6 +85,9 @@ class DeckoApp extends StatefulWidget {
   static DailyStudyCountsRepository dailyCountsOf(BuildContext context) =>
       _scopeOf(context).dailyStudyCountsRepository;
 
+  static SettingsRepository settingsOf(BuildContext context) =>
+      _scopeOf(context).settingsRepository;
+
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
         context.dependOnInheritedWidgetOfExactType<_DeckoScope>();
@@ -133,6 +136,7 @@ class _DeckoAppState extends State<DeckoApp> {
       importedSourceStore: widget.importedSourceStore,
       studyOptionsRepository: widget.studyOptionsRepository,
       dailyStudyCountsRepository: widget.dailyStudyCountsRepository,
+      settingsRepository: widget.settingsRepository,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -160,6 +164,7 @@ class _DeckoScope extends InheritedWidget {
     required this.importedSourceStore,
     required this.studyOptionsRepository,
     required this.dailyStudyCountsRepository,
+    required this.settingsRepository,
     required super.child,
   });
 
@@ -172,6 +177,7 @@ class _DeckoScope extends InheritedWidget {
   final ImportedSourceStore importedSourceStore;
   final StudyOptionsRepository studyOptionsRepository;
   final DailyStudyCountsRepository dailyStudyCountsRepository;
+  final SettingsRepository settingsRepository;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -183,5 +189,6 @@ class _DeckoScope extends InheritedWidget {
       mediaStore != oldWidget.mediaStore ||
       importedSourceStore != oldWidget.importedSourceStore ||
       studyOptionsRepository != oldWidget.studyOptionsRepository ||
-      dailyStudyCountsRepository != oldWidget.dailyStudyCountsRepository;
+      dailyStudyCountsRepository != oldWidget.dailyStudyCountsRepository ||
+      settingsRepository != oldWidget.settingsRepository;
 }

@@ -13,4 +13,11 @@ abstract class SettingsRepository {
 
   /// Persists the furigana on/off preference.
   Future<void> saveShowFurigana(bool show);
+
+  /// The motivational daily card goal (defaults to 20). A presentation target
+  /// only — it never affects scheduling or the due queue (MVP_015).
+  Future<int> getDailyGoal();
+
+  /// Persists the daily card goal.
+  Future<void> saveDailyGoal(int goal);
 }
