@@ -551,3 +551,25 @@ Decko could only read legacy uncompressed `.apkg` exports (`collection.anki21`/`
 - **CocoaPods is now required to build/run on iOS** (the `zstandard` plugin uses CocoaPods, not SPM). `flutter analyze`/`flutter test` are unaffected (host VM + fake decoder). Installing CocoaPods (`brew install cocoapods`) is a one-time dev-env step; on-device modern import is verified after that.
 - No re-import is required for already-imported decks; their ids/state are unchanged. This MVP doesn't migrate existing decks.
 - Media protobuf parsing is `name`-only and best-effort; exotic media-index variants degrade to "media unavailable" with a warning rather than failing the import.
+
+## DEC-023: Import diagnostics are user-facing trust signals, not raw parser logs
+
+Date: 2026-06-21
+Status: Accepted
+
+### Context
+
+MVP_013 produced structured `ImportDiagnostics`, but the import UI still showed flat warning strings and a few raw fields. The next problem is trust: a user importing a real Anki deck needs to understand what Decko found, what imported cleanly, what was approximated, and whether the deck is safe to study — without parser noise.
+
+### Decision
+
+- **Severity + category + health.** Each finding is an `ImportDiagnostic { category, severity (info/warning/error), message, technicalDetail? }`. Categories are user-understandable (Package · Collection · Notes & fields · Templates · Media · Progress · Scheduling). Overall `ImportHealth` (healthy / usableWithWarnings / blocked) is **derived** from the findings' severities — not set by hand.
+- **One reusable health UI.** `ImportHealthSummary` renders a status header (calm copy per state), a friendly metadata chip row (format described in plain language, note/card/template/media counts), grouped attention findings, and a collapsed **"Technical details"** disclosure (raw format/collection/per-finding detail). No enum names or SQLite wording in the primary view; technical detail only behind progressive disclosure.
+- **Surfaces.** The summary appears in the import preview (above keep/fresh), in a calm post-import **result** state for imports with warnings (clean imports stay frictionless: snackbar → Home), and in an **Import report** screen reachable from deck detail. The report persists: diagnostics are stored on `DeckImportInfo` and serialized with the deck.
+- **Blocking vs unsupported** stay as typed exceptions (`DeckImportException` / `UnsupportedPackageException`) surfaced in the import error state with a practical next step — distinct from the health-summary states.
+
+### Consequences
+
+- Import results are explainable and reassuring; warnings are grouped and humane, not alarming, and never hidden.
+- Diagnostics travel with the deck (small JSON on `DeckImportInfo`), so the report is revisitable; decks imported before this show a "no report" state.
+- Health derives from severity, so adding a finding automatically updates the summary — no separate status bookkeeping.

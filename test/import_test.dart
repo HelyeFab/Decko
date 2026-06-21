@@ -842,7 +842,7 @@ void main() {
       final DeckImportPreview p = await adapter.preview(bytes);
       expect(p.diagnostics!.hasMediaManifest, isFalse);
       expect(
-          p.diagnostics!.warnings.any((String w) => w.contains('media may be unavailable')),
+          p.diagnostics!.warnings.any((String w) => w.contains('media may not play or show')),
           isTrue);
       // Still studyable.
       final Deck deck = await adapter.importDeck(bytes,

@@ -5,6 +5,7 @@ import '../domain/deck.dart';
 import '../features/deck_detail/deck_detail_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
 import '../features/deck_options/deck_options_screen.dart';
+import '../features/import/import_report_screen.dart';
 import '../features/import/import_screen.dart';
 import '../features/imported_source/imported_source_screen.dart';
 import '../features/progress/progress_screen.dart';
@@ -49,6 +50,9 @@ abstract final class DeckoRoutes {
 
   /// Per-deck study options for the deck with [id].
   static String deckOptions(String id) => '/deck/$id/options';
+
+  /// Saved import report for the deck with [id].
+  static String deckReport(String id) => '/deck/$id/report';
 }
 
 /// Root navigator key — deck/review routes attach here so they cover the shell.
@@ -116,6 +120,15 @@ GoRouter buildDeckoRouter() {
                             ? const _DeckNotFound()
                             : DeckOptionsScreen(
                                 deckId: deck.id, deckName: deck.name);
+                      },
+                    ),
+                    GoRoute(
+                      path: 'report',
+                      builder: (BuildContext context, GoRouterState state) {
+                        final String? id = state.pathParameters['deckId'];
+                        return id == null
+                            ? const _DeckNotFound()
+                            : ImportReportScreen(deckId: id);
                       },
                     ),
                   ],

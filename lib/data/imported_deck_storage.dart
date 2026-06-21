@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/deck.dart';
 import '../domain/import/deck_import_info.dart';
+import '../domain/import/import_diagnostics.dart';
 import '../domain/import/imported_card_progress.dart';
 import '../domain/import/imported_card_state.dart';
 import '../domain/learning_item.dart';
@@ -51,6 +52,8 @@ class ImportedDeckStorage {
                 'progressMode': d.importInfo!.progressMode.name,
                 'importedAt': d.importInfo!.importedAt.toIso8601String(),
                 'sourceName': d.importInfo!.sourceName,
+                if (d.importInfo!.diagnostics != null)
+                  'diagnostics': d.importInfo!.diagnostics!.toMap(),
               },
         'items': d.items.map(_itemToMap).toList(growable: false),
       };
@@ -91,6 +94,10 @@ class ImportedDeckStorage {
                   .byName(info['progressMode'] as String),
               importedAt: DateTime.parse(info['importedAt'] as String),
               sourceName: (info['sourceName'] as String?) ?? 'Anki',
+              diagnostics: info['diagnostics'] == null
+                  ? null
+                  : ImportDiagnostics.fromMap(
+                      (info['diagnostics'] as Map).cast<String, dynamic>()),
             ),
       items: (m['items'] as List<dynamic>)
           .map((dynamic i) => _itemFromMap(i as Map<String, dynamic>))

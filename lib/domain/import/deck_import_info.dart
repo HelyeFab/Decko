@@ -1,3 +1,5 @@
+import 'import_diagnostics.dart';
+
 /// How imported progress was handled for an imported deck.
 enum ImportProgressMode {
   /// The user kept the source deck's progress.
@@ -25,11 +27,16 @@ class DeckImportInfo {
     required this.progressMode,
     required this.importedAt,
     this.sourceName = 'Anki',
+    this.diagnostics,
   });
 
   final ImportProgressMode progressMode;
   final DateTime importedAt;
   final String sourceName;
+
+  /// The import report for this deck, kept so it can be revisited from deck
+  /// detail (MVP_014). Null for decks imported before this was recorded.
+  final ImportDiagnostics? diagnostics;
 
   String get sourceLine => 'Imported from $sourceName';
 }

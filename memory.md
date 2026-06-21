@@ -4,12 +4,27 @@
 2026-06-20
 
 ## Current stage
-MVP_013 complete: import compatibility hardening — modern `.apkg`
-(`collection.anki21b`, zstd) is now actually imported (decompress → existing
-pipeline), best-effort modern media, structured ImportDiagnostics, specific
-failure messages. ⚠️ Adds a CocoaPods requirement for iOS (zstandard plugin, no
-SPM) — NOT installed here, so `flutter run` on iOS needs `brew install
-cocoapods`; analyze/test fine on host. 111 tests, analyze clean.
+MVP_014 complete: import validation & diagnostics UX — structured diagnostics
+became a calm trust experience (severity/category + derived ImportHealth, a
+reusable ImportHealthSummary shown in preview + a post-import result for decks
+with warnings + a persisted "Import report" on deck detail). No scheduler/FSRS/
+queue changes. CocoaPods now installed (1.16.2); app builds+runs on iOS sim.
+115 tests, analyze clean.
+
+## Last completed (MVP_014 — import diagnostics UX, DEC-023)
+- ImportDiagnostics upgraded: ImportDiagnostic {category, severity, message,
+  technicalDetail}, DiagnosticCategory/DiagnosticSeverity, derived ImportHealth
+  (healthy/usableWithWarnings/blocked). Serialized; persisted on DeckImportInfo
+  (via ImportedDeckStorage) so the report is revisitable.
+- ImportHealthSummary (features/import/widgets): status header + plain-language
+  metadata chips + grouped findings + collapsed "Technical details". Reused in
+  the import preview, the post-import RESULT phase (warnings only; clean imports
+  keep snackbar→Home), and ImportReportScreen (route /deck/:id/report, reached
+  from an "Import report" tile on deck detail).
+- Blocking/unsupported remain typed exceptions → import error state.
+- Tests: health summary healthy/warning/blocking + technical expansion +
+  deck-detail→report + reworked preview test. 115 total.
+- NOTE: decks imported before MVP_014 have no stored diagnostics → "no report".
 
 ## Last completed (MVP_013 — import compatibility hardening, DEC-022)
 - Modern collection: detect `collection.anki21b` → zstd-decompress (injectable
@@ -244,6 +259,7 @@ cocoapods`; analyze/test fine on host. 111 tests, analyze clean.
 - Two-level study options (global + per-deck overrides → effective); per-session caps (DEC-020).
 - Study option profiles (global→profile→deck), TRUE daily limits, enforced sibling burying (DEC-021).
 - Modern .anki21b (zstd) import + ImportDiagnostics + specific failure messages; CocoaPods now needed for iOS (DEC-022).
+- Import diagnostics are user-facing trust signals (severity/health + ImportHealthSummary + persisted report), not parser logs (DEC-023).
 
 ## What is still placeholder
 - FSRS uses DEFAULT weights (no per-user training) and no intra-day learning steps — FSRS-style, not Anki parity.
@@ -262,12 +278,12 @@ cocoapods`; analyze/test fine on host. 111 tests, analyze clean.
 - Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-Install CocoaPods (`brew install cocoapods`) to build/run on iOS and verify
-modern `.apkg` import on a real device with a real modern deck. Then per the
-MVP_013 brief: MVP_014 — Decko Progress & Light Gamification Polish (or a
-remaining Anki import-compat pass). Smaller follow-ups in ROADMAP: desired
-retention + max interval (FSRS plumbing), import-aware profile suggestions,
-finer-grained sibling burying, full media protobuf parsing.
+No brief queued. Likely next (per MVP_014 brief): MVP_015 — Decko Progress &
+Light Gamification Polish, or a remaining Anki import-parity pass. To SEE the
+new import report on device, re-import a deck (existing decks predate stored
+diagnostics). Smaller follow-ups in ROADMAP: full media-protobuf parsing,
+desired retention + max interval (FSRS plumbing), import-aware profile
+suggestions, finer-grained sibling burying.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).

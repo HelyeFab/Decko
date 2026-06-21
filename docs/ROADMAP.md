@@ -83,6 +83,12 @@ Small, intentionally-postponed improvements captured so they are not lost.
   (zstd payloads + `MediaEntries` protobuf index) extracted best-effort. Added
   `ImportDiagnostics` + specific failure messages. Note: adds a CocoaPods
   requirement for iOS builds.
+- ~~**Import validation & diagnostics UX.**~~ DONE (MVP_014, DEC-023): structured
+  diagnostics became a calm trust UX — severity/category model + derived
+  `ImportHealth`, a reusable `ImportHealthSummary` (status + plain-language
+  metadata + grouped findings + collapsed technical detail), shown in the import
+  preview, a post-import result for decks with warnings, and a persisted "Import
+  report" on deck detail. No scheduler/FSRS/queue changes.
 - **Import: smarter field mapping.** Field→Decko mapping is heuristic
   (front/back positional, kana→reading, sentence→example). Note-type-aware
   mapping would import more decks cleanly. (From MVP_005 testing.)

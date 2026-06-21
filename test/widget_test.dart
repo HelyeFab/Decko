@@ -36,6 +36,7 @@ import 'package:decko/core/widgets/decko_card.dart';
 import 'package:decko/domain/review_card_mode.dart';
 import 'package:decko/domain/review_session_result.dart';
 import 'package:decko/features/import/widgets/import_preview_panel.dart';
+import 'package:decko/features/import/widgets/import_health_summary.dart';
 import 'package:decko/features/deck_library/widgets/study_ribbon.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
@@ -510,8 +511,13 @@ void main() {
               format: AnkiPackageFormat.modern21b,
               models: 2,
               templates: 3,
-              warnings: <String>[
-                'Cards reference media but no media manifest was found — media may be unavailable.',
+              findings: <ImportDiagnostic>[
+                ImportDiagnostic(
+                  category: DiagnosticCategory.media,
+                  severity: DiagnosticSeverity.warning,
+                  message:
+                      'Some cards reference sound or images, but Decko found no media in this package — that media may not play or show.',
+                ),
               ],
             ),
           ),
@@ -523,10 +529,106 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('collection.anki21b'), findsOneWidget); // collection file
-    expect(find.text('Note types'), findsOneWidget);
-    expect(find.text('Card templates'), findsOneWidget);
-    expect(find.textContaining('media may be unavailable'), findsOneWidget);
+    expect(find.text('Imported with a few notes'), findsOneWidget); // health
+    expect(find.textContaining('media may not play or show'), findsOneWidget);
+    expect(find.text('TECHNICAL DETAILS'), findsOneWidget); // progressive
+  });
+
+  Widget healthHost(ImportDiagnostics d) => MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ImportHealthSummary(diagnostics: d),
+            ),
+          ),
+        ),
+      );
+
+  testWidgets('Import health: healthy state is reassuring (MVP_014)',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(healthHost(const ImportDiagnostics(
+      format: AnkiPackageFormat.legacy21,
+      notes: 10,
+      cards: 12,
+      templates: 1,
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Deck looks good'), findsOneWidget);
+    expect(find.text('TECHNICAL DETAILS'), findsOneWidget);
+  });
+
+  testWidgets('Import health: warning state groups findings + expands tech',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(healthHost(const ImportDiagnostics(
+      format: AnkiPackageFormat.modern21b,
+      notes: 5,
+      cards: 6,
+      findings: <ImportDiagnostic>[
+        ImportDiagnostic(
+          category: DiagnosticCategory.media,
+          severity: DiagnosticSeverity.warning,
+          message: 'Some media is missing.',
+          technicalDetail: '2 manifest entries have no payload.',
+        ),
+      ],
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Imported with a few notes'), findsOneWidget);
+    expect(find.text('Some media is missing.'), findsOneWidget);
+
+    await tester.tap(find.text('TECHNICAL DETAILS'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Package format'), findsOneWidget);
+    expect(find.textContaining('2 manifest entries'), findsOneWidget);
+  });
+
+  testWidgets('Import health: blocked state explains the failure',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(healthHost(const ImportDiagnostics(
+      format: AnkiPackageFormat.unknown,
+      blockingError: 'No Anki collection was found in this package.',
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Couldn’t import this deck'), findsOneWidget);
+    expect(find.text('No Anki collection was found in this package.'),
+        findsOneWidget);
+  });
+
+  testWidgets('Deck detail links to the saved import report (MVP_014)',
+      (WidgetTester tester) async {
+    final Deck deck = Deck(
+      id: 'imp',
+      name: 'Imported X',
+      description: 'd',
+      importInfo: DeckImportInfo(
+        progressMode: ImportProgressMode.fresh,
+        importedAt: DateTime(2026),
+        diagnostics: const ImportDiagnostics(
+          format: AnkiPackageFormat.modern21b,
+          notes: 3,
+          cards: 3,
+          findings: <ImportDiagnostic>[
+            ImportDiagnostic(
+              category: DiagnosticCategory.media,
+              severity: DiagnosticSeverity.warning,
+              message: 'Some media is missing.',
+            ),
+          ],
+        ),
+      ),
+      items: const <LearningItem>[LearningItem(id: 'a', front: 'a', back: 'a')],
+    );
+    await _pumpApp(tester,
+        deckRepository: _FixedDeckRepository(<Deck>[deck]));
+
+    await tester.tap(find.text('Imported X').last); // shelf row → deck detail
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Import report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Imported with a few notes'), findsOneWidget); // health
+    expect(find.text('Some media is missing.'), findsOneWidget);
   });
 
   testWidgets('Import preview warns honestly when no progress is found',

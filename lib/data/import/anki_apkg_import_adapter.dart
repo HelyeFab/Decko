@@ -105,7 +105,11 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
       name: parsed.deckName,
       description: 'Imported from Anki · ${items.length} cards',
       items: items,
-      importInfo: DeckImportInfo(progressMode: mode, importedAt: importedAt),
+      importInfo: DeckImportInfo(
+        progressMode: mode,
+        importedAt: importedAt,
+        diagnostics: parsed.diagnostics,
+      ),
     );
   }
 
@@ -338,23 +342,44 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
     final bool mediaCompressed = format == AnkiPackageFormat.modern21b;
     final Map<String, String> mediaMap = await _readMediaMap(archive, format);
 
-    // Diagnostics + non-blocking warnings.
-    final List<String> warnings = <String>[...notes];
+    // Categorised, severity-tagged findings for the diagnostics UX (DEC-023).
+    final List<ImportDiagnostic> findings = <ImportDiagnostic>[];
     final bool mediaManifestPresent = archive.findFile('media') != null;
     final int templateCount =
         models.values.fold(0, (int s, ImportedAnkiModel m) => s + m.templates.length);
+
+    if (deckIds.length > 1) {
+      findings.add(ImportDiagnostic(
+        category: DiagnosticCategory.package,
+        severity: DiagnosticSeverity.info,
+        message: 'Several Anki decks were combined into one Decko deck.',
+        technicalDetail: '${deckIds.length} source decks merged into one.',
+      ));
+    }
     if (audioRefs + imageRefs > 0 && mediaMap.isEmpty) {
-      warnings.add(
-          'Cards reference media but no media manifest was found — media may be unavailable.');
+      findings.add(const ImportDiagnostic(
+        category: DiagnosticCategory.media,
+        severity: DiagnosticSeverity.warning,
+        message: 'Some cards reference sound or images, but Decko found no '
+            'media in this package — that media may not play or show.',
+      ));
     }
     final int missingPayloads = mediaMap.keys
         .where((String k) => archive.findFile(k) == null)
         .length;
     if (missingPayloads > 0) {
-      warnings.add(
-          '$missingPayloads media file(s) listed in the manifest are missing from the package.');
+      findings.add(ImportDiagnostic(
+        category: DiagnosticCategory.media,
+        severity: DiagnosticSeverity.warning,
+        message: missingPayloads == 1
+            ? 'One media file is listed but missing from the package, so it '
+                'won’t be available.'
+            : '$missingPayloads media files are listed but missing from the '
+                'package, so they won’t be available.',
+        technicalDetail:
+            '$missingPayloads media manifest entr${missingPayloads == 1 ? 'y has' : 'ies have'} no payload in the zip.',
+      ));
     }
-
     return _Parsed(
       deckName: deckName,
       cards: cards,
@@ -378,7 +403,7 @@ class AnkiApkgImportAdapter implements DeckImportAdapter {
         models: models.length,
         templates: templateCount,
         mediaEntries: mediaMap.length,
-        warnings: warnings,
+        findings: findings,
       ),
     );
   }

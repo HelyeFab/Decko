@@ -329,6 +329,26 @@ re-inventing equivalents.
 - No new primitives — everything reuses `SettingsSection` / `StepperRow` /
   `ChoiceRow` / `SwitchRow` from MVP_011.
 
+### Added in MVP_014 (import diagnostics UX, DEC-023)
+
+- **`ImportHealthSummary`** (`features/import/widgets/import_health_summary.dart`) —
+  the reusable import "health" panel. A coloured status header (✓ healthy in
+  `primaryContainer` / ⚠ usable in `tertiaryContainer` / ✕ blocked in
+  `errorContainer`) with calm copy, a `Wrap` of plain-language metadata chips
+  (format described in words, note/card/template/media counts), grouped attention
+  findings (category eyebrow + severity-coloured rows), and a collapsed
+  **"Technical details"** disclosure. No enum/SQLite wording in the primary view.
+  Used by the import preview, the post-import result, and the import report.
+- **Import flow states** — the import screen gained a calm **result** phase
+  (`_ResultPanel`) shown only for imports with warnings (clean imports keep the
+  snackbar→Home flow). Blocking/unsupported stay in the existing error state with
+  a practical next step.
+- **`ImportReportScreen`** (`features/import/`) — the saved report, reached from a
+  "Import report" `_DeckActionTile` on deck detail (imported decks with stored
+  diagnostics). Reuses `ImportHealthSummary`.
+- Severity colours: error → `error`, warning → `tertiary`, info →
+  `onSurfaceVariant` (a reusable convention for finding rows).
+
 ### Conventions
 
 - Buttons use the themed `FilledButton`/`OutlinedButton` (min height 56) for

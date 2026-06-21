@@ -17,15 +17,17 @@ import '../../data/import/anki_apkg_import_adapter.dart';
 import '../../domain/deck.dart';
 import '../../domain/import/deck_import_adapter.dart';
 import '../../domain/import/deck_import_preview.dart';
+import '../../domain/import/import_diagnostics.dart';
 import '../../domain/learning_item.dart';
 import '../../domain/repositories/review_state_repository.dart';
 import '../../domain/review_card_state.dart';
+import 'widgets/import_health_summary.dart';
 import 'widgets/import_preview_panel.dart';
 
 /// Picks the bytes of an `.apkg` file, or null if cancelled.
 typedef ApkgPicker = Future<Uint8List?> Function();
 
-enum _Phase { idle, analysing, preview, importing, error }
+enum _Phase { idle, analysing, preview, importing, result, error }
 
 /// The Anki import flow as a single screen with internal phases.
 ///
@@ -50,6 +52,7 @@ class _ImportScreenState extends State<ImportScreen> {
   _Phase _phase = _Phase.idle;
   Uint8List? _bytes;
   DeckImportPreview? _preview;
+  Deck? _importedDeck;
   String _error = '';
 
   Future<void> _pickAndPreview() async {
@@ -97,16 +100,25 @@ class _ImportScreenState extends State<ImportScreen> {
           ReviewCardState.fromLearningItem(deck.id, item),
       ]);
       if (!mounted) return;
-      // Reset this tab to idle — it persists in the shell, so the next visit
-      // should start fresh rather than re-showing the import we just finished.
-      setState(() {
-        _phase = _Phase.idle;
-        _bytes = null;
-        _preview = null;
-      });
-      // Shown on the app-level messenger, so it appears once we're on the library.
-      DeckoSnackbar.showSuccess(context, 'Imported “${deck.name}”.');
-      GoRouter.of(context).go(DeckoRoutes.home);
+      // Clean imports stay frictionless (snackbar → Home). Imports with notes
+      // pause on a calm result so nothing's a surprise (MVP_014).
+      final ImportHealth? health = deck.importInfo?.diagnostics?.health;
+      if (health == ImportHealth.usableWithWarnings) {
+        setState(() {
+          _importedDeck = deck;
+          _bytes = null;
+          _preview = null;
+          _phase = _Phase.result;
+        });
+      } else {
+        setState(() {
+          _phase = _Phase.idle;
+          _bytes = null;
+          _preview = null;
+        });
+        DeckoSnackbar.showSuccess(context, 'Imported “${deck.name}”.');
+        GoRouter.of(context).go(DeckoRoutes.home);
+      }
     } on DeckImportException catch (e) {
       _fail(e.message);
     } catch (_) {
@@ -123,6 +135,15 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   void _reset() => setState(() => _phase = _Phase.idle);
+
+  void _finishResult() {
+    if (!mounted) return;
+    setState(() {
+      _phase = _Phase.idle;
+      _importedDeck = null;
+    });
+    GoRouter.of(context).go(DeckoRoutes.home);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +176,8 @@ class _ImportScreenState extends State<ImportScreen> {
           onStartFresh: () => _confirm(keepProgress: false),
           onCancel: _reset,
         );
+      case _Phase.result:
+        return _ResultPanel(deck: _importedDeck!, onDone: _finishResult);
       case _Phase.error:
         return _ErrorState(message: _error, onRetry: _reset);
       case _Phase.idle:
@@ -349,6 +372,47 @@ class _ErrorState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Calm post-import result for decks that imported with notes (MVP_014).
+class _ResultPanel extends StatelessWidget {
+  const _ResultPanel({required this.deck, required this.onDone});
+
+  final Deck deck;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ImportDiagnostics? diag = deck.importInfo?.diagnostics;
+    return ListView(
+      padding: const EdgeInsets.all(DeckoSpacing.pagePadding),
+      children: <Widget>[
+        Text(
+          'Imported',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            letterSpacing: 0.8,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: DeckoSpacing.xs),
+        Text(
+          deck.name,
+          style: theme.textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: DeckoSpacing.lg),
+        if (diag != null) ImportHealthSummary(diagnostics: diag),
+        const SizedBox(height: DeckoSpacing.xl),
+        FilledButton.icon(
+          onPressed: onDone,
+          icon: const FaIcon(FontAwesomeIcons.check),
+          label: const Text('Done — start studying'),
+        ),
+      ],
     );
   }
 }

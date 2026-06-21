@@ -157,6 +157,15 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
               onTap: () => context.push(DeckoRoutes.deckOptions(deck.id)),
             ),
             if (deck.isImported) ...<Widget>[
+              if (deck.importInfo?.diagnostics != null) ...<Widget>[
+                const SizedBox(height: DeckoSpacing.md),
+                _DeckActionTile(
+                  icon: FontAwesomeIcons.clipboardCheck,
+                  title: 'Import report',
+                  subtitle: 'What Decko found when it imported this deck',
+                  onTap: () => context.push(DeckoRoutes.deckReport(deck.id)),
+                ),
+              ],
               const SizedBox(height: DeckoSpacing.md),
               _DeckActionTile(
                 icon: FontAwesomeIcons.layerGroup,
