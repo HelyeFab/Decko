@@ -1,18 +1,19 @@
 # Decko Memory
 
 ## Last updated
-2026-06-21
+2026-06-22
 
 ## Current stage
-MVP_018 in review: Listening Challenge — the SECOND registered practice mode
-(`listening_challenge`), proving the MVP_017 platform. Audio (word from front,
-else sentence from example) → pick the meaning from 4 generated choices.
+MVP_018 COMPLETE (committed ccf7733): Listening Challenge — the SECOND registered
+practice mode (`listening_challenge`), proving the MVP_017 platform. Word audio
+(front) → pick meaning; sentence audio (example) → pick the matching sentence (or
+translation when a deck has Sentence-English); reveal shows a meaning context.
 `ListeningChallengeBuilder` (pure/local/deterministic) does availability +
-distinct-choice gen; surfaces via the registry in Deck Detail / Hub / review
-manual actions (ONE new PracticeLauncher case, no other screen touched). Manual +
-deck practice only (motivational XP; reviewPresentation=false, deferred). FSRS/
-review untouched (DEC-027). 158 tests, analyze clean. NOT committed — awaiting
-verification.
+distinct same-kind choice gen; surfaces via the registry in Deck Detail / Hub /
+review manual actions (ONE new PracticeLauncher case, no other screen touched).
+Manual + deck practice only (motivational XP; reviewPresentation=false, deferred).
+FSRS/review untouched (DEC-027). Progress level card now shows combinedXp (review
++ practice). 159 tests, analyze clean, verified on iOS sim.
 
 ## Last completed (MVP_018 — Listening Challenge, DEC-027)
 - Domain (`lib/domain/listening/`): ListeningChallengeRound/Session/Result +
@@ -33,7 +34,7 @@ verification.
   (modeId listeningChallenge, 5 XP/correct). practiceModeIcon/practiceCardAction
   gained the listening case (headphones / "Listen & choose").
 - Tests: listening_test.dart (7: availability, choice gen, registry) + 1 widget
-  (full flow + practice-XP-not-review-state boundary). 158 total.
+  (full flow + practice-XP-not-review-state boundary). 159 total.
 - DEFERRED: scheduler-routed listening review; richer prompt targets; typing.
 
 ## Last completed (MVP_017 — practice-mode platform — Bunburu is now the first
@@ -44,7 +45,7 @@ hard-coded games); `PracticeLauncher` maps mode→screen. `PracticeOutcome` seam
 motivational only: ProgressSnapshot.practiceXp + practiceCount (combinedXp counts
 toward LEVEL; review metrics/totalCardsReviewed untouched). Manual practice never
 mutates review state; scheduled review still grades through ReviewScheduler
-(DEC-026). 150 tests, analyze clean. NOT committed yet — awaiting verification.
+(DEC-026). 150 tests, analyze clean. Committed.
 
 ## Last completed (MVP_017 — practice-mode platform, DEC-026)
 - Domain (`lib/domain/practice/`): PracticeMode (id/title/sub/desc/kind/
