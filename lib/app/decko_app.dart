@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../config.dart';
 import '../core/constants/decko_strings.dart';
 import '../data/bunburu_tokenizer.dart';
+import '../data/decko_practice_mode_registry.dart';
 import '../data/file_imported_source_store.dart';
 import '../data/file_media_store.dart';
 import '../data/file_sentence_token_cache.dart';
@@ -17,6 +18,7 @@ import '../domain/repositories/daily_study_counts_repository.dart';
 import '../domain/repositories/deck_repository.dart';
 import '../domain/repositories/imported_source_store.dart';
 import '../domain/repositories/media_store.dart';
+import '../domain/repositories/practice_mode_registry.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/review_state_repository.dart';
 import '../domain/repositories/sentence_token_cache.dart';
@@ -52,6 +54,7 @@ class DeckoApp extends StatefulWidget {
         const SharedPrefsDailyStudyCountsRepository(),
     this.tokenizer,
     this.sentenceTokenCache = const FileSentenceTokenCache(),
+    this.practiceModeRegistry = const DeckoPracticeModeRegistry(),
   });
 
   final DeckRepository deckRepository;
@@ -67,6 +70,7 @@ class DeckoApp extends StatefulWidget {
   /// Bunburu service (MVP_016); tests inject a fake.
   final SentenceTokenizer? tokenizer;
   final SentenceTokenCache sentenceTokenCache;
+  final PracticeModeRegistry practiceModeRegistry;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -106,6 +110,9 @@ class DeckoApp extends StatefulWidget {
 
   static SentenceTokenCache tokenCacheOf(BuildContext context) =>
       _scopeOf(context).sentenceTokenCache;
+
+  static PracticeModeRegistry practiceRegistryOf(BuildContext context) =>
+      _scopeOf(context).practiceModeRegistry;
 
   /// A ready-to-use round service (tokenizer + cache) for the sentence builder.
   static SentenceRoundService sentenceRoundsOf(BuildContext context) =>
@@ -171,6 +178,7 @@ class _DeckoAppState extends State<DeckoApp> {
       settingsRepository: widget.settingsRepository,
       tokenizer: _tokenizer,
       sentenceTokenCache: widget.sentenceTokenCache,
+      practiceModeRegistry: widget.practiceModeRegistry,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -201,6 +209,7 @@ class _DeckoScope extends InheritedWidget {
     required this.settingsRepository,
     required this.tokenizer,
     required this.sentenceTokenCache,
+    required this.practiceModeRegistry,
     required super.child,
   });
 
@@ -216,6 +225,7 @@ class _DeckoScope extends InheritedWidget {
   final SettingsRepository settingsRepository;
   final SentenceTokenizer tokenizer;
   final SentenceTokenCache sentenceTokenCache;
+  final PracticeModeRegistry practiceModeRegistry;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -230,5 +240,6 @@ class _DeckoScope extends InheritedWidget {
       dailyStudyCountsRepository != oldWidget.dailyStudyCountsRepository ||
       settingsRepository != oldWidget.settingsRepository ||
       tokenizer != oldWidget.tokenizer ||
-      sentenceTokenCache != oldWidget.sentenceTokenCache;
+      sentenceTokenCache != oldWidget.sentenceTokenCache ||
+      practiceModeRegistry != oldWidget.practiceModeRegistry;
 }

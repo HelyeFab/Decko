@@ -25,10 +25,12 @@ import '../../domain/review_scheduling_policy.dart';
 import '../../domain/progress_snapshot.dart';
 import '../../domain/review_session.dart';
 import '../../domain/review_session_result.dart';
-import '../../domain/sentence_builder/sentence_builder_mapper.dart';
+import '../../domain/practice/practice_mode.dart';
+import '../../domain/repositories/practice_mode_registry.dart';
 import '../../domain/sentence_builder/sentence_builder_round.dart';
 import '../../domain/sentence_builder/sentence_builder_source.dart';
-import '../sentence_builder/sentence_builder_loader.dart';
+import '../practice/practice_launcher.dart';
+import '../practice/widgets/practice_mode_tile.dart';
 import '../sentence_builder/sentence_round_service.dart';
 import '../sentence_builder/widgets/sentence_builder_view.dart';
 import '../../domain/repositories/daily_study_counts_repository.dart';
@@ -94,7 +96,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
 
   /// Imported source for this deck, used to build sentence rounds (MVP_016).
   ImportedAnkiSource? _source;
-  static const SentenceBuilderMapper _mapper = SentenceBuilderMapper();
+  late final PracticeModeRegistry _registry;
   late final SentenceRoundService _service;
   final Map<String, Future<SentenceBuilderRound?>> _builderFutures =
       <String, Future<SentenceBuilderRound?>>{};
@@ -124,6 +126,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     final StudyOptionsRepository optionsRepo = DeckoApp.studyOptionsOf(context);
     _countsRepo = DeckoApp.dailyCountsOf(context);
     _service = DeckoApp.sentenceRoundsOf(context);
+    _registry = DeckoApp.practiceRegistryOf(context);
     final ImportedSourceStore sourceStore = DeckoApp.sourceOf(context);
     final DateTime now = DateTime.now();
 
@@ -168,11 +171,15 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     return _source!.noteById(noteId);
   }
 
-  /// Whether [item] looks sentence-capable (cheap, synchronous) — used to decide
-  /// the manual action and the builder presentation. The real round is tokenized
-  /// asynchronously by the service. Never touches review/FSRS state (MVP_016).
-  bool _looksCapable(LearningItem item) =>
-      _mapper.looksCapable(item, note: _noteForItem(item));
+  /// Manual practice modes available for [item], via the registry (MVP_017).
+  List<PracticeMode> _manualModes(LearningItem item) =>
+      _registry.manualModesForCard(item, note: _noteForItem(item));
+
+  /// Whether the sentence-builder can present [item] as a review (registry +
+  /// the opt-in study option gate this in [_reviewingBody]).
+  bool _hasReviewBuilder(LearningItem item) => _registry
+      .reviewPresentationModesForCard(item, note: _noteForItem(item))
+      .any((PracticeMode m) => m.id == PracticeModeId.bunburuSentenceBuilder);
 
   /// The (memoized) tokenized review-presentation round for [item].
   Future<SentenceBuilderRound?> _builderFutureFor(LearningItem item) =>
@@ -186,27 +193,16 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
         ),
       );
 
-  /// Opens manual sentence practice for [item] over the review screen. Pushes a
-  /// loader/screen that records nothing to review/progress — practice can't
-  /// change the schedule (MVP_016, DEC-025).
-  void _openManualBuilder(LearningItem item) {
-    final SentenceRoundService service = _service;
-    final ImportedAnkiNote? note = _noteForItem(item);
-    final String deckId = widget.deck.id;
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (BuildContext context) => SentenceBuilderLoader(
-        title: 'Build sentence',
-        load: () async {
-          final SentenceBuilderRound? round = await service.roundForItem(
-            item,
-            deckId: deckId,
-            source: SentenceBuilderSource.manualCard,
-            note: note,
-          );
-          return <SentenceBuilderRound>[?round];
-        },
-      ),
-    ));
+  /// Launches a manual practice [mode] for [item] over the review screen.
+  /// Records nothing to review/progress — practice can't change the schedule.
+  void _launchManual(PracticeMode mode, LearningItem item) {
+    PracticeLauncher.launchCard(
+      context,
+      mode,
+      item,
+      deckId: widget.deck.id,
+      note: _noteForItem(item),
+    );
   }
 
   ReviewSession _buildSession() {
@@ -437,8 +433,9 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     final LearningItem item = session.currentItem!;
     final bool useBuilder = _options.sentenceBuilderReview &&
         !_noBuilder.contains(item.id) &&
-        _looksCapable(item);
-    final bool canManualBuild = !useBuilder && _looksCapable(item);
+        _hasReviewBuilder(item);
+    final List<PracticeMode> manualModes =
+        useBuilder ? const <PracticeMode>[] : _manualModes(item);
 
     return Padding(
       padding: const EdgeInsets.all(DeckoSpacing.pagePadding),
@@ -469,12 +466,12 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
             ),
             const SizedBox(height: DeckoSpacing.md),
             RatingButtonRow(onRate: _rate),
-            if (canManualBuild) ...<Widget>[
+            for (final PracticeMode mode in manualModes) ...<Widget>[
               const SizedBox(height: DeckoSpacing.sm),
               TextButton.icon(
-                onPressed: () => _openManualBuilder(item),
-                icon: const FaIcon(FontAwesomeIcons.cubesStacked, size: 14),
-                label: const Text('Build this sentence'),
+                onPressed: () => _launchManual(mode, item),
+                icon: FaIcon(practiceModeIcon(mode.id), size: 14),
+                label: Text(practiceCardAction(mode.id)),
               ),
             ],
           ],

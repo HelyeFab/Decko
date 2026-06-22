@@ -16,7 +16,7 @@ import '../../domain/deck.dart';
 import '../../domain/due_queue.dart';
 import '../../domain/repositories/review_state_repository.dart';
 import '../../domain/review_card_state.dart';
-import '../sentence_builder/sentence_builder_hub_screen.dart';
+import '../practice/practice_hub_screen.dart';
 import 'widgets/deck_row.dart';
 import 'widgets/empty_library_card.dart';
 import 'widgets/study_ribbon.dart';
@@ -188,7 +188,7 @@ class _PopulatedHome extends StatelessWidget {
           const SizedBox(height: DeckoSpacing.xl),
           const SectionHeader(
             title: 'Practice',
-            subtitle: 'Play with the sentences in your decks.',
+            subtitle: 'Play with the words in your decks.',
           ),
           const SizedBox(height: DeckoSpacing.lg),
           const _PracticeRow(),
@@ -204,7 +204,7 @@ class _PopulatedHome extends StatelessWidget {
   bool get _hasSentenceDecks => decks.any((Deck d) => d.isImported);
 }
 
-/// The Home entry into the sentence-builder practice hub (MVP_016).
+/// The Home entry into the practice hub (MVP_016; registry-driven in MVP_017).
 class _PracticeRow extends StatelessWidget {
   const _PracticeRow();
 
@@ -217,7 +217,7 @@ class _PracticeRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(DeckoRadii.lg),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (BuildContext context) => const SentenceBuilderHubScreen(),
+          builder: (BuildContext context) => const PracticeHubScreen(),
         )),
         child: Ink(
           padding: const EdgeInsets.all(DeckoSpacing.lg),
@@ -235,7 +235,7 @@ class _PracticeRow extends StatelessWidget {
                   color: scheme.onPrimaryContainer.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(DeckoRadii.md),
                 ),
-                child: FaIcon(FontAwesomeIcons.cubesStacked,
+                child: FaIcon(FontAwesomeIcons.gamepad,
                     size: 18, color: scheme.onPrimaryContainer),
               ),
               const SizedBox(width: DeckoSpacing.md),
@@ -243,13 +243,13 @@ class _PracticeRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('Sentence builder',
+                    Text('Practice modes',
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: scheme.onPrimaryContainer,
                           fontWeight: FontWeight.w700,
                         )),
                     const SizedBox(height: 2),
-                    Text('Rebuild sentences from your decks',
+                    Text('Play with the words in your decks',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: scheme.onPrimaryContainer.withValues(alpha: 0.85),
                         )),

@@ -202,6 +202,13 @@ See: `docs/import-progress.md`
   motivational-only and never touches FSRS/review state. Deferred: builder
   audio, hearts/timed/daily modes, smarter routing policy, Decko-hosted
   tokenizer service.
+- ~~Practice-mode platform~~ DONE (MVP_017, DEC-026): Bunburu is now the first
+  *registered* practice mode. A `PracticeModeRegistry` discovers modes per card
+  and per deck; Deck Detail, the Practice Hub, and Review ask the registry (no
+  hard-coded games), and a `PracticeLauncher` maps mode→screen. A lightweight
+  `PracticeOutcome` seam records motivational practice XP + a count
+  (`combinedXp` counts toward level; review metrics untouched). Future games
+  (Listening / Typing / Matching / Kanji) plug in without editing those screens.
 
 ## I5 — FSRS Production Scheduler
 

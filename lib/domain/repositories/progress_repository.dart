@@ -1,3 +1,4 @@
+import '../practice/practice_outcome.dart';
 import '../progress_snapshot.dart';
 import '../review_session_result.dart';
 
@@ -11,6 +12,10 @@ abstract class ProgressRepository {
 
   /// Folds a completed session into the stored snapshot and persists it.
   Future<void> recordSessionResult(ReviewSessionResult result);
+
+  /// Folds a practice [outcome] into the snapshot — motivational only (practice
+  /// XP + count). Never touches review state, streak, or counters (MVP_017).
+  Future<void> recordPracticeOutcome(PracticeOutcome outcome);
 
   /// Clears stored progress. Useful for tests/debug.
   Future<void> resetProgress();

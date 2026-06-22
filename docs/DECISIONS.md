@@ -621,3 +621,25 @@ MVP_016 brings the Bunburu sentence-unscramble concept into Decko as a sentence 
 - The safety boundary is enforced by construction: practice screens take no review dependencies; the review presentation reuses the one grading path. Tests assert the manual action's visibility, the practice loop, and that the routed review grades through the normal seam (progress recorded, session completes).
 - **Four entry surfaces:** a Home "Practice" section → a `SentenceBuilderHubScreen` (lists sentence-capable decks); a manual "Build this sentence" action on the revealed review card; a deck-detail practice tile; and the opt-in `sentenceBuilderReview` review presentation. Async tokenization sits behind a calm loader (spinner / "tokenizer unavailable" retry / "no sentences"). Tiles render per-token furigana ruby.
 - Deferred (documented): sentence-audio playback in the builder; hearts/timed/daily-challenge modes; a smarter policy for *when* to route a review to the builder; bulk pre-tokenizing a whole deck (rounds are capped per session); Decko hosting its own tokenizer service instead of reusing Bunburu's. The `sentenceBuilderReview` flag is global-only for now (no per-deck override).
+
+## DEC-026: Practice modes are a registered platform; outcomes feed motivation, not review
+
+Date: 2026-06-22
+Status: Accepted
+
+### Context
+
+MVP_016 proved Decko can host a richer game (Bunburu) without breaking review. But it was a special case wired directly into Deck Detail, Review, and a Bunburu-specific hub. Before adding more games (Listening, Typing, Matching…), Decko needs a shared platform so a new game plugs in without editing unrelated screens.
+
+### Decision
+
+- **Practice modes are registered capabilities discovered per card and per deck.** A `PracticeMode` descriptor (id, title/subtitle/description, kind, `manualLaunch`, `reviewPresentation`) is registered in a `PracticeModeRegistry` (`availableForCard` / `availableForDeck` / `manualModesForCard` / `reviewPresentationModesForCard`). Bunburu is the first registered mode (`bunburu_sentence_builder`); availability derives from the existing sentence-capability check. Deck Detail, the Practice Hub, and Review ask the registry — they never hard-code a game. A single `PracticeLauncher` maps a mode → its screen (one new `case` per future game). UI keeps icons/action labels (id→icon, id→"Build this sentence") so the domain stays framework-light.
+- **A lightweight outcome→motivation seam.** `PracticeOutcome` (mode, item/deck, timings, correct/incorrect, xp) is recorded via `ProgressRepository.recordPracticeOutcome`. This is **motivation only**: it adds `practiceXp` + a `practiceCount` to `ProgressSnapshot`. Practice XP counts toward **level** (`combinedXp = totalXp + practiceXp`) but is kept *separate* from review XP so review-derived metrics (`totalCardsReviewed`, the "100 cards" achievement) stay accurate.
+- **The boundary is enforced, not just intended.** Manual/deck practice never mutates `ReviewCardState`, FSRS, due dates, daily counters, or sibling burying — by construction (practice screens take no review dependencies; the recorder touches only motivational fields). A scheduler-routed review presentation still submits its grade through the normal `ReviewScheduler` seam (the builder is only the card's presentation).
+
+### Consequences
+
+- Adding a future game = register a `PracticeMode` + add a `PracticeLauncher` case + a domain availability rule. No edits to Deck Detail / Review / Hub logic.
+- Practice feels rewarding (XP, count, celebration) without distorting the spaced-repetition schedule or review stats.
+- Tests assert card/deck availability and the manual-practice-vs-review boundary (practice records motivation XP; `cardsReviewedToday`/review state stay zero).
+- Deferred: a real second game; per-mode richer outcomes/analytics; "coming soon" placeholders (intentionally omitted to avoid fake functionality).

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/practice/practice_outcome.dart';
 import '../domain/progress_snapshot.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/review_session_result.dart';
@@ -35,6 +36,14 @@ class SharedPrefsProgressRepository implements ProgressRepository {
   }
 
   @override
+  Future<void> recordPracticeOutcome(PracticeOutcome outcome) async {
+    final ProgressSnapshot current = await getSnapshot();
+    final ProgressSnapshot next = current.recordingPractice(outcome.xpAwarded);
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, _encode(next));
+  }
+
+  @override
   Future<void> resetProgress() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
@@ -49,6 +58,8 @@ class SharedPrefsProgressRepository implements ProgressRepository {
       'currentStreakDays': s.currentStreakDays,
       'cardsReviewedToday': s.cardsReviewedToday,
       'longestStreakDays': s.longestStreakDays,
+      'practiceXp': s.practiceXp,
+      'practiceCount': s.practiceCount,
       'lastReviewedAt': s.lastReviewedAt?.toIso8601String(),
       'lastSessionResult': last == null
           ? null
@@ -77,6 +88,8 @@ class SharedPrefsProgressRepository implements ProgressRepository {
           (map['currentStreakDays'] as int?) ??
           0,
       cardsReviewedToday: (map['cardsReviewedToday'] as int?) ?? 0,
+      practiceXp: (map['practiceXp'] as int?) ?? 0,
+      practiceCount: (map['practiceCount'] as int?) ?? 0,
       lastReviewedAt:
           lastReviewedAt == null ? null : DateTime.parse(lastReviewedAt),
       lastSessionResult: last == null

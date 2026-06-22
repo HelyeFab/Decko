@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
+import '../../app/decko_app.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_app_bar.dart';
 import '../../domain/sentence_builder/sentence_builder_round.dart';
@@ -58,7 +59,11 @@ class _SentenceBuilderLoaderState extends State<SentenceBuilderLoader> {
         if (rounds.isEmpty) {
           return _Scaffold(title: widget.title, child: const _Empty());
         }
-        return SentenceBuilderScreen(rounds: rounds, title: widget.title);
+        return SentenceBuilderScreen(
+          rounds: rounds,
+          title: widget.title,
+          onCompleted: DeckoApp.progressOf(context).recordPracticeOutcome,
+        );
       },
     );
   }

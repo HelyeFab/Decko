@@ -404,6 +404,28 @@ re-inventing equivalents.
   and the opt-in review presentation, which reuses `SentenceBuilderView` inside
   the review body and keeps the normal grade buttons.
 
+### Added in MVP_017 (practice-mode platform, DEC-026)
+
+- **`PracticeModeTile`** (`features/practice/widgets/practice_mode_tile.dart`) —
+  the canonical practice-mode row (icon medallion + title + subtitle + play),
+  with an `accent` variant for Hub heroes. UI-side `practiceModeIcon(id)` and
+  `practiceCardAction(id)` map a mode to its icon / in-review action label, so
+  the domain stays framework-light. Used by the Hub, Deck Detail, and Review.
+- **`PracticeHubScreen`** (`features/practice/`) — the registry-driven hub
+  ("Available now" mode tiles → a deck picker; "From your decks" deck rows that
+  launch their mode), replacing the Bunburu-specific hub. Reached from the Home
+  "Practice" section (now labelled generically, `gamepad` icon).
+- **Deck Detail "Practice modes"** — a `_PracticeModesSection` lists
+  `registry.availableForDeck(deck)` as `PracticeModeTile`s; hidden when none.
+- **Review manual actions** — the revealed card renders one button per
+  `registry.manualModesForCard(item)` (Bunburu → "Build this sentence"); the
+  opt-in review presentation is gated by `registry.reviewPresentationModesForCard`.
+- **`PracticeLauncher`** (`features/practice/practice_launcher.dart`) — the one
+  place mapping a `PracticeMode` → its screen (`launchDeck` / `launchCard`); a
+  future game is one new `case`.
+- Practice completion shows a `+N XP` pill (motivational; review schedule
+  unchanged).
+
 ## Accessibility Baseline
 
 All Decko UI work should consider:

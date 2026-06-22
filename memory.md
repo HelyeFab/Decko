@@ -4,7 +4,39 @@
 2026-06-21
 
 ## Current stage
-MVP_016 in review: Bunburu sentence builder — a Decko-native sentence-unscramble
+MVP_017 in review: Practice Mode Registry & Game Hub — Bunburu is now the first
+REGISTERED practice mode. `PracticeModeRegistry` (availableForCard/Deck,
+manual/reviewPresentation modes) + `DeckoPracticeModeRegistry` (Bunburu);
+Deck Detail / Practice Hub / Review discover modes via the registry (no
+hard-coded games); `PracticeLauncher` maps mode→screen. `PracticeOutcome` seam →
+motivational only: ProgressSnapshot.practiceXp + practiceCount (combinedXp counts
+toward LEVEL; review metrics/totalCardsReviewed untouched). Manual practice never
+mutates review state; scheduled review still grades through ReviewScheduler
+(DEC-026). 150 tests, analyze clean. NOT committed yet — awaiting verification.
+
+## Last completed (MVP_017 — practice-mode platform, DEC-026)
+- Domain (`lib/domain/practice/`): PracticeMode (id/title/sub/desc/kind/
+  manualLaunch/reviewPresentation), PracticeModeId (bunburuSentenceBuilder +
+  storageKey), PracticeOutcome (+ toJson/fromJson) — Codex-authored models.
+  Registry iface `lib/domain/repositories/practice_mode_registry.dart`;
+  `lib/data/decko_practice_mode_registry.dart` (availability via
+  SentenceBuilderMapper.looksCapable). In DeckoApp scope (practiceRegistryOf).
+- Progress: ProgressSnapshot.practiceXp/practiceCount + recordingPractice(xp)
+  (review fields untouched); combinedXp drives currentLevel/xpIntoLevel;
+  totalCardsReviewed still review-XP-only. ProgressRepository.recordPracticeOutcome
+  + migration-safe serialization.
+- UI: `features/practice/` — PracticeHubScreen (Available now / From your decks,
+  registry-driven), PracticeLauncher (mode→screen), PracticeModeTile (+ icon/
+  action-label maps). Deck-detail `_PracticeModesSection`; review manual buttons
+  via registry; SentenceBuilderScreen reports PracticeOutcome on completion (5 XP
+  per correct sentence) + shows +XP pill. Old SentenceBuilderHubScreen deleted;
+  Home "Practice" row → PracticeHubScreen (gamepad).
+- Tests: practice_test.dart (7: registry availability, recordingPractice
+  boundary, outcome json, recordPracticeOutcome persist) + 2 widget (manual
+  practice records XP not review state; Home→hub). 150 total.
+- DEFERRED: a 2nd game, richer per-mode outcomes, coming-soon placeholders (omitted).
+
+## Last completed (MVP_016 — Bunburu sentence builder — a Decko-native sentence-unscramble
 game from imported sentence fields. Japanese tokenised into WORD-level tiles
 (with furigana) by the Bunburu kuromoji micro-service (POST /furigana; app key
 in gitignored .env via --dart-define-from-file), cached per deck on disk. FOUR

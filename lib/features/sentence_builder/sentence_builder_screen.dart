@@ -5,6 +5,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../app/decko_app.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_app_bar.dart';
+import '../../domain/practice/practice_mode.dart';
+import '../../domain/practice/practice_outcome.dart';
 import '../../domain/sentence_builder/sentence_builder_result.dart';
 import '../../domain/sentence_builder/sentence_builder_round.dart';
 import '../../domain/sentence_builder/sentence_builder_session.dart';
@@ -20,10 +22,18 @@ class SentenceBuilderScreen extends StatefulWidget {
     super.key,
     required this.rounds,
     this.title = 'Sentence builder',
+    this.onCompleted,
   });
 
   final List<SentenceBuilderRound> rounds;
   final String title;
+
+  /// Reports the motivational outcome when the session finishes (MVP_017).
+  /// Null in contexts that shouldn't record (e.g. previews/tests).
+  final void Function(PracticeOutcome outcome)? onCompleted;
+
+  /// Motivational XP per correctly-built sentence.
+  static const int xpPerCorrect = 5;
 
   @override
   State<SentenceBuilderScreen> createState() => _SentenceBuilderScreenState();
@@ -33,6 +43,8 @@ class _SentenceBuilderScreenState extends State<SentenceBuilderScreen> {
   late final SentenceBuilderSession _session =
       SentenceBuilderSession(widget.rounds);
   final AudioPlayer _player = AudioPlayer();
+  late final DateTime _startedAt = DateTime.now();
+  PracticeOutcome? _outcome;
   bool? _resolvedCorrect;
   int _attempts = 0;
 
@@ -68,6 +80,20 @@ class _SentenceBuilderScreenState extends State<SentenceBuilderScreen> {
       correct: _resolvedCorrect ?? false,
       attempts: _attempts,
     ));
+    if (_session.isComplete && _outcome == null) {
+      final int correct = _session.correctCount;
+      _outcome = PracticeOutcome(
+        modeId: PracticeModeId.bunburuSentenceBuilder,
+        deckId: widget.rounds.isNotEmpty ? widget.rounds.first.deckId : null,
+        itemId: widget.rounds.length == 1 ? widget.rounds.first.itemId : null,
+        startedAt: _startedAt,
+        completedAt: DateTime.now(),
+        correctCount: correct,
+        incorrectCount: _session.total - correct,
+        xpAwarded: correct * SentenceBuilderScreen.xpPerCorrect,
+      );
+      widget.onCompleted?.call(_outcome!);
+    }
     setState(() {
       _resolvedCorrect = null;
       _attempts = 0;
@@ -83,6 +109,7 @@ class _SentenceBuilderScreenState extends State<SentenceBuilderScreen> {
             ? _Completion(
                 correct: _session.correctCount,
                 total: _session.total,
+                xpAwarded: _outcome?.xpAwarded ?? 0,
                 onDone: () => Navigator.of(context).pop(),
               )
             : _playing(),
@@ -137,11 +164,13 @@ class _Completion extends StatelessWidget {
   const _Completion({
     required this.correct,
     required this.total,
+    required this.xpAwarded,
     required this.onDone,
   });
 
   final int correct;
   final int total;
+  final int xpAwarded;
   final VoidCallback onDone;
 
   @override
@@ -171,7 +200,36 @@ class _Completion extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: DeckoSpacing.xs),
+            if (xpAwarded > 0) ...<Widget>[
+              const SizedBox(height: DeckoSpacing.md),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DeckoSpacing.md,
+                    vertical: DeckoSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(DeckoRadii.pill),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      FaIcon(FontAwesomeIcons.bolt,
+                          size: 13,
+                          color: theme.colorScheme.onPrimaryContainer),
+                      const SizedBox(width: DeckoSpacing.sm),
+                      Text('+$xpAwarded XP',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w700,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: DeckoSpacing.md),
             Text(
               'Practice only — your review schedule is unchanged.',
               textAlign: TextAlign.center,

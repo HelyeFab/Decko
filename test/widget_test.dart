@@ -45,6 +45,7 @@ import 'package:decko/domain/sentence_builder/sentence_builder_token.dart';
 import 'package:decko/domain/sentence_builder/cube_token.dart';
 import 'package:decko/domain/sentence_builder/sentence_tokenizer.dart';
 import 'package:decko/domain/repositories/sentence_token_cache.dart';
+import 'package:decko/domain/practice/practice_outcome.dart';
 import 'package:decko/features/deck_library/widgets/study_ribbon.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
@@ -130,6 +131,9 @@ class _InMemoryProgress implements ProgressRepository {
   @override
   Future<void> recordSessionResult(ReviewSessionResult result) async =>
       snapshot = snapshot.recordingSession(result, now);
+  @override
+  Future<void> recordPracticeOutcome(PracticeOutcome outcome) async =>
+      snapshot = snapshot.recordingPractice(outcome.xpAwarded);
   @override
   Future<void> resetProgress() async => snapshot = ProgressSnapshot.empty;
 }
@@ -610,19 +614,56 @@ void main() {
     expect(progress.snapshot.totalXp, 10);
   });
 
-  testWidgets('Home surfaces a sentence-builder practice hub (MVP_016)',
+  testWidgets(
+      'Manual practice records motivation XP but never review state (MVP_017)',
+      (WidgetTester tester) async {
+    final _InMemoryProgress progress =
+        _InMemoryProgress(DateTime(2026, 6, 22, 10));
+    await _pumpApp(tester,
+        deckRepository: _FixedDeckRepository(<Deck>[sentenceDeck()]),
+        progressRepository: progress);
+
+    await tester.tap(find.text('Sentence Deck').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start review'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show answer'));
+    await tester.pumpAndSettle();
+
+    // Launch manual practice from the card and play it to completion.
+    await tester.tap(find.text('Build this sentence'));
+    await tester.pumpAndSettle();
+    for (final String word in <String>['one', 'two', 'three']) {
+      await tester.tap(find.text(word));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Finish'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Practice complete'), findsOneWidget);
+    // Motivation recorded; review state untouched (the boundary).
+    expect(progress.snapshot.practiceCount, 1);
+    expect(progress.snapshot.practiceXp, 5); // 1 sentence correct × 5
+    expect(progress.snapshot.cardsReviewedToday, 0);
+    expect(progress.snapshot.totalXp, 0);
+  });
+
+  testWidgets('Home opens the registry-driven practice hub (MVP_017)',
       (WidgetTester tester) async {
     await _pumpApp(tester,
         deckRepository: _FixedDeckRepository(<Deck>[sentenceDeck()]));
 
-    // The Home practice entry appears because a deck has sentences.
-    expect(find.text('Sentence builder'), findsOneWidget);
-    await tester.tap(find.text('Sentence builder'));
+    // The Home practice entry appears because a deck supports a mode.
+    expect(find.text('Practice modes'), findsOneWidget);
+    await tester.tap(find.text('Practice modes'));
     await tester.pumpAndSettle();
 
-    // The hub lists the capable deck and explains it's practice-only.
-    expect(find.textContaining('practice only'), findsOneWidget);
-    expect(find.text('Sentence Deck'), findsWidgets);
+    // The hub shows the registered mode (Available now) + the supporting deck.
+    expect(find.text('Available now'), findsOneWidget);
+    expect(find.text('Sentence builder'), findsWidgets); // the registered mode
+    expect(find.text('Sentence Deck'), findsWidgets); // From your decks
   });
 
   testWidgets('Selected app theme persists across a restart',

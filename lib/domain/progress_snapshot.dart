@@ -14,6 +14,8 @@ class ProgressSnapshot {
     this.currentStreakDays = 0,
     this.longestStreakDays = 0,
     this.cardsReviewedToday = 0,
+    this.practiceXp = 0,
+    this.practiceCount = 0,
     this.lastReviewedAt,
     this.lastSessionResult,
   });
@@ -24,6 +26,7 @@ class ProgressSnapshot {
   /// XP awarded per reviewed card.
   static const int xpPerCard = 10;
 
+  /// Review XP (drives the review-derived "cards reviewed" metric).
   final int totalXp;
   final int currentStreakDays;
 
@@ -31,11 +34,34 @@ class ProgressSnapshot {
   /// earned even after the current streak breaks (MVP_015).
   final int longestStreakDays;
   final int cardsReviewedToday;
+
+  /// Motivational XP earned from practice modes (MVP_017). Counts toward level
+  /// but is kept separate from review XP so review metrics stay accurate.
+  final int practiceXp;
+
+  /// How many practice sessions have been completed (MVP_017).
+  final int practiceCount;
   final DateTime? lastReviewedAt;
   final ReviewSessionResult? lastSessionResult;
 
-  /// Total cards reviewed across all time (derived from XP).
+  /// All XP that counts toward level — review + practice.
+  int get combinedXp => totalXp + practiceXp;
+
+  /// Total cards reviewed across all time (derived from review XP only).
   int get totalCardsReviewed => totalXp ~/ xpPerCard;
+
+  /// Returns the snapshot after a practice session awarded [xp] (MVP_017).
+  /// Touches only motivational fields — never review state, streak, or counts.
+  ProgressSnapshot recordingPractice(int xp) => ProgressSnapshot(
+        totalXp: totalXp,
+        currentStreakDays: currentStreakDays,
+        longestStreakDays: longestStreakDays,
+        cardsReviewedToday: cardsReviewedToday,
+        practiceXp: practiceXp + (xp < 0 ? 0 : xp),
+        practiceCount: practiceCount + 1,
+        lastReviewedAt: lastReviewedAt,
+        lastSessionResult: lastSessionResult,
+      );
 
   /// Whether a review has already been recorded today.
   bool get reviewedToday => cardsReviewedToday > 0;
@@ -47,11 +73,11 @@ class ProgressSnapshot {
   /// Whether today's motivational [goal] has been met.
   bool dailyGoalMet(int goal) => goal > 0 && cardsReviewedToday >= goal;
 
-  /// Levels are 100 XP each, starting at level 1.
-  int get currentLevel => totalXp ~/ 100 + 1;
+  /// Levels are 100 XP each, starting at level 1 (review + practice XP).
+  int get currentLevel => combinedXp ~/ 100 + 1;
 
   /// XP accumulated within the current level, in [0, 100).
-  int get xpIntoLevel => totalXp % 100;
+  int get xpIntoLevel => combinedXp % 100;
 
   /// True when no session has been recorded yet.
   bool get hasProgress => lastReviewedAt != null;
