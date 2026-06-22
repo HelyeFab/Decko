@@ -18,23 +18,28 @@ word tiles + furigana + sentence audio button + random deck-practice selection.
 Committed. (Audio [sound:…] is also read from item.example, not just note fields.)
 
 ## Last completed (MVP_016 — Bunburu sentence builder, DEC-025)
-- Domain (`lib/domain/sentence_builder/`): Token/Round/Session/Result + Source
-  enum, script-boundary tokeniser, pure SentenceBuilderMapper (Anki source
-  Sentence* fields → fallback example; capable when ≥2 tokens). 14 domain tests
-  (Codex-authored via `codex exec`).
-- Bridge `SentenceBuilderRounds` (forItem/forDeck/deckLikelyHasSentences); UI
-  `SentenceBuilderView` (cube tokens, build/check/reveal) + `SentenceBuilderScreen`
-  (session + motivational completion).
+- Tokenization via the Bunburu kuromoji micro-service (POST /furigana; key in
+  gitignored .env via --dart-define-from-file) → word-level CubeTokens +
+  furigana. Pipeline: SentenceBuilderMapper (SYNC sentence picker; [sound:] →
+  audioRef incl. from item.example) → SentenceRoundService (ASYNC: per-deck
+  FileSentenceTokenCache + batch tokenize, skip <2 tiles; random deck-practice
+  selection). Tokenizer client + CubeToken/FuriganaSegment ported by Codex.
+  (Earlier in-house tokenisers — script-boundary, BudouX — rejected & removed.)
 - StudyOptions gained global `sentenceBuilderReview` (form toggle, in
-  EffectiveStudyOptions). Review session presents capable cards as the builder
-  when on, grading via the existing _rate → ReviewScheduler seam.
-- Manual button on the revealed review card; deck-detail "Sentence builder" tile.
+  EffectiveStudyOptions). Review session async-loads the builder round
+  (FutureBuilder + fallback to normal card), grading via the existing _rate →
+  ReviewScheduler seam.
+- UI: SentenceBuilderView (cube tiles + furigana ruby + audio button),
+  SentenceBuilderScreen, SentenceBuilderLoader (spinner/error/empty),
+  SentenceBuilderHubScreen. Four surfaces: Home "Practice" hub, manual per-card,
+  deck-detail tile, opt-in review presentation.
 - LAYOUT GOTCHA: SentenceBuilderView action buttons must avoid Row+Expanded
-  (infinite-width under loose constraints in the review body) — stacked
-  full-width buttons; review builder branch uses a ListView.
-- Tests: 14 domain + 6 rounds/options + 3 widget. 148 total.
-- DEFERRED: builder audio, hearts/timed/daily modes, routing policy, per-deck
-  flag, morphological tokenisation.
+  (infinite-width in the review body) — stacked full-width; review builder area
+  uses a ListView.
+- Tests: 13 domain/service (fake SplitTokenizer + in-memory cache) + 4 widget.
+  142 total. analyze clean; verified live on iOS sim.
+- DEFERRED: builder audio autoplay, hearts/timed/daily modes, routing policy,
+  per-deck flag, Decko-hosted tokenizer service, deck bulk pre-tokenize.
 
 ## Last completed (MVP_015 — progress polish & light gamification, DEC-024)
 - Data: ProgressSnapshot gained monotonic `longestStreakDays` (migration-safe
@@ -48,21 +53,6 @@ Committed. (Audio [sound:…] is also read from item.example, not just note fiel
 - Settings hub: `_DailyGoalControl` stepper (5–100, step 5).
 - Tests: progress_gamification_test.dart (8) + 2 widget (progress celebrate,
   summary chips). 125 total.
-
-## Last completed (MVP_014 — import diagnostics UX, DEC-023)
-- ImportDiagnostics upgraded: ImportDiagnostic {category, severity, message,
-  technicalDetail}, DiagnosticCategory/DiagnosticSeverity, derived ImportHealth
-  (healthy/usableWithWarnings/blocked). Serialized; persisted on DeckImportInfo
-  (via ImportedDeckStorage) so the report is revisitable.
-- ImportHealthSummary (features/import/widgets): status header + plain-language
-  metadata chips + grouped findings + collapsed "Technical details". Reused in
-  the import preview, the post-import RESULT phase (warnings only; clean imports
-  keep snackbar→Home), and ImportReportScreen (route /deck/:id/report, reached
-  from an "Import report" tile on deck detail).
-- Blocking/unsupported remain typed exceptions → import error state.
-- Tests: health summary healthy/warning/blocking + technical expansion +
-  deck-detail→report + reworked preview test.
-- NOTE: decks imported before MVP_014 have no stored diagnostics → "no report".
 
 ## Last completed (MVP_014 — import diagnostics UX, DEC-023)
 - ImportDiagnostics upgraded: ImportDiagnostic {category, severity, message,
@@ -341,12 +331,4 @@ morphological tokenisation.
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).
 - Per-grade write cost on very large decks mitigated by flush-on-exit; revisit with a DB if it bites.
-
-## MVP_016 follow-ups (post-brief, in this session)
-- Fixed: [sound:...] / furigana markers leaked into tokens (cleanSentence strips them).
-- BudouX (budoux pkg) replaces the script-boundary tokeniser for Japanese →
-  clean phrase tiles (pure-Dart, const, bundled model; no native/pod change).
-- Added a Home 'Practice' section → SentenceBuilderHubScreen (lists capable
-  decks). Chose this over a 5th bottom-nav tab.
-- 150 tests (incl. [sound:] stripping + hub). DEFERRED: builder audio,
-  hearts/timed/daily, routing policy, word-level (kuromoji) tokenisation.
+- Sentence builder needs the Bunburu tokenizer service: teammates need their own gitignored `.env` (BUNBURU_API_URL + BUNBURU_APP_KEY) and must run `--dart-define-from-file=.env`; offline → clean "tokenizer unavailable" state.
