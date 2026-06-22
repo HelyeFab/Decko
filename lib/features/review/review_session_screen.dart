@@ -200,7 +200,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
       context,
       mode,
       item,
-      deckId: widget.deck.id,
+      deck: widget.deck,
       note: _noteForItem(item),
     );
   }

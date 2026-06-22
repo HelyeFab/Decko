@@ -2,6 +2,9 @@
 enum PracticeModeId {
   /// Bunburu sentence builder practice.
   bunburuSentenceBuilder,
+
+  /// Listening challenge (audio → meaning) practice.
+  listeningChallenge,
 }
 
 /// Storage helpers for [PracticeModeId].
@@ -9,12 +12,14 @@ extension PracticeModeIdName on PracticeModeId {
   /// Stable storage key for this practice mode.
   String get storageKey => switch (this) {
     PracticeModeId.bunburuSentenceBuilder => 'bunburu_sentence_builder',
+    PracticeModeId.listeningChallenge => 'listening_challenge',
   };
 }
 
 /// Parses a practice mode id from its stable storage key.
 PracticeModeId? practiceModeIdFromKey(String key) => switch (key) {
   'bunburu_sentence_builder' => PracticeModeId.bunburuSentenceBuilder,
+  'listening_challenge' => PracticeModeId.listeningChallenge,
   _ => null,
 };
 

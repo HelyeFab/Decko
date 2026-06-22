@@ -209,6 +209,14 @@ See: `docs/import-progress.md`
   `PracticeOutcome` seam records motivational practice XP + a count
   (`combinedXp` counts toward level; review metrics untouched). Future games
   (Listening / Typing / Matching / Kanji) plug in without editing those screens.
+- ~~Listening Challenge mode~~ DONE (MVP_018, DEC-027): the second registered
+  practice mode — `listening_challenge`. Audio (word from `front`, else sentence
+  from `example`) → pick the meaning from four generated choices.
+  `ListeningChallengeBuilder` (pure, local, deterministic) handles availability
+  + distinct-choice generation; appears via the registry in Deck Detail / Hub /
+  review manual actions (one new `PracticeLauncher` case, no other screen
+  touched). Manual + deck practice only (motivational XP); review presentation
+  deferred. Proved the MVP_017 platform.
 
 ## I5 — FSRS Production Scheduler
 

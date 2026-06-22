@@ -643,3 +643,25 @@ MVP_016 proved Decko can host a richer game (Bunburu) without breaking review. B
 - Practice feels rewarding (XP, count, celebration) without distorting the spaced-repetition schedule or review stats.
 - Tests assert card/deck availability and the manual-practice-vs-review boundary (practice records motivation XP; `cardsReviewedToday`/review state stay zero).
 - Deferred: a real second game; per-mode richer outcomes/analytics; "coming soon" placeholders (intentionally omitted to avoid fake functionality).
+
+## DEC-027: Listening Challenge is a registered practice mode powered by imported audio
+
+Date: 2026-06-22
+Status: Accepted
+
+### Context
+
+MVP_017 built a practice-mode platform (registry + launcher + outcome seam, DEC-026). MVP_018 adds the second real mode to prove the platform: a Listening Challenge that uses imported audio. It must slot in without editing Deck Detail / Review / the Hub.
+
+### Decision
+
+- **Listening Challenge (`listening_challenge`) is registered like any mode.** It appears wherever the registry is queried — Deck Detail "Practice modes", the Practice Hub, and a review card's manual actions — because those surfaces are already registry-driven. `PracticeLauncher` gains one `case`; no other screen changed.
+- **Availability is audio-driven and pure.** A `ListeningChallengeBuilder` extracts a playable `[sound:…]` (word audio from the card `front`, else sentence audio from `example`) plus an answer (the card's `back` meaning, or `Sentence-English`). A card is capable if it has audio + an answer; a deck is capable with ≥4 such cards (enough for distractors). Round construction generates exactly four **distinct** choices (one correct + three distractors drawn from the deck, no duplicates), with a graceful "not enough audio" state otherwise. It's all local and deterministic given a `Random` — no tokenizer service.
+- **Manual + deck practice only this MVP.** `reviewPresentation = false` (a scheduler-routed listening review is deferred). Manual/deck outcomes flow through the existing `PracticeOutcome` → motivational XP seam (5 XP per correct), and **never** mutate FSRS, review state, due dates, daily counters, or sibling burying. If a scheduled listening review is added later, it must grade through `ReviewScheduler` like every mode.
+- Audio playback reuses the existing `MediaStore` + `audioplayers`; missing/unresolvable audio degrades to a friendly "audio unavailable — pick the meaning" state rather than blocking the round.
+
+### Consequences
+
+- The platform's claim holds: a second game = register a `PracticeMode` + a builder + one `PracticeLauncher` case + an availability rule. Deck Detail / Review / Hub were untouched.
+- Tests cover availability (card/deck, with/without audio), choice generation (one correct, no duplicates, fallback), the manual-outcome boundary (XP recorded; review state stays zero), and the play→choose→feedback→complete flow.
+- Deferred: scheduler-routed listening review; richer prompt targets (sentence-meaning vs matching-sentence); typing/transcription (a later MVP).

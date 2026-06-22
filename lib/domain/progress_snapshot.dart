@@ -79,8 +79,8 @@ class ProgressSnapshot {
   /// XP accumulated within the current level, in [0, 100).
   int get xpIntoLevel => combinedXp % 100;
 
-  /// True when no session has been recorded yet.
-  bool get hasProgress => lastReviewedAt != null;
+  /// True once there's any recorded activity — a review or a practice session.
+  bool get hasProgress => lastReviewedAt != null || practiceCount > 0;
 
   /// Returns the snapshot that results from completing [result] at [now].
   ///

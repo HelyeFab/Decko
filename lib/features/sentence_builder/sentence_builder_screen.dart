@@ -183,8 +183,10 @@ class _Completion extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            FaIcon(FontAwesomeIcons.solidStar,
-                size: 52, color: theme.colorScheme.primary),
+            Center(
+              child: FaIcon(FontAwesomeIcons.solidStar,
+                  size: 52, color: theme.colorScheme.primary),
+            ),
             const SizedBox(height: DeckoSpacing.lg),
             Text(
               'Practice complete',

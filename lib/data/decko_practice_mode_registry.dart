@@ -1,6 +1,7 @@
 import '../domain/deck.dart';
 import '../domain/import/source/imported_anki_source.dart';
 import '../domain/learning_item.dart';
+import '../domain/listening/listening_challenge_builder.dart';
 import '../domain/practice/practice_mode.dart';
 import '../domain/repositories/practice_mode_registry.dart';
 import '../domain/sentence_builder/sentence_builder_mapper.dart';
@@ -11,6 +12,7 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
   const DeckoPracticeModeRegistry();
 
   static const SentenceBuilderMapper _mapper = SentenceBuilderMapper();
+  static const ListeningChallengeBuilder _listening = ListeningChallengeBuilder();
 
   static const PracticeMode _bunburu = PracticeMode(
     id: PracticeModeId.bunburuSentenceBuilder,
@@ -23,14 +25,28 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
     reviewPresentation: true,
   );
 
+  static const PracticeMode _listeningMode = PracticeMode(
+    id: PracticeModeId.listeningChallenge,
+    title: 'Listening',
+    subtitle: 'Match the audio to its meaning',
+    description: 'Hear a word and pick the right meaning from four choices — '
+        'builds sound-to-meaning recognition.',
+    kind: PracticeModeKind.listen,
+    manualLaunch: true,
+    // Review presentation deferred (MVP_018): manual + deck practice only.
+    reviewPresentation: false,
+  );
+
   @override
-  List<PracticeMode> get allModes => const <PracticeMode>[_bunburu];
+  List<PracticeMode> get allModes =>
+      const <PracticeMode>[_bunburu, _listeningMode];
 
   @override
   List<PracticeMode> availableForCard(LearningItem item,
       {ImportedAnkiNote? note}) {
     return <PracticeMode>[
       if (_mapper.looksCapable(item, note: note)) _bunburu,
+      if (_listening.isCapable(item, note: note)) _listeningMode,
     ];
   }
 
@@ -38,6 +54,7 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
   List<PracticeMode> availableForDeck(Deck deck, {ImportedAnkiSource? source}) {
     return <PracticeMode>[
       if (_deckHasSentences(deck, source)) _bunburu,
+      if (_listening.deckIsCapable(deck, source: source)) _listeningMode,
     ];
   }
 

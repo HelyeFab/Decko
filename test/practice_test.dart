@@ -103,7 +103,8 @@ void main() {
       expect(s.practiceCount, 1);
       expect(s.totalXp, 0); // no review happened
       expect(s.cardsReviewedToday, 0);
-      expect(s.hasProgress, isFalse); // practice alone isn't "reviewed"
+      expect(s.lastReviewedAt, isNull); // practice didn't record a review
+      expect(s.combinedXp, 25); // but practice XP counts toward level
     });
   });
 }

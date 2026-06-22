@@ -4,7 +4,39 @@
 2026-06-21
 
 ## Current stage
-MVP_017 in review: Practice Mode Registry & Game Hub — Bunburu is now the first
+MVP_018 in review: Listening Challenge — the SECOND registered practice mode
+(`listening_challenge`), proving the MVP_017 platform. Audio (word from front,
+else sentence from example) → pick the meaning from 4 generated choices.
+`ListeningChallengeBuilder` (pure/local/deterministic) does availability +
+distinct-choice gen; surfaces via the registry in Deck Detail / Hub / review
+manual actions (ONE new PracticeLauncher case, no other screen touched). Manual +
+deck practice only (motivational XP; reviewPresentation=false, deferred). FSRS/
+review untouched (DEC-027). 158 tests, analyze clean. NOT committed — awaiting
+verification.
+
+## Last completed (MVP_018 — Listening Challenge, DEC-027)
+- Domain (`lib/domain/listening/`): ListeningChallengeRound/Session/Result +
+  PromptKind/Source enums; pure `ListeningChallengeBuilder` (cardFor: word audio
+  from item.front via soundRefIn → cleaned back; else sentence audio from
+  item.example → Sentence-English/back; isCapable/deckIsCapable(>=4);
+  roundForItem/roundsForDeck with 4 distinct choices — 1 correct + 3 distractors,
+  random selection, graceful when <4 audio cards). Reuses sentence_text
+  soundRefIn/cleanSentence.
+- PracticeModeId.listeningChallenge ('listening_challenge'); registered in
+  DeckoPracticeModeRegistry (manualLaunch true, reviewPresentation FALSE).
+- PracticeLauncher: listening case (SYNC, no async service — local audio +
+  existing text). launchCard now takes `Deck deck` (needs the deck for
+  distractors) — review caller passes widget.deck.
+- `features/listening/ListeningChallengeScreen`: play/replay button, 4 choice
+  cards, feedback, next/finish, completion + XP pill, audio-unavailable state
+  (MediaStore + audioplayers, autoplay per round). Reports PracticeOutcome
+  (modeId listeningChallenge, 5 XP/correct). practiceModeIcon/practiceCardAction
+  gained the listening case (headphones / "Listen & choose").
+- Tests: listening_test.dart (7: availability, choice gen, registry) + 1 widget
+  (full flow + practice-XP-not-review-state boundary). 158 total.
+- DEFERRED: scheduler-routed listening review; richer prompt targets; typing.
+
+## Last completed (MVP_017 — practice-mode platform — Bunburu is now the first
 REGISTERED practice mode. `PracticeModeRegistry` (availableForCard/Deck,
 manual/reviewPresentation modes) + `DeckoPracticeModeRegistry` (Bunburu);
 Deck Detail / Practice Hub / Review discover modes via the registry (no

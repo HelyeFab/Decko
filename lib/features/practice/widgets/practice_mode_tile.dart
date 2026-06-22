@@ -8,11 +8,13 @@ import '../../../domain/practice/practice_mode.dart';
 /// framework-light).
 FaIconData practiceModeIcon(PracticeModeId id) => switch (id) {
       PracticeModeId.bunburuSentenceBuilder => FontAwesomeIcons.cubesStacked,
+      PracticeModeId.listeningChallenge => FontAwesomeIcons.headphones,
     };
 
 /// The action label for launching a mode from a single card (e.g. in review).
 String practiceCardAction(PracticeModeId id) => switch (id) {
       PracticeModeId.bunburuSentenceBuilder => 'Build this sentence',
+      PracticeModeId.listeningChallenge => 'Listen & choose',
     };
 
 /// A tappable practice-mode row (MVP_017). Used by the Practice Hub and Deck

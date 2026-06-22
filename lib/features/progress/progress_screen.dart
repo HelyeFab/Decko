@@ -72,7 +72,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return <Widget>[
       _DailyGoalCard(reviewed: s.cardsReviewedToday, goal: goal),
       const SizedBox(height: DeckoSpacing.lg),
-      _LevelCard(xp: s.totalXp, level: s.currentLevel, xpIntoLevel: s.xpIntoLevel),
+      _LevelCard(
+          xp: s.combinedXp, level: s.currentLevel, xpIntoLevel: s.xpIntoLevel),
       const SizedBox(height: DeckoSpacing.lg),
       Row(
         children: <Widget>[

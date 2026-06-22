@@ -426,6 +426,20 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Added in MVP_018 (Listening Challenge, DEC-027)
+
+- **`ListeningChallengeScreen`** (`features/listening/`) — a big circular
+  play/replay button (`volumeHigh`; `volumeXmark` when audio is unavailable),
+  four `_ChoiceCard`s, immediate correct/incorrect feedback (correct =
+  `primaryContainer`+check, wrong-selected = `errorContainer`+x, others muted),
+  the revealed prompt word/sentence, next/finish, and a headphones completion
+  panel with a `+N XP` pill. Reuses `MediaStore` + `audioplayers` (autoplay per
+  round). No new media layer.
+- Registered via the platform — `headphones` icon + "Listen & choose" card
+  action added to the `practiceModeIcon` / `practiceCardAction` maps; it surfaces
+  in the Practice Hub, Deck Detail "Practice modes", and review manual actions
+  with no screen-specific code.
+
 ## Accessibility Baseline
 
 All Decko UI work should consider:

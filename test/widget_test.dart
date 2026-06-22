@@ -650,6 +650,56 @@ void main() {
     expect(progress.snapshot.totalXp, 0);
   });
 
+  Deck audioDeck() => Deck(
+        id: 'au',
+        name: 'Audio Deck',
+        description: 'd',
+        importInfo: DeckImportInfo(
+          progressMode: ImportProgressMode.fresh,
+          importedAt: DateTime(2026),
+        ),
+        items: <LearningItem>[
+          for (int i = 0; i < 4; i++)
+            LearningItem(
+                id: 'a$i', front: 'word$i [sound:a$i.mp3]', back: 'meaning $i'),
+        ],
+      );
+
+  testWidgets(
+      'Listening challenge plays through and records practice XP only (MVP_018)',
+      (WidgetTester tester) async {
+    final _InMemoryProgress progress =
+        _InMemoryProgress(DateTime(2026, 6, 22, 10));
+    await _pumpApp(tester,
+        deckRepository: _FixedDeckRepository(<Deck>[audioDeck()]),
+        progressRepository: progress);
+
+    await tester.tap(find.text('Audio Deck').last);
+    await tester.pumpAndSettle();
+    // Deck detail surfaces the registered Listening mode (audio-rich deck).
+    await tester.tap(find.text('Listening'));
+    await tester.pumpAndSettle();
+
+    // Play / choose / next through every round (audio is unavailable in test —
+    // the challenge still works on the four meaning choices).
+    expect(find.textContaining('pick the meaning'), findsOneWidget);
+    int guard = 0;
+    while (find.text('Listening complete').evaluate().isEmpty && guard < 10) {
+      guard++;
+      await tester.tap(find.text('meaning 0').first);
+      await tester.pumpAndSettle();
+      final bool last = find.text('Finish').evaluate().isNotEmpty;
+      await tester.tap(find.text(last ? 'Finish' : 'Next'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Listening complete'), findsOneWidget);
+    // Motivation recorded; review state untouched (the boundary).
+    expect(progress.snapshot.practiceCount, 1);
+    expect(progress.snapshot.cardsReviewedToday, 0);
+    expect(progress.snapshot.totalXp, 0);
+  });
+
   testWidgets('Home opens the registry-driven practice hub (MVP_017)',
       (WidgetTester tester) async {
     await _pumpApp(tester,
