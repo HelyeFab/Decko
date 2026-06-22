@@ -377,6 +377,33 @@ re-inventing equivalents.
   `_DailyGoalControl`) — a −/value/+ row in the Settings hub (5–100, step 5),
   persisted to `SettingsRepository`.
 
+### Added in MVP_016 (Bunburu sentence builder, DEC-025)
+
+- **`SentenceBuilderView`** (`features/sentence_builder/widgets/`) — the
+  interactive surface: a build row (slots) above a shuffled bank of soft "cube"
+  token chips (`Material`+`InkWell`, rounded, subtle shadow; filled =
+  `primaryContainer`). Check / Show-answer actions, a gentle shake on a wrong
+  check, and a coloured reveal block (correct = `primaryContainer`, revealed =
+  `tertiaryContainer`) showing the full sentence + translation + optional audio.
+  Presentation-only; the host owns the post-resolve action via `onResolved`.
+  Note: avoid `Row`+`Expanded` for its action buttons — stacked full-width
+  buttons keep it robust under loose/unbounded width (it renders inside both a
+  `ListView` and the review body).
+- **`SentenceBuilderScreen`** (`features/sentence_builder/`) — drives a session
+  (single manual round or deck practice) and ends on a calm MVP_015-style
+  "Practice complete" panel ("your review schedule is unchanged"). Records
+  nothing to review/progress.
+- **`SentenceBuilderHubScreen`** (`features/sentence_builder/`) — a practice hub
+  listing sentence-capable decks (deck tiles with `cubesStacked` + play), reached
+  from a Home "Practice" section. Tapping a deck loads its source, builds rounds,
+  and opens `SentenceBuilderScreen`. Warm "No sentences yet" empty state.
+- **Entry points** — a Home "Practice" section with a `primaryContainer`
+  **Sentence builder** row → the hub (shown when any deck likely has sentences);
+  a "Build this sentence" `TextButton` in the review card's revealed area
+  (manual); a `cubesStacked` "Sentence builder" deck-detail tile (deck practice);
+  and the opt-in review presentation, which reuses `SentenceBuilderView` inside
+  the review body and keeps the normal grade buttons.
+
 ## Accessibility Baseline
 
 All Decko UI work should consider:

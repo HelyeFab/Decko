@@ -191,10 +191,17 @@ See: `docs/import-progress.md`
 - Matching game
 - Cloze deletion
 - Listening mode
-- Bunburu sentence builder mode: adapt the existing `HelyeFab/bunburu` cube-ordering
-  sentence game into Decko after Anki-parity scheduling is solid. It should be
-  powered by imported sentence fields and integrate with Decko progress and
-  achievements while keeping normal review scheduling separate.
+- ~~Bunburu sentence builder mode~~ STARTED (MVP_016, DEC-025): a Decko-native
+  sentence builder powered by imported sentence fields. Japanese is tokenised
+  into proper word-level tiles (with furigana) by the **Bunburu kuromoji
+  micro-service** (`POST /furigana`; app key via gitignored `.env`), cached per
+  deck on disk. Four entry surfaces — a Home "Practice" hub, a manual per-card
+  "Build this sentence", a deck-detail practice tile, and an opt-in
+  scheduler-routed review presentation (`sentenceBuilderReview`) that grades
+  through the normal review-answer seam. Manual/deck practice is
+  motivational-only and never touches FSRS/review state. Deferred: builder
+  audio, hearts/timed/daily modes, smarter routing policy, Decko-hosted
+  tokenizer service.
 
 ## I5 — FSRS Production Scheduler
 

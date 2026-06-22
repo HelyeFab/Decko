@@ -4,11 +4,37 @@
 2026-06-21
 
 ## Current stage
-MVP_015 complete: progress polish & light gamification foundation — a read-only
-motivation layer over progress (NO scheduler/FSRS/queue/daily-counter/burying
-changes). Daily goal (Settings stepper, default 20), a daily-goal ring + kinder
-streak + achievements grid on the Progress screen, and a review completion
-celebration (XP/goal/streak chips). 125 tests, analyze clean, builds on iOS sim.
+MVP_016 in review: Bunburu sentence builder — a Decko-native sentence-unscramble
+game from imported sentence fields. Japanese tokenised into WORD-level tiles
+(with furigana) by the Bunburu kuromoji micro-service (POST /furigana; app key
+in gitignored .env via --dart-define-from-file), cached per deck on disk. FOUR
+surfaces: Home "Practice" hub, manual per-card ("Build this sentence"),
+deck-detail tile, OPT-IN review presentation (global `sentenceBuilderReview`,
+grades through the normal seam). Practice records nothing to review/progress —
+FSRS untouched (DEC-025). Earlier in-house tokenisers (script-boundary, BudouX)
+rejected; BudouX removed. Tokenizer client/models ported by Codex. 142 tests,
+analyze clean, builds+runs on iOS sim with the .env key. User-verified live:
+word tiles + furigana + sentence audio button + random deck-practice selection.
+Committed. (Audio [sound:…] is also read from item.example, not just note fields.)
+
+## Last completed (MVP_016 — Bunburu sentence builder, DEC-025)
+- Domain (`lib/domain/sentence_builder/`): Token/Round/Session/Result + Source
+  enum, script-boundary tokeniser, pure SentenceBuilderMapper (Anki source
+  Sentence* fields → fallback example; capable when ≥2 tokens). 14 domain tests
+  (Codex-authored via `codex exec`).
+- Bridge `SentenceBuilderRounds` (forItem/forDeck/deckLikelyHasSentences); UI
+  `SentenceBuilderView` (cube tokens, build/check/reveal) + `SentenceBuilderScreen`
+  (session + motivational completion).
+- StudyOptions gained global `sentenceBuilderReview` (form toggle, in
+  EffectiveStudyOptions). Review session presents capable cards as the builder
+  when on, grading via the existing _rate → ReviewScheduler seam.
+- Manual button on the revealed review card; deck-detail "Sentence builder" tile.
+- LAYOUT GOTCHA: SentenceBuilderView action buttons must avoid Row+Expanded
+  (infinite-width under loose constraints in the review body) — stacked
+  full-width buttons; review builder branch uses a ListView.
+- Tests: 14 domain + 6 rounds/options + 3 widget. 148 total.
+- DEFERRED: builder audio, hearts/timed/daily modes, routing policy, per-deck
+  flag, morphological tokenisation.
 
 ## Last completed (MVP_015 — progress polish & light gamification, DEC-024)
 - Data: ProgressSnapshot gained monotonic `longestStreakDays` (migration-safe
@@ -305,13 +331,22 @@ celebration (XP/goal/streak chips). 125 tests, analyze clean, builds on iOS sim.
 - Extracted media on disk per deck (MVP_008); lossless Anki source JSON per deck (MVP_009).
 
 ## Next action
-No brief queued. Next per MVP_015 brief: MVP_016 — Bunburu Sentence Builder Mode
-(route outcomes through the MVP_015 progress/achievement layer; keep FSRS
-scheduling separate; power it from imported Sentence/Sentence-Kana/-English/Audio
-fields). Smaller follow-ups in ROADMAP: full media-protobuf parsing, desired
-retention + max interval (FSRS plumbing), import-aware profile suggestions,
-finer-grained sibling burying, achievement persistence if the derived set grows.
+No brief queued. Per MVP_016 follow-ups: richer Bunburu modes (hearts, timed,
+daily challenge), builder sentence-audio playback, a smarter policy for WHEN to
+route a review to the builder, a game-mode hub, or other practice modes. Smaller
+ROADMAP follow-ups: full media-protobuf parsing, desired retention + max interval
+(FSRS plumbing), import-aware profile suggestions, per-deck sentenceBuilderReview,
+morphological tokenisation.
 
 ## Blockers / open questions
 - Real-.apkg testing needs the user (export with "Support older Anki versions"; simctl can't drive the picker).
 - Per-grade write cost on very large decks mitigated by flush-on-exit; revisit with a DB if it bites.
+
+## MVP_016 follow-ups (post-brief, in this session)
+- Fixed: [sound:...] / furigana markers leaked into tokens (cleanSentence strips them).
+- BudouX (budoux pkg) replaces the script-boundary tokeniser for Japanese →
+  clean phrase tiles (pure-Dart, const, bundled model; no native/pod change).
+- Added a Home 'Practice' section → SentenceBuilderHubScreen (lists capable
+  decks). Chose this over a 5th bottom-nav tab.
+- 150 tests (incl. [sound:] stripping + hub). DEFERRED: builder audio,
+  hearts/timed/daily, routing policy, word-level (kuromoji) tokenisation.

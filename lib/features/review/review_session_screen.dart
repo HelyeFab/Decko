@@ -25,6 +25,12 @@ import '../../domain/review_scheduling_policy.dart';
 import '../../domain/progress_snapshot.dart';
 import '../../domain/review_session.dart';
 import '../../domain/review_session_result.dart';
+import '../../domain/sentence_builder/sentence_builder_mapper.dart';
+import '../../domain/sentence_builder/sentence_builder_round.dart';
+import '../../domain/sentence_builder/sentence_builder_source.dart';
+import '../sentence_builder/sentence_builder_loader.dart';
+import '../sentence_builder/sentence_round_service.dart';
+import '../sentence_builder/widgets/sentence_builder_view.dart';
 import '../../domain/repositories/daily_study_counts_repository.dart';
 import '../../domain/repositories/imported_source_store.dart';
 import '../../domain/repositories/study_options_repository.dart';
@@ -86,6 +92,16 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   ProgressSnapshot? _postSnapshot;
   int _dailyGoal = 20;
 
+  /// Imported source for this deck, used to build sentence rounds (MVP_016).
+  ImportedAnkiSource? _source;
+  static const SentenceBuilderMapper _mapper = SentenceBuilderMapper();
+  late final SentenceRoundService _service;
+  final Map<String, Future<SentenceBuilderRound?>> _builderFutures =
+      <String, Future<SentenceBuilderRound?>>{};
+
+  /// Items whose builder round failed/was empty — fall back to the normal card.
+  final Set<String> _noBuilder = <String>{};
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -107,6 +123,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     // Capture repos/stores before awaiting so we don't use context across gaps.
     final StudyOptionsRepository optionsRepo = DeckoApp.studyOptionsOf(context);
     _countsRepo = DeckoApp.dailyCountsOf(context);
+    _service = DeckoApp.sentenceRoundsOf(context);
     final ImportedSourceStore sourceStore = DeckoApp.sourceOf(context);
     final DateTime now = DateTime.now();
 
@@ -114,7 +131,8 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
         await _repo!.getStatesForDeck(widget.deck.id);
     _options = await optionsRepo.getEffectiveOptions(widget.deck.id);
     _daily = await _countsRepo!.getCounts(widget.deck.id, now);
-    _noteIdByItemId = await _loadNoteMap(sourceStore);
+    _source = await sourceStore.getSourceForDeck(widget.deck.id);
+    _noteIdByItemId = _buildNoteMap(_source);
     _states
       ..clear()
       ..addEntries(stored.map((s) => MapEntry<String, ReviewCardState>(
@@ -130,20 +148,65 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   /// Maps each item to its source Anki note id (for sibling burying): from
   /// imported progress when present, else from the preserved source's card
   /// links. Empty for decks with no Anki source (demo decks).
-  Future<Map<String, String>> _loadNoteMap(ImportedSourceStore store) async {
+  Map<String, String> _buildNoteMap(ImportedAnkiSource? source) {
     final Map<String, String> map = <String, String>{};
     for (final LearningItem item in widget.deck.items) {
       final String? nid = item.importedProgress?.sourceNoteId;
       if (nid != null) map[item.id] = nid;
     }
-    final ImportedAnkiSource? source =
-        await store.getSourceForDeck(widget.deck.id);
     if (source != null) {
       for (final ImportedAnkiCardSource c in source.cardSources) {
         map.putIfAbsent('anki-card-${c.sourceCardId}', () => c.sourceNoteId);
       }
     }
     return map;
+  }
+
+  ImportedAnkiNote? _noteForItem(LearningItem item) {
+    final String? noteId = item.importedProgress?.sourceNoteId;
+    if (noteId == null || _source == null) return null;
+    return _source!.noteById(noteId);
+  }
+
+  /// Whether [item] looks sentence-capable (cheap, synchronous) — used to decide
+  /// the manual action and the builder presentation. The real round is tokenized
+  /// asynchronously by the service. Never touches review/FSRS state (MVP_016).
+  bool _looksCapable(LearningItem item) =>
+      _mapper.looksCapable(item, note: _noteForItem(item));
+
+  /// The (memoized) tokenized review-presentation round for [item].
+  Future<SentenceBuilderRound?> _builderFutureFor(LearningItem item) =>
+      _builderFutures.putIfAbsent(
+        item.id,
+        () => _service.roundForItem(
+          item,
+          deckId: widget.deck.id,
+          source: SentenceBuilderSource.reviewPresentation,
+          note: _noteForItem(item),
+        ),
+      );
+
+  /// Opens manual sentence practice for [item] over the review screen. Pushes a
+  /// loader/screen that records nothing to review/progress — practice can't
+  /// change the schedule (MVP_016, DEC-025).
+  void _openManualBuilder(LearningItem item) {
+    final SentenceRoundService service = _service;
+    final ImportedAnkiNote? note = _noteForItem(item);
+    final String deckId = widget.deck.id;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (BuildContext context) => SentenceBuilderLoader(
+        title: 'Build sentence',
+        load: () async {
+          final SentenceBuilderRound? round = await service.roundForItem(
+            item,
+            deckId: deckId,
+            source: SentenceBuilderSource.manualCard,
+            note: note,
+          );
+          return <SentenceBuilderRound>[?round];
+        },
+      ),
+    ));
   }
 
   ReviewSession _buildSession() {
@@ -371,6 +434,12 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
 
   Widget _reviewingBody(ReviewSession session) {
     final theme = Theme.of(context);
+    final LearningItem item = session.currentItem!;
+    final bool useBuilder = _options.sentenceBuilderReview &&
+        !_noBuilder.contains(item.id) &&
+        _looksCapable(item);
+    final bool canManualBuild = !useBuilder && _looksCapable(item);
+
     return Padding(
       padding: const EdgeInsets.all(DeckoSpacing.pagePadding),
       child: Column(
@@ -382,40 +451,16 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
           ),
           const SizedBox(height: DeckoSpacing.lg),
           Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                child: GestureDetector(
-                  // Tap to flip either way (front ⇄ back).
-                  onTap: _toggleReveal,
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: DeckoApp.furiganaOf(context),
-                    builder: (BuildContext context, bool globalFurigana, _) {
-                      final bool showFront =
-                          _options.imageDisplayMode == ImageDisplayMode.withQuestion ||
-                              _revealed;
-                      return DeckoCard(
-                        item: session.currentItem!,
-                        deckId: widget.deck.id,
-                        style: _cardStyle,
-                        revealed: _revealed,
-                        showFurigana:
-                            _options.resolveShowFurigana(globalFurigana),
-                        showFrontImage: showFront,
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
+            child: useBuilder ? _builderArea(item) : _normalCardArea(item),
           ),
           const SizedBox(height: DeckoSpacing.lg),
-          if (!_revealed)
+          if (!_revealed && !useBuilder)
             FilledButton.icon(
               onPressed: _reveal,
               icon: const FaIcon(FontAwesomeIcons.eye),
               label: const Text('Show answer'),
             )
-          else ...<Widget>[
+          else if (_revealed) ...<Widget>[
             Text(
               'How well did you know it?',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -424,8 +469,79 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
             ),
             const SizedBox(height: DeckoSpacing.md),
             RatingButtonRow(onRate: _rate),
+            if (canManualBuild) ...<Widget>[
+              const SizedBox(height: DeckoSpacing.sm),
+              TextButton.icon(
+                onPressed: () => _openManualBuilder(item),
+                icon: const FaIcon(FontAwesomeIcons.cubesStacked, size: 14),
+                label: const Text('Build this sentence'),
+              ),
+            ],
           ],
         ],
+      ),
+    );
+  }
+
+  /// The sentence-builder presentation of the current card. Tokenizes async;
+  /// while it loads a spinner shows, and if it can't produce a round the card
+  /// falls back to the normal flashcard. Grading below stays on the normal seam.
+  Widget _builderArea(LearningItem item) {
+    return FutureBuilder<SentenceBuilderRound?>(
+      future: _builderFutureFor(item),
+      builder:
+          (BuildContext context, AsyncSnapshot<SentenceBuilderRound?> snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final SentenceBuilderRound? round = snap.data;
+        if (round == null) {
+          // No usable round — fall back to the normal card on the next frame.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _noBuilder.add(item.id)) setState(() {});
+          });
+          return const Center(child: CircularProgressIndicator());
+        }
+        return ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            SentenceBuilderView(
+              key: ValueKey<String>('builder-${item.id}'),
+              round: round,
+              onResolved: (_) {
+                if (!_revealed) setState(() => _revealed = true);
+              },
+              onPlayAudio:
+                  round.audioRef != null ? () => _play(round.audioRef) : null,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _normalCardArea(LearningItem item) {
+    return Center(
+      child: SingleChildScrollView(
+        child: GestureDetector(
+          onTap: _toggleReveal,
+          child: ValueListenableBuilder<bool>(
+            valueListenable: DeckoApp.furiganaOf(context),
+            builder: (BuildContext context, bool globalFurigana, _) {
+              final bool showFront = _options.imageDisplayMode ==
+                      ImageDisplayMode.withQuestion ||
+                  _revealed;
+              return DeckoCard(
+                item: item,
+                deckId: widget.deck.id,
+                style: _cardStyle,
+                revealed: _revealed,
+                showFurigana: _options.resolveShowFurigana(globalFurigana),
+                showFrontImage: showFront,
+              );
+            },
+          ),
+        ),
       ),
     );
   }

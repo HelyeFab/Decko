@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../config.dart';
 import '../core/constants/decko_strings.dart';
+import '../data/bunburu_tokenizer.dart';
 import '../data/file_imported_source_store.dart';
 import '../data/file_media_store.dart';
+import '../data/file_sentence_token_cache.dart';
 import '../data/mock_deck_repository.dart';
 import '../data/shared_prefs_progress_repository.dart';
 import '../data/shared_prefs_review_state_repository.dart';
@@ -16,8 +19,11 @@ import '../domain/repositories/imported_source_store.dart';
 import '../domain/repositories/media_store.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/review_state_repository.dart';
+import '../domain/repositories/sentence_token_cache.dart';
 import '../domain/repositories/settings_repository.dart';
 import '../domain/repositories/study_options_repository.dart';
+import '../domain/sentence_builder/sentence_tokenizer.dart';
+import '../features/sentence_builder/sentence_round_service.dart';
 import 'deck_store.dart';
 import 'decko_router.dart';
 import 'furigana_controller.dart';
@@ -44,6 +50,8 @@ class DeckoApp extends StatefulWidget {
     this.studyOptionsRepository = const SharedPrefsStudyOptionsRepository(),
     this.dailyStudyCountsRepository =
         const SharedPrefsDailyStudyCountsRepository(),
+    this.tokenizer,
+    this.sentenceTokenCache = const FileSentenceTokenCache(),
   });
 
   final DeckRepository deckRepository;
@@ -54,6 +62,11 @@ class DeckoApp extends StatefulWidget {
   final ImportedSourceStore importedSourceStore;
   final StudyOptionsRepository studyOptionsRepository;
   final DailyStudyCountsRepository dailyStudyCountsRepository;
+
+  /// The Japanese tokenizer for the sentence builder. Null uses the live
+  /// Bunburu service (MVP_016); tests inject a fake.
+  final SentenceTokenizer? tokenizer;
+  final SentenceTokenCache sentenceTokenCache;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -88,6 +101,19 @@ class DeckoApp extends StatefulWidget {
   static SettingsRepository settingsOf(BuildContext context) =>
       _scopeOf(context).settingsRepository;
 
+  static SentenceTokenizer tokenizerOf(BuildContext context) =>
+      _scopeOf(context).tokenizer;
+
+  static SentenceTokenCache tokenCacheOf(BuildContext context) =>
+      _scopeOf(context).sentenceTokenCache;
+
+  /// A ready-to-use round service (tokenizer + cache) for the sentence builder.
+  static SentenceRoundService sentenceRoundsOf(BuildContext context) =>
+      SentenceRoundService(
+        tokenizer: tokenizerOf(context),
+        cache: tokenCacheOf(context),
+      );
+
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
         context.dependOnInheritedWidgetOfExactType<_DeckoScope>();
@@ -103,6 +129,7 @@ class _DeckoAppState extends State<DeckoApp> {
   late final ThemeController _themeController;
   late final FuriganaController _furiganaController;
   late final DeckStore _deckStore;
+  late final SentenceTokenizer _tokenizer;
   final GoRouter _router = buildDeckoRouter();
 
   @override
@@ -114,6 +141,11 @@ class _DeckoAppState extends State<DeckoApp> {
     _furiganaController.load();
     _deckStore = DeckStore(demoDecks: widget.deckRepository);
     _deckStore.load();
+    _tokenizer = widget.tokenizer ??
+        BunburuTokenizer(
+          baseUrl: Uri.parse(kBunburuApiUrl),
+          appKey: kBunburuAppKey,
+        );
   }
 
   @override
@@ -137,6 +169,8 @@ class _DeckoAppState extends State<DeckoApp> {
       studyOptionsRepository: widget.studyOptionsRepository,
       dailyStudyCountsRepository: widget.dailyStudyCountsRepository,
       settingsRepository: widget.settingsRepository,
+      tokenizer: _tokenizer,
+      sentenceTokenCache: widget.sentenceTokenCache,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -165,6 +199,8 @@ class _DeckoScope extends InheritedWidget {
     required this.studyOptionsRepository,
     required this.dailyStudyCountsRepository,
     required this.settingsRepository,
+    required this.tokenizer,
+    required this.sentenceTokenCache,
     required super.child,
   });
 
@@ -178,6 +214,8 @@ class _DeckoScope extends InheritedWidget {
   final StudyOptionsRepository studyOptionsRepository;
   final DailyStudyCountsRepository dailyStudyCountsRepository;
   final SettingsRepository settingsRepository;
+  final SentenceTokenizer tokenizer;
+  final SentenceTokenCache sentenceTokenCache;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -190,5 +228,7 @@ class _DeckoScope extends InheritedWidget {
       importedSourceStore != oldWidget.importedSourceStore ||
       studyOptionsRepository != oldWidget.studyOptionsRepository ||
       dailyStudyCountsRepository != oldWidget.dailyStudyCountsRepository ||
-      settingsRepository != oldWidget.settingsRepository;
+      settingsRepository != oldWidget.settingsRepository ||
+      tokenizer != oldWidget.tokenizer ||
+      sentenceTokenCache != oldWidget.sentenceTokenCache;
 }

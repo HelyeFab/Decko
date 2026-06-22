@@ -76,6 +76,21 @@ class StudyOptionsForm extends StatelessWidget {
           ],
         ),
         const SizedBox(height: DeckoSpacing.xl),
+        SettingsSection(
+          title: 'Sentence builder',
+          children: <Widget>[
+            SwitchRow(
+              label: 'Review sentences as a builder',
+              subtitle:
+                  'Cards with a sentence are tested by rebuilding it. Grading '
+                  'is unchanged.',
+              value: o.sentenceBuilderReview,
+              onChanged: (bool v) =>
+                  onChanged(o.copyWith(sentenceBuilderReview: v)),
+            ),
+          ],
+        ),
+        const SizedBox(height: DeckoSpacing.xl),
         _Advanced(
           children: <Widget>[
             ChoiceRow<NewCardOrder>(

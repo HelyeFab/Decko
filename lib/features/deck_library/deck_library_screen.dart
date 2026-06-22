@@ -16,6 +16,7 @@ import '../../domain/deck.dart';
 import '../../domain/due_queue.dart';
 import '../../domain/repositories/review_state_repository.dart';
 import '../../domain/review_card_state.dart';
+import '../sentence_builder/sentence_builder_hub_screen.dart';
 import 'widgets/deck_row.dart';
 import 'widgets/empty_library_card.dart';
 import 'widgets/study_ribbon.dart';
@@ -183,9 +184,84 @@ class _PopulatedHome extends StatelessWidget {
           ),
           const SizedBox(height: DeckoSpacing.md),
         ],
-        const SizedBox(height: DeckoSpacing.sm),
+        if (_hasSentenceDecks) ...<Widget>[
+          const SizedBox(height: DeckoSpacing.xl),
+          const SectionHeader(
+            title: 'Practice',
+            subtitle: 'Play with the sentences in your decks.',
+          ),
+          const SizedBox(height: DeckoSpacing.lg),
+          const _PracticeRow(),
+        ],
+        const SizedBox(height: DeckoSpacing.lg),
         _ImportGhostRow(onTap: onImport),
       ],
+    );
+  }
+
+  // The hub accurately filters to sentence-capable decks (async); the Home
+  // entry just needs an imported deck to point at.
+  bool get _hasSentenceDecks => decks.any((Deck d) => d.isImported);
+}
+
+/// The Home entry into the sentence-builder practice hub (MVP_016).
+class _PracticeRow extends StatelessWidget {
+  const _PracticeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (BuildContext context) => const SentenceBuilderHubScreen(),
+        )),
+        child: Ink(
+          padding: const EdgeInsets.all(DeckoSpacing.lg),
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            borderRadius: BorderRadius.circular(DeckoRadii.lg),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                height: 44,
+                width: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: scheme.onPrimaryContainer.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(DeckoRadii.md),
+                ),
+                child: FaIcon(FontAwesomeIcons.cubesStacked,
+                    size: 18, color: scheme.onPrimaryContainer),
+              ),
+              const SizedBox(width: DeckoSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Sentence builder',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        )),
+                    const SizedBox(height: 2),
+                    Text('Rebuild sentences from your decks',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onPrimaryContainer.withValues(alpha: 0.85),
+                        )),
+                  ],
+                ),
+              ),
+              FaIcon(FontAwesomeIcons.play,
+                  size: 14, color: scheme.onPrimaryContainer),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -595,3 +595,29 @@ After the Anki-parity and import-trust foundations, Decko needs to feel more mot
 - Studying feels rewarding (goal ring, kinder streak, celebratory summary, badges) while review math is untouched — the safety constraints hold by construction.
 - Adding an achievement is a pure-function change; no scheduler coupling, no stored badge state to migrate.
 - Future game modes (e.g. Bunburu) can route outcomes through this same progress/achievement layer without becoming a scheduling dependency.
+
+## DEC-025: Bunburu / Sentence Builder — practice and an opt-in review presentation, never a hidden scheduler
+
+Date: 2026-06-21
+Status: Accepted
+
+### Context
+
+MVP_016 brings the Bunburu sentence-unscramble concept into Decko as a sentence builder powered by imported sentence fields. It must feel native and close to the card, without ever distorting review correctness.
+
+### Decision
+
+- **Word-level tokenization via a service; a pure pipeline decoupled from review.** `SentenceBuilderMapper` (sync) picks the best sentence + translation + audio + reading from preserved Anki source fields (`Sentence` / `Sentence-Kana` / `Sentence-English` / `Sentence Audio`, falling back to `LearningItem.example`), after sanitising (`[sound:…]` / bracketed furigana / HTML stripped). Tokenization is done by the **Bunburu kuromoji micro-service** (the same service the standalone Bunburu app uses): `POST /furigana` returns proper word-level `CubeToken`s with per-token furigana. `SentenceRoundService` combines the picker + the tokenizer + a per-deck file cache to build `SentenceBuilderRound`s asynchronously; a card is "capable" only when it yields ≥2 tiles. None of this imports the Anki adapter, FSRS, the scheduler, or review-state storage.
+  - **Why a service, not on-device:** real Japanese word segmentation needs a dictionary (kuromoji's IPADIC is ~15MB). Decko is local-first by *preference*, not mandate, so we reuse the existing service rather than bundle a dictionary. Results are cached per deck on disk (`FileSentenceTokenCache`), so after the first tokenize the builder is instant and works offline; the service is only hit for new/changed sentences. The app key lives in a gitignored `.env` (`--dart-define-from-file`), never in source; when unconfigured/offline the builder shows a clear "tokenizer unavailable" state.
+  - An earlier in-house tokenizer (script-boundary heuristic, then BudouX phrase-level) was abandoned: neither produced acceptable word-level tiles. (BudouX dependency removed.)
+- **Three entry paths, two result regimes.**
+  - *Manual per-card* ("Build this sentence" on the revealed review card) and *deck practice* (a deck-detail tile) open a `SentenceBuilderScreen` that records **nothing** to review/progress repositories — practice cannot change FSRS state, due counts, imported progress, or burying. Its completion is a self-contained, motivational-only panel.
+  - *Scheduler-routed review presentation* (opt-in via the global `sentenceBuilderReview` study option): a due card with a usable sentence is **presented** as a builder, but grading still flows through the existing Again/Hard/Good/Easy → `ReviewScheduler` write-back. The builder is the card's question/reveal; it creates no second scheduler path and no hidden review event.
+- **The seam is presentation, not scheduling.** The scheduler still decides which card is due; the review screen decides how it's shown (flashcard / listening / reading / production / sentence builder). Grading is unchanged.
+
+### Consequences
+
+- Learners get sentence practice next to the card and as a deck activity, plus an optional "review my sentences as a builder" mode — all without risk to the spaced-repetition schedule.
+- The safety boundary is enforced by construction: practice screens take no review dependencies; the review presentation reuses the one grading path. Tests assert the manual action's visibility, the practice loop, and that the routed review grades through the normal seam (progress recorded, session completes).
+- **Four entry surfaces:** a Home "Practice" section → a `SentenceBuilderHubScreen` (lists sentence-capable decks); a manual "Build this sentence" action on the revealed review card; a deck-detail practice tile; and the opt-in `sentenceBuilderReview` review presentation. Async tokenization sits behind a calm loader (spinner / "tokenizer unavailable" retry / "no sentences"). Tiles render per-token furigana ruby.
+- Deferred (documented): sentence-audio playback in the builder; hearts/timed/daily-challenge modes; a smarter policy for *when* to route a review to the builder; bulk pre-tokenizing a whole deck (rounds are capped per session); Decko hosting its own tokenizer service instead of reusing Bunburu's. The `sentenceBuilderReview` flag is global-only for now (no per-deck override).

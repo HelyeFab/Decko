@@ -9,8 +9,13 @@ import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/section_header.dart';
 import '../../domain/deck.dart';
 import '../../domain/import/deck_import_info.dart';
+import '../../domain/import/source/imported_anki_source.dart';
 import '../../domain/learning_item.dart';
 import '../../domain/review_card_state.dart';
+import '../../domain/repositories/imported_source_store.dart';
+import '../../domain/sentence_builder/sentence_builder_source.dart';
+import '../sentence_builder/sentence_builder_loader.dart';
+import '../sentence_builder/sentence_round_service.dart';
 import 'widgets/sample_item_row.dart';
 
 /// Detail view for a single [Deck].
@@ -33,6 +38,27 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
   static const int _previewCount = 4;
 
   Future<List<ReviewCardState>>? _statesFuture;
+
+  /// Opens the deck's sentence-builder practice. Tokenizes (async) behind the
+  /// loader; records nothing to review/progress (MVP_016, DEC-025).
+  void _launchSentenceBuilder(Deck deck) {
+    final ImportedSourceStore store = DeckoApp.sourceOf(context);
+    final SentenceRoundService service = DeckoApp.sentenceRoundsOf(context);
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (BuildContext context) => SentenceBuilderLoader(
+        title: 'Sentence builder',
+        load: () async {
+          final ImportedAnkiSource? source =
+              await store.getSourceForDeck(deck.id);
+          return service.roundsForDeck(
+            deck,
+            ankiSource: source,
+            source: SentenceBuilderSource.deckPractice,
+          );
+        },
+      ),
+    ));
+  }
 
   @override
   void didChangeDependencies() {
@@ -172,6 +198,13 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                 title: 'View imported source',
                 subtitle: 'Original Anki fields, tags, and card templates',
                 onTap: () => context.push(DeckoRoutes.deckSource(deck.id)),
+              ),
+              const SizedBox(height: DeckoSpacing.md),
+              _DeckActionTile(
+                icon: FontAwesomeIcons.cubesStacked,
+                title: 'Sentence builder',
+                subtitle: 'Rebuild sentences from this deck — practice only',
+                onTap: () => _launchSentenceBuilder(deck),
               ),
             ],
           ],

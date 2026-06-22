@@ -38,6 +38,13 @@ import 'package:decko/domain/review_session_result.dart';
 import 'package:decko/features/import/widgets/import_preview_panel.dart';
 import 'package:decko/features/import/widgets/import_health_summary.dart';
 import 'package:decko/features/review/widgets/session_summary.dart';
+import 'package:decko/features/sentence_builder/sentence_builder_screen.dart';
+import 'package:decko/domain/sentence_builder/sentence_builder_round.dart';
+import 'package:decko/domain/sentence_builder/sentence_builder_source.dart';
+import 'package:decko/domain/sentence_builder/sentence_builder_token.dart';
+import 'package:decko/domain/sentence_builder/cube_token.dart';
+import 'package:decko/domain/sentence_builder/sentence_tokenizer.dart';
+import 'package:decko/domain/repositories/sentence_token_cache.dart';
 import 'package:decko/features/deck_library/widgets/study_ribbon.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
@@ -60,6 +67,37 @@ class _FixedDeckRepository implements DeckRepository {
     }
     return null;
   }
+}
+
+/// A fake tokenizer that splits each line on spaces — deterministic, offline.
+class _SplitTokenizer implements SentenceTokenizer {
+  @override
+  Future<TokenizeResult> tokenize(List<String> lines) async => TokenizeResult(
+        lines: lines,
+        tokens: <List<CubeToken>>[
+          for (final String l in lines)
+            <CubeToken>[
+              for (final String w
+                  in l.split(' ').where((String w) => w.isNotEmpty))
+                CubeToken(surface: w),
+            ],
+        ],
+      );
+}
+
+class _InMemoryTokenCache implements SentenceTokenCache {
+  final Map<String, Map<String, CachedTokenization>> _byDeck =
+      <String, Map<String, CachedTokenization>>{};
+  @override
+  Future<Map<String, CachedTokenization>> load(String deckId) async =>
+      Map<String, CachedTokenization>.of(
+          _byDeck[deckId] ?? const <String, CachedTokenization>{});
+  @override
+  Future<void> save(
+          String deckId, Map<String, CachedTokenization> entries) async =>
+      (_byDeck[deckId] ??= <String, CachedTokenization>{}).addAll(entries);
+  @override
+  Future<void> clear(String deckId) async => _byDeck.remove(deckId);
 }
 
 /// In-memory settings; writes land synchronously so two app pumps are
@@ -254,6 +292,7 @@ Future<void> _pumpApp(
   DailyStudyCountsRepository? dailyStudyCountsRepository,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
+  // Sentence builder uses a fake tokenizer + in-memory cache (no network).
   tester.view.physicalSize = const Size(420, 2400);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -272,6 +311,8 @@ Future<void> _pumpApp(
           studyOptionsRepository ?? _InMemoryStudyOptionsRepository(),
       dailyStudyCountsRepository:
           dailyStudyCountsRepository ?? _InMemoryDailyCountsRepository(),
+      tokenizer: _SplitTokenizer(),
+      sentenceTokenCache: _InMemoryTokenCache(),
     ),
   );
   await tester.pumpAndSettle();
@@ -458,6 +499,130 @@ void main() {
     expect(find.text('+50 XP'), findsOneWidget);
     expect(find.text('3 day streak'), findsOneWidget);
     expect(find.text('Daily goal reached'), findsOneWidget);
+  });
+
+  // ---- MVP_016: Sentence Builder ------------------------------------------
+
+  Deck sentenceDeck() => Deck(
+        id: 'sb',
+        name: 'Sentence Deck',
+        description: 'd',
+        importInfo: DeckImportInfo(
+          progressMode: ImportProgressMode.fresh,
+          importedAt: DateTime(2026),
+        ),
+        items: const <LearningItem>[
+          LearningItem(
+              id: 'sb1', front: 'go', back: 'went', example: 'one two three'),
+        ],
+      );
+
+  testWidgets('Sentence builder plays a round to completion (MVP_016)',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(420, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    const SentenceBuilderRound round = SentenceBuilderRound(
+      deckId: 'd',
+      source: SentenceBuilderSource.deckPractice,
+      sentence: 'one two three',
+      tokens: <SentenceBuilderToken>[
+        SentenceBuilderToken(text: 'one', position: 0),
+        SentenceBuilderToken(text: 'two', position: 1),
+        SentenceBuilderToken(text: 'three', position: 2),
+      ],
+    );
+
+    await tester.pumpWidget(const MaterialApp(
+      home: SentenceBuilderScreen(rounds: <SentenceBuilderRound>[round]),
+    ));
+    await tester.pumpAndSettle();
+
+    // Build in the correct order; each word is only in the bank when tapped.
+    for (final String word in <String>['one', 'two', 'three']) {
+      await tester.tap(find.text(word));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+    expect(find.text('Perfect!'), findsOneWidget);
+
+    await tester.tap(find.text('Finish'));
+    await tester.pumpAndSettle();
+    expect(find.text('Practice complete'), findsOneWidget);
+    expect(find.textContaining('review schedule is unchanged'), findsOneWidget);
+  });
+
+  testWidgets('Manual "Build this sentence" shows on a sentence card (MVP_016)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester,
+        deckRepository: _FixedDeckRepository(<Deck>[sentenceDeck()]));
+
+    await tester.tap(find.text('Sentence Deck').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start review'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show answer'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Build this sentence'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Sentence-builder review presentation grades through the normal seam (MVP_016)',
+      (WidgetTester tester) async {
+    final _InMemoryStudyOptionsRepository options =
+        _InMemoryStudyOptionsRepository()
+          ..global = const StudyOptions(sentenceBuilderReview: true);
+    final _InMemoryProgress progress =
+        _InMemoryProgress(DateTime(2026, 6, 21, 10));
+
+    await _pumpApp(tester,
+        deckRepository: _FixedDeckRepository(<Deck>[sentenceDeck()]),
+        studyOptionsRepository: options,
+        progressRepository: progress);
+
+    await tester.tap(find.text('Sentence Deck').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start review'));
+    await tester.pumpAndSettle();
+
+    // The card is presented as a builder, not the normal flashcard.
+    expect(find.text('Tap the words below in order'), findsOneWidget);
+    expect(find.text('Check'), findsOneWidget);
+
+    for (final String word in <String>['one', 'two', 'three']) {
+      await tester.tap(find.text(word));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+
+    // Resolving reveals the normal grade buttons; grading flows as usual.
+    expect(find.text('How well did you know it?'), findsOneWidget);
+    await tester.tap(find.text('Good'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Session complete'), findsOneWidget);
+    // The grade went through the normal review-answer seam (progress recorded).
+    expect(progress.snapshot.cardsReviewedToday, 1);
+    expect(progress.snapshot.totalXp, 10);
+  });
+
+  testWidgets('Home surfaces a sentence-builder practice hub (MVP_016)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester,
+        deckRepository: _FixedDeckRepository(<Deck>[sentenceDeck()]));
+
+    // The Home practice entry appears because a deck has sentences.
+    expect(find.text('Sentence builder'), findsOneWidget);
+    await tester.tap(find.text('Sentence builder'));
+    await tester.pumpAndSettle();
+
+    // The hub lists the capable deck and explains it's practice-only.
+    expect(find.textContaining('practice only'), findsOneWidget);
+    expect(find.text('Sentence Deck'), findsWidgets);
   });
 
   testWidgets('Selected app theme persists across a restart',

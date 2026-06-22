@@ -27,6 +27,7 @@ class StudyOptions {
     this.imageDisplayMode = ImageDisplayMode.withQuestion,
     this.burySiblingsUntilTomorrow = false,
     this.newCardOrder = NewCardOrder.deckOrder,
+    this.sentenceBuilderReview = false,
   });
 
   final int newCardsPerDay;
@@ -36,6 +37,11 @@ class StudyOptions {
   final ImageDisplayMode imageDisplayMode;
   final bool burySiblingsUntilTomorrow;
   final NewCardOrder newCardOrder;
+
+  /// When on, due cards that have a usable sentence are reviewed as a
+  /// sentence-builder challenge. Grading still flows through the normal
+  /// review-answer seam — this only changes presentation (MVP_016, DEC-025).
+  final bool sentenceBuilderReview;
 
   static const StudyOptions defaults = StudyOptions();
 
@@ -47,6 +53,7 @@ class StudyOptions {
     ImageDisplayMode? imageDisplayMode,
     bool? burySiblingsUntilTomorrow,
     NewCardOrder? newCardOrder,
+    bool? sentenceBuilderReview,
   }) {
     return StudyOptions(
       newCardsPerDay: newCardsPerDay ?? this.newCardsPerDay,
@@ -57,6 +64,8 @@ class StudyOptions {
       burySiblingsUntilTomorrow:
           burySiblingsUntilTomorrow ?? this.burySiblingsUntilTomorrow,
       newCardOrder: newCardOrder ?? this.newCardOrder,
+      sentenceBuilderReview:
+          sentenceBuilderReview ?? this.sentenceBuilderReview,
     );
   }
 
@@ -68,6 +77,7 @@ class StudyOptions {
         'imageDisplayMode': imageDisplayMode.name,
         'burySiblingsUntilTomorrow': burySiblingsUntilTomorrow,
         'newCardOrder': newCardOrder.name,
+        'sentenceBuilderReview': sentenceBuilderReview,
       };
 
   static StudyOptions fromMap(Map<String, dynamic> m) => StudyOptions(
@@ -82,6 +92,7 @@ class StudyOptions {
             m['burySiblingsUntilTomorrow'] as bool? ?? false,
         newCardOrder: _enumByName(
             NewCardOrder.values, m['newCardOrder'], NewCardOrder.deckOrder),
+        sentenceBuilderReview: m['sentenceBuilderReview'] as bool? ?? false,
       );
 }
 
@@ -242,6 +253,7 @@ class EffectiveStudyOptions {
     required this.burySiblingsUntilTomorrow,
     required this.newCardOrder,
     required this.furiganaPreference,
+    required this.sentenceBuilderReview,
   });
 
   final int newCardsPerDay;
@@ -252,6 +264,7 @@ class EffectiveStudyOptions {
   final bool burySiblingsUntilTomorrow;
   final NewCardOrder newCardOrder;
   final FuriganaPreference furiganaPreference;
+  final bool sentenceBuilderReview;
 
   /// Resolves global/default → (profile) → deck override. [base] is the global
   /// defaults or, when a profile is assigned, the profile's options (MVP_012).
@@ -271,6 +284,8 @@ class EffectiveStudyOptions {
       newCardOrder: deck?.newCardOrder ?? base.newCardOrder,
       furiganaPreference:
           deck?.furiganaPreference ?? FuriganaPreference.useGlobal,
+      // Global-only for now: the review presentation toggle isn't per-deck.
+      sentenceBuilderReview: base.sentenceBuilderReview,
     );
   }
 
