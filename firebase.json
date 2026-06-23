@@ -1,0 +1,26 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "ios": {
+        "default": {
+          "projectId": "decko-7a443",
+          "appId": "1:873448731827:ios:f7a2a2da1bee117b54ecc6",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "decko-7a443",
+          "configurations": {
+            "ios": "1:873448731827:ios:f7a2a2da1bee117b54ecc6"
+          }
+        }
+      }
+    }
+  }
+}

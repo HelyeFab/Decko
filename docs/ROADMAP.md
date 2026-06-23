@@ -226,6 +226,14 @@ See: `docs/import-progress.md`
   baseline (streak reconstructed, XP kept). Motivation stays separate from
   FSRS/review scheduling — nothing in the due path changed. Sets up cloud sync
   (MVP_020 — Auth & Firebase).
+- ~~Auth & Firebase sync foundation~~ DONE (MVP_020, DEC-029): Firebase Auth
+  (anonymous / email-password / Google) + Firestore, all behind `AuthRepository`
+  / `SyncRepository` seams (local-only fakes are the default; Decko stays usable
+  signed-out & offline). Syncs **only** profile, safe settings, and the activity
+  ledger — `/users/{uid}/**`, scoped by Firestore rules. Activity sync is
+  idempotent by event id and never deletes local-only events. Imported decks,
+  media, FSRS, review-card state, and due queues are deliberately **not** synced.
+  Branded Account & sync screen under Settings. Next: MVP_021.
 
 ## I5 — FSRS Production Scheduler
 

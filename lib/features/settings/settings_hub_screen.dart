@@ -29,6 +29,13 @@ class SettingsHubScreen extends StatelessWidget {
           ),
           children: <Widget>[
             _SettingsTile(
+              icon: FontAwesomeIcons.cloudArrowUp,
+              title: 'Account & sync',
+              subtitle: 'Protect your progress across devices',
+              onTap: () => context.push(DeckoRoutes.account),
+            ),
+            const SizedBox(height: DeckoSpacing.md),
+            _SettingsTile(
               icon: FontAwesomeIcons.sliders,
               title: 'Study defaults',
               subtitle: 'Daily limits, audio, and images for every deck',

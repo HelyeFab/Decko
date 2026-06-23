@@ -48,6 +48,10 @@ import 'package:decko/domain/repositories/sentence_token_cache.dart';
 import 'package:decko/domain/practice/practice_outcome.dart';
 import 'package:decko/domain/activity/activity_event.dart';
 import 'package:decko/domain/repositories/activity_ledger_repository.dart';
+import 'package:decko/data/local_only_auth_repository.dart';
+import 'package:decko/domain/auth/auth_repository.dart';
+import 'package:decko/domain/auth/auth_state.dart';
+import 'package:decko/domain/auth/decko_user.dart';
 import 'package:decko/features/deck_library/widgets/study_ribbon.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
@@ -70,6 +74,26 @@ class _FixedDeckRepository implements DeckRepository {
     }
     return null;
   }
+}
+
+/// An auth repository already signed in, for account-screen tests.
+class _SignedInAuth implements AuthRepository {
+  _SignedInAuth(this._user);
+  final DeckoUser _user;
+  @override
+  Stream<AuthState> authStateChanges() => Stream<AuthState>.value(AuthState(_user));
+  @override
+  DeckoUser? get currentUser => _user;
+  @override
+  Future<DeckoUser> signInAnonymously() async => _user;
+  @override
+  Future<DeckoUser> signInWithEmail(String e, String p) async => _user;
+  @override
+  Future<DeckoUser> createAccountWithEmail(String e, String p) async => _user;
+  @override
+  Future<DeckoUser> signInWithGoogle() async => _user;
+  @override
+  Future<void> signOut() async {}
 }
 
 /// In-memory activity ledger so tests avoid path_provider.
@@ -322,6 +346,7 @@ Future<void> _pumpApp(
   StudyOptionsRepository? studyOptionsRepository,
   DailyStudyCountsRepository? dailyStudyCountsRepository,
   ActivityLedgerRepository? activityLedger,
+  AuthRepository? authRepository,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   // Sentence builder uses a fake tokenizer + in-memory cache (no network).
@@ -346,6 +371,10 @@ Future<void> _pumpApp(
       tokenizer: _SplitTokenizer(),
       sentenceTokenCache: _InMemoryTokenCache(),
       activityLedger: activityLedger ?? _InMemoryLedger(),
+      // Signed in by default so tests pass the auth gate (MVP_020.1); gate tests
+      // override with a signed-out repository.
+      authRepository: authRepository ??
+          _SignedInAuth(const DeckoUser(uid: 'test', email: 'tester@decko.app')),
     ),
   );
   await tester.pumpAndSettle();
@@ -732,6 +761,45 @@ void main() {
     expect(progress.snapshot.totalXp, 0);
   });
 
+  testWidgets('Auth gate blocks the app until signed in (MVP_020.1)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester, authRepository: const LocalOnlyAuthRepository());
+
+    // Signed out → the sign-in gate, not Home.
+    expect(find.text('Sign in to continue learning.'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Your decks'), findsNothing);
+  });
+
+  testWidgets('Signed-in user reaches Home with a salutation (MVP_020.1)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester,
+        authRepository:
+            _SignedInAuth(const DeckoUser(uid: 'u1', displayName: 'Emi Tanaka')));
+
+    // Past the gate: Home renders, greeting the user by first name.
+    expect(find.text('Your decks'), findsOneWidget);
+    expect(find.text('Emi'), findsOneWidget);
+    expect(find.textContaining('Good '), findsOneWidget); // time-based greeting
+    expect(find.text('Sign in to continue learning.'), findsNothing);
+  });
+
+  testWidgets('Account screen shows sync + sign-out when signed in (MVP_020)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester,
+        authRepository:
+            _SignedInAuth(const DeckoUser(uid: 'u1', email: 'a@b.com')));
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Account & sync'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('a@b.com'), findsOneWidget);
+    expect(find.text('Cloud sync'), findsOneWidget);
+    expect(find.text('What syncs'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+  });
+
   testWidgets('Home opens the registry-driven practice hub (MVP_017)',
       (WidgetTester tester) async {
     await _pumpApp(tester,
@@ -766,7 +834,10 @@ void main() {
     expect(settings.id, 'decko-dark');
 
     // "Restart": a fresh app sharing the same settings store hydrates dark.
-    await tester.pumpWidget(DeckoApp(settingsRepository: settings));
+    await tester.pumpWidget(DeckoApp(
+      settingsRepository: settings,
+      authRepository: _SignedInAuth(const DeckoUser(uid: 'test')),
+    ));
     await tester.pumpAndSettle();
     expect(_appBrightness(tester), Brightness.dark);
   });
@@ -1466,7 +1537,10 @@ void main() {
     );
     await const ImportedDeckStorage().save(<Deck>[imported]);
 
-    await tester.pumpWidget(DeckoApp(mediaStore: _InMemoryMediaStore()));
+    await tester.pumpWidget(DeckoApp(
+      mediaStore: _InMemoryMediaStore(),
+      authRepository: _SignedInAuth(const DeckoUser(uid: 'test')),
+    ));
     await tester.pumpAndSettle();
     expect(find.text('Imported Z'), findsOneWidget);
 

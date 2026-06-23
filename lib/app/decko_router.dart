@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/auth/auth_repository.dart';
 import '../domain/deck.dart';
+import '../features/auth/sign_in_screen.dart';
 import '../features/deck_detail/deck_detail_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
 import '../features/deck_options/deck_options_screen.dart';
@@ -14,6 +18,7 @@ import '../features/settings/profile_editor_screen.dart';
 import '../features/settings/settings_hub_screen.dart';
 import '../features/settings/study_profiles_screen.dart';
 import '../features/review/review_session_screen.dart';
+import '../features/account/account_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
 import 'decko_app.dart';
 import 'decko_shell.dart';
@@ -23,6 +28,9 @@ abstract final class DeckoRoutes {
   static const String home = '/';
   static const String import = '/import';
   static const String progress = '/progress';
+
+  /// The auth gate — Decko requires a signed-in account (MVP_020.1, DEC-029).
+  static const String signIn = '/signin';
 
   /// The Settings tab (a hub).
   static const String settings = '/settings';
@@ -38,6 +46,8 @@ abstract final class DeckoRoutes {
 
   /// Theme gallery, under Settings.
   static const String themes = '/settings/themes';
+
+  static const String account = '/settings/account';
 
   /// Deck detail for the deck with [id].
   static String deck(String id) => '/deck/$id';
@@ -68,11 +78,26 @@ final GlobalKey<NavigatorState> _rootNavigatorKey =
 /// pushed on the **root** navigator so it plays full-screen over the bar.
 /// Deck-scoped routes resolve the [Deck] from the [DeckRepository]; an unknown
 /// id falls back gracefully.
-GoRouter buildDeckoRouter() {
+GoRouter buildDeckoRouter(AuthRepository auth) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: DeckoRoutes.home,
+    refreshListenable: GoRouterRefreshStream(auth.authStateChanges()),
+    redirect: (BuildContext context, GoRouterState state) {
+      // A real (non-anonymous) account is required to reach the app.
+      final bool signedIn =
+          auth.currentUser != null && !auth.currentUser!.isAnonymous;
+      final bool atGate = state.matchedLocation == DeckoRoutes.signIn;
+      if (!signedIn) return atGate ? null : DeckoRoutes.signIn;
+      if (atGate) return DeckoRoutes.home;
+      return null;
+    },
     routes: <RouteBase>[
+      GoRoute(
+        path: DeckoRoutes.signIn,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, _) => const SignInScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (BuildContext context, GoRouterState state,
                 StatefulNavigationShell navigationShell) =>
@@ -173,6 +198,10 @@ GoRouter buildDeckoRouter() {
                   path: 'themes',
                   builder: (_, _) => const ThemeGalleryScreen(),
                 ),
+                GoRoute(
+                  path: 'account',
+                  builder: (_, _) => const AccountScreen(),
+                ),
               ],
             ),
           ]),
@@ -186,6 +215,24 @@ Deck? _resolveDeck(BuildContext context, GoRouterState state) {
   final String? id = state.pathParameters['deckId'];
   if (id == null) return null;
   return DeckoApp.repositoryOf(context).getDeckById(id);
+}
+
+/// Bridges a [Stream] (auth state) to a [Listenable] so GoRouter re-evaluates
+/// its redirect whenever sign-in state changes (MVP_020.1).
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription =
+        stream.asBroadcastStream().listen((dynamic _) => notifyListeners());
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
 }
 
 /// Shown when a deck id in the URL doesn't match a known deck.

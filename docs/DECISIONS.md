@@ -719,3 +719,88 @@ motivation, kept strictly separate from review/FSRS state.
 - Tests cover event serialization, XP/streak/heatmap derivation, file
   persistence, and the migration (incl. idempotency).
 - Sets up MVP_020 (Auth & Firebase sync) to mirror a clean local model.
+
+## DEC-029: Local-first auth, and an activity-only cloud sync boundary
+
+Date: 2026-06-22
+Status: Accepted
+
+### Context
+
+MVP_019 made the activity ledger the local source of truth for motivation. To
+support cross-device learning we need a cloud identity + sync — but imported Anki
+progress and FSRS scheduling are high-risk correctness data that must not be put
+at risk by sync. So the foundation has to be deliberately narrow.
+
+### Decision
+
+- **Firebase Auth provides identity; sync is opt-in and additive.** Decko stays
+  fully usable signed-out and offline — Firebase init is guarded, and a
+  `LocalOnlyAuthRepository` / `LocalOnlySyncRepository` are the safe defaults.
+- **Two kinds of state, one synced.** Review/imported state (FSRS, due dates,
+  imported progress, card ids, decks, media) is **not** synced in this MVP.
+  Motivational state — profile, safe settings, and the MVP_019 activity ledger —
+  **is**. Review correctness stays local until a dedicated, safety-designed
+  review-sync MVP.
+- **Everything is behind seams.** `AuthRepository` (+ `FirebaseAuthRepository`,
+  anonymous / email-password / Google) and `SyncRepository` /
+  `CloudActivityRepository` / `CloudUserRepository` (+ Firestore impls). Screens
+  never touch Firebase; tests run entirely on in-memory fakes.
+- **Activity sync is idempotent and non-destructive.** Events are keyed by their
+  stable id (`/users/{uid}/activityEvents/{id}`), so re-uploading never
+  duplicates progress; downloading merges cloud events the device lacks and
+  **never deletes local-only events**. Conflicts favour additive merge.
+- **Settings/profile are push-only this pass** (`/users/{uid}/settings/app`,
+  `/profile/main`) — a safe cloud backup; cross-device settings *restore* is
+  deferred so an older cloud value can't silently revert a local change.
+- **Daily goal stays activity-count based** (DEC-028); only theme, furigana, and
+  daily goal sync — never per-deck study options.
+
+### Non-negotiables (unchanged)
+
+- Cloud sync must never overwrite imported Anki progress or FSRS review state.
+- `ReviewScheduler` remains the only path for due/review mutations.
+- Syncing XP/streaks/history must not imply syncing card due dates.
+- Local data wins over destructive cloud operations.
+
+### Consequences
+
+- Firestore rules scope each user to `/users/{uid}/**` only.
+- Tests cover auth flows, sync idempotency/merge, the no-delete-local rule,
+  settings mapping, the signed-out/offline path, and the account-screen states.
+- Sets up MVP_021 (Typing Recall) or a dedicated review-state sync MVP — the
+  latter only once its safety model is explicitly designed.
+
+## DEC-029a: Decko now requires sign-in (auth gate) — supersedes DEC-029's "usable without an account"
+
+Date: 2026-06-23
+Status: Accepted (revises DEC-029)
+
+### Context
+
+DEC-029 made cloud sync opt-in and kept Decko fully usable signed-out/offline.
+The product owner has since decided Decko should be an account-first app: every
+user signs in before reaching the app, so there is always a cloud identity for
+sync and a personalised home.
+
+### Decision
+
+- **A mandatory auth gate.** The GoRouter `redirect` sends any unauthenticated
+  session to `/signin` (a branded `SignInScreen`); a signed-in session is
+  redirected away from the gate to Home. `refreshListenable` is bound to the
+  auth-state stream so the gate reacts immediately to sign-in/sign-out.
+- **A real account is required — no guest.** Email/password or Google only; the
+  anonymous "continue as guest" path was removed from the UI. (Firebase session
+  persistence means the gate is only hit on first launch / after sign-out, so the
+  app still works offline once signed in.)
+- **Personalised Home.** A `SalutationHeader` greets the user by first name with
+  their Google photo (initial / placeholder fallback) and a time-based greeting.
+
+### Consequences
+
+- This **supersedes** DEC-029's "fully usable without an account / offline"
+  promise. Everything else in DEC-029 stands: only profile + safe settings +
+  activity ledger sync; review/FSRS/imported state are never synced or mutated.
+- First launch now needs network to sign in; subsequent launches are offline-OK.
+- Tests: the harness signs in by default so app tests pass the gate; dedicated
+  tests cover the gate (signed-out → SignInScreen) and the salutation.

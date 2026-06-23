@@ -426,6 +426,17 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Added in MVP_020 (Account & sync, DEC-029)
+
+- **`AccountScreen`** (`features/account/`, route `/settings/account`) — branded
+  identity + sync, never stock Firebase UI. Signed-out: a `primaryContainer`
+  hero, email/password fields, Sign in / Create account, an "or" divider,
+  Continue with Google, an anonymous option, and the local-only promise. Signed
+  in: a profile card, a live sync-status card (`StreamBuilder<SyncState>` with
+  status icon + "Sync now"), a "What syncs / stays local" card, and Sign out.
+- **Settings hub** gains an **Account & sync** tile (`cloudArrowUp`) at the top.
+- Errors surface inline + via `DeckoSnackbar`; all friendly, never raw Firebase.
+
 ### Added in MVP_019 (Activity ledger & heatmap, DEC-028)
 
 - **`ActivityHeatmap`** (`features/progress/widgets/`) — a GitHub-style XP grid:

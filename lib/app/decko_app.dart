@@ -7,6 +7,8 @@ import '../data/activity_migration.dart';
 import '../data/bunburu_tokenizer.dart';
 import '../data/decko_practice_mode_registry.dart';
 import '../data/local_activity_ledger_repository.dart';
+import '../data/local_only_auth_repository.dart';
+import '../data/local_only_sync_repository.dart';
 import '../data/file_imported_source_store.dart';
 import '../data/file_media_store.dart';
 import '../data/file_sentence_token_cache.dart';
@@ -20,6 +22,7 @@ import '../domain/repositories/daily_study_counts_repository.dart';
 import '../domain/repositories/deck_repository.dart';
 import '../domain/repositories/imported_source_store.dart';
 import '../domain/repositories/media_store.dart';
+import '../domain/auth/auth_repository.dart';
 import '../domain/repositories/activity_ledger_repository.dart';
 import '../domain/repositories/practice_mode_registry.dart';
 import '../domain/repositories/progress_repository.dart';
@@ -28,6 +31,7 @@ import '../domain/repositories/sentence_token_cache.dart';
 import '../domain/repositories/settings_repository.dart';
 import '../domain/repositories/study_options_repository.dart';
 import '../domain/sentence_builder/sentence_tokenizer.dart';
+import '../domain/sync/sync_repository.dart';
 import '../features/sentence_builder/sentence_round_service.dart';
 import 'deck_store.dart';
 import 'decko_router.dart';
@@ -59,6 +63,8 @@ class DeckoApp extends StatefulWidget {
     this.sentenceTokenCache = const FileSentenceTokenCache(),
     this.practiceModeRegistry = const DeckoPracticeModeRegistry(),
     this.activityLedger = const LocalActivityLedgerRepository(),
+    this.authRepository = const LocalOnlyAuthRepository(),
+    this.syncRepository = const LocalOnlySyncRepository(),
   });
 
   final DeckRepository deckRepository;
@@ -76,6 +82,8 @@ class DeckoApp extends StatefulWidget {
   final SentenceTokenCache sentenceTokenCache;
   final PracticeModeRegistry practiceModeRegistry;
   final ActivityLedgerRepository activityLedger;
+  final AuthRepository authRepository;
+  final SyncRepository syncRepository;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -122,6 +130,12 @@ class DeckoApp extends StatefulWidget {
   static ActivityLedgerRepository ledgerOf(BuildContext context) =>
       _scopeOf(context).activityLedger;
 
+  static AuthRepository authOf(BuildContext context) =>
+      _scopeOf(context).authRepository;
+
+  static SyncRepository syncOf(BuildContext context) =>
+      _scopeOf(context).syncRepository;
+
   /// A ready-to-use round service (tokenizer + cache) for the sentence builder.
   static SentenceRoundService sentenceRoundsOf(BuildContext context) =>
       SentenceRoundService(
@@ -145,11 +159,13 @@ class _DeckoAppState extends State<DeckoApp> {
   late final FuriganaController _furiganaController;
   late final DeckStore _deckStore;
   late final SentenceTokenizer _tokenizer;
-  final GoRouter _router = buildDeckoRouter();
+  late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
+    // The router gates on auth (MVP_020.1) — built with the auth repository.
+    _router = buildDeckoRouter(widget.authRepository);
     _themeController = ThemeController(widget.settingsRepository);
     _themeController.load();
     _furiganaController = FuriganaController(widget.settingsRepository);
@@ -164,6 +180,10 @@ class _DeckoAppState extends State<DeckoApp> {
     // One-time backfill of legacy progress into the activity ledger (MVP_019).
     ActivityMigration.ensureBackfilled(
         widget.activityLedger, widget.progressRepository);
+    // If already signed in, sync activity in the background (MVP_020).
+    if (widget.authRepository.currentUser != null) {
+      widget.syncRepository.syncNow();
+    }
   }
 
   @override
@@ -191,6 +211,8 @@ class _DeckoAppState extends State<DeckoApp> {
       sentenceTokenCache: widget.sentenceTokenCache,
       practiceModeRegistry: widget.practiceModeRegistry,
       activityLedger: widget.activityLedger,
+      authRepository: widget.authRepository,
+      syncRepository: widget.syncRepository,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -223,6 +245,8 @@ class _DeckoScope extends InheritedWidget {
     required this.sentenceTokenCache,
     required this.practiceModeRegistry,
     required this.activityLedger,
+    required this.authRepository,
+    required this.syncRepository,
     required super.child,
   });
 
@@ -240,6 +264,8 @@ class _DeckoScope extends InheritedWidget {
   final SentenceTokenCache sentenceTokenCache;
   final PracticeModeRegistry practiceModeRegistry;
   final ActivityLedgerRepository activityLedger;
+  final AuthRepository authRepository;
+  final SyncRepository syncRepository;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -256,5 +282,7 @@ class _DeckoScope extends InheritedWidget {
       tokenizer != oldWidget.tokenizer ||
       sentenceTokenCache != oldWidget.sentenceTokenCache ||
       practiceModeRegistry != oldWidget.practiceModeRegistry ||
-      activityLedger != oldWidget.activityLedger;
+      activityLedger != oldWidget.activityLedger ||
+      authRepository != oldWidget.authRepository ||
+      syncRepository != oldWidget.syncRepository;
 }

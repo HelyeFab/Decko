@@ -19,6 +19,7 @@ import '../../domain/review_card_state.dart';
 import '../practice/practice_hub_screen.dart';
 import 'widgets/deck_row.dart';
 import 'widgets/empty_library_card.dart';
+import 'widgets/salutation_header.dart';
 import 'widgets/study_ribbon.dart';
 
 /// Decko's home (MVP_008.5, Direction A — "Study ribbon").
@@ -162,6 +163,7 @@ class _PopulatedHome extends StatelessWidget {
         DeckoSpacing.xxxl,
       ),
       children: <Widget>[
+        const SalutationHeader(),
         if (entries.length == 1)
           StudyRibbon(
             target: entries.first.deck,

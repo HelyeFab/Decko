@@ -46,3 +46,8 @@ app.*.map.json
 
 # Local secrets (tokenizer app key) — never commit
 .env
+
+# Firebase secrets — never commit
+secrets/
+*-firebase-adminsdk-*.json
+serviceAccount*.json

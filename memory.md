@@ -4,8 +4,36 @@
 2026-06-22
 
 ## Current stage
-MVP_019 in review: Activity Ledger, XP, Streaks & Heatmap (DEC-028). A durable
-local `ActivityEvent` ledger (file-backed JSON at <appSupport>/decko_activity/
+MVP_020 in review: Auth & Firebase Sync Foundation (DEC-029). Firebase project
+decko-7a443 (iOS app registered; firebase_options.dart + GoogleService-Info.plist
+committed = client config, NOT secret; admin SDK key in gitignored secrets/).
+Firebase Auth (anonymous/email-password/Google via google_sign_in 7.x) +
+Firestore, all behind AuthRepository + SyncRepository seams (LocalOnly* defaults;
+app runs signed-out & offline — Firebase.initializeApp guarded in main). Syncs
+ONLY profile + safe settings (theme/furigana/dailyGoal, push-only) + the MVP_019
+activity ledger (idempotent by event id, additive merge, NEVER deletes local-only
+events). NOT synced: imported decks, media, FSRS, ReviewCardState, due queues.
+Firestore rules deployed: /users/{uid}/** scoped to that uid. Branded AccountScreen
+under Settings (/settings/account). iOS deploy target bumped to 15.0 (Firebase).
+analysis_options excludes build/ (Firebase bundles its own test files there).
+Providers enabled in console (Email/Password, Google, Anonymous); user verified a
+live Google sign-in writing /users/{uid}/{activityEvents,profile,settings}.
+
+MVP_020.1 follow-up (DEC-029a, REVISES DEC-029): Decko is now ACCOUNT-FIRST — a
+mandatory auth GATE. GoRouter redirect sends unauth → /signin (branded
+SignInScreen, email/pw + Google, NO guest/anonymous); signed-in → Home.
+refreshListenable = GoRouterRefreshStream(authStateChanges). DeckoApp builds the
+router in initState with widget.authRepository. Removed the anonymous button from
+AccountScreen. Home gained a SalutationHeader (time greeting + first name + Google
+photo / initial fallback; DeckoUser gained photoUrl + greetingName/initial).
+Firebase session persistence → gate only on first launch / after sign-out (offline
+OK thereafter). Test harness _pumpApp signs in by default so app tests pass the
+gate; direct DeckoApp pumps in tests inject _SignedInAuth. 179 tests, analyze
+clean. NOT committed — awaiting verification. NEXT: MVP_021 (Typing Recall, or a
+dedicated review-state sync MVP once its safety model is designed).
+
+## Last completed (MVP_019 — Activity Ledger, XP, Streaks & Heatmap, DEC-028) committed afe0dd5
+A durable local `ActivityEvent` ledger (file-backed JSON at <appSupport>/decko_activity/
 events.json) records review + practice over time. Pure ActivityProgressCalculator
 derives total/review/practice XP, XP today, cards/practice today, current+longest
 streak (from active days), GitHub-style heatmap (84d), recent activity. Progress
@@ -15,8 +43,9 @@ level card; daily goal now activity-COUNT based = reviews+practice rounds, defau
 writes BOTH snapshot + ledger). Legacy ProgressSnapshot PRESERVED + migrated ONCE
 (idempotent, ActivityMigration in DeckoApp.initState) as legacy baseline events (XP
 kept; streak reconstructed so it survives; legacy excluded from heatmap). Review/
-FSRS/due/counters UNTOUCHED. 169 tests, analyze clean. NOT committed — awaiting
-verification. NEXT: MVP_020 Auth & Firebase sync.
+FSRS/due/counters UNTOUCHED. 169 tests, analyze clean. Committed afe0dd5 (heatmap
+fills width; achievement badges got earned-check/locked-lock markers; First review
+needs an actual review).
 
 ## Last completed (MVP_018 — Listening Challenge, DEC-027) committed ccf7733: SECOND registered
 practice mode (`listening_challenge`), proving the MVP_017 platform. Word audio
