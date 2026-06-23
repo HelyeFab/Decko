@@ -234,6 +234,17 @@ See: `docs/import-progress.md`
   idempotent by event id and never deletes local-only events. Imported decks,
   media, FSRS, review-card state, and due queues are deliberately **not** synced.
   Branded Account & sync screen under Settings. Next: MVP_021.
+  (MVP_020.1 / DEC-029a made Decko account-first: a mandatory auth gate +
+  personalised salutation on Home.)
+- ~~Typing Recall mode~~ DONE (MVP_021, DEC-030): Decko's third registered
+  practice mode — `typing_recall`. Per card it mixes reading rounds (show the
+  word → type the kana reading) and meaning rounds (→ type the English meaning,
+  any listed alternative accepted). A conservative, explainable
+  `TypingRecallChecker` grades correct / almost / incorrect (safe normalisation:
+  trim, kana, full/half-width, case, punctuation; loose match or 1-char typo →
+  almost). Pure builder + one `PracticeLauncher` case; manual + deck practice
+  only (motivational XP — correct 5 / almost 2), review presentation deferred.
+  No FSRS/review mutation. Next: MVP_022 (Matching) or MVP_023 (Image recall).
 
 ## I5 — FSRS Production Scheduler
 

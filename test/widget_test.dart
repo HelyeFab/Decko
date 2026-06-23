@@ -46,6 +46,9 @@ import 'package:decko/domain/sentence_builder/cube_token.dart';
 import 'package:decko/domain/sentence_builder/sentence_tokenizer.dart';
 import 'package:decko/domain/repositories/sentence_token_cache.dart';
 import 'package:decko/domain/practice/practice_outcome.dart';
+import 'package:decko/domain/practice/practice_mode.dart';
+import 'package:decko/domain/typing/typing_recall.dart';
+import 'package:decko/features/typing/typing_recall_screen.dart';
 import 'package:decko/domain/activity/activity_event.dart';
 import 'package:decko/domain/repositories/activity_ledger_repository.dart';
 import 'package:decko/data/local_only_auth_repository.dart';
@@ -798,6 +801,66 @@ void main() {
     expect(find.text('Cloud sync'), findsOneWidget);
     expect(find.text('What syncs'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('Typing recall: type → feedback → complete records practice XP '
+      '(MVP_021)', (WidgetTester tester) async {
+    PracticeOutcome? outcome;
+    final List<TypingRecallRound> rounds = <TypingRecallRound>[
+      const TypingRecallRound(
+        itemId: 'a',
+        deckId: 'd',
+        targetKind: TypingTargetKind.meaning,
+        promptText: '食べる',
+        answer: 'to eat',
+        accepted: <String>['to eat'],
+        source: TypingRecallSource.deckPractice,
+      ),
+      const TypingRecallRound(
+        itemId: 'b',
+        deckId: 'd',
+        targetKind: TypingTargetKind.reading,
+        promptText: '犬',
+        answer: 'いぬ',
+        accepted: <String>['いぬ'],
+        source: TypingRecallSource.deckPractice,
+      ),
+    ];
+    await tester.pumpWidget(MaterialApp(
+      home: TypingRecallScreen(
+        rounds: rounds,
+        title: 'Typing',
+        onCompleted: (PracticeOutcome o) => outcome = o,
+      ),
+    ));
+
+    // Round 1: correct.
+    await tester.enterText(find.byType(TextField), 'to eat');
+    await tester.pump();
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+    expect(find.text('Correct!'), findsOneWidget);
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+
+    // Round 2: wrong → the expected answer is revealed, no shame.
+    await tester.enterText(find.byType(TextField), 'ねこ');
+    await tester.pump();
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+    expect(find.text('Not quite'), findsOneWidget);
+    expect(find.text('Answer: いぬ'), findsOneWidget);
+    await tester.tap(find.text('Finish'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Typing complete'), findsOneWidget);
+    expect(find.textContaining('review schedule is unchanged'), findsOneWidget);
+    // Practice outcome: 1 of 2 correct → 5 XP, mode tagged typing_recall.
+    expect(outcome, isNotNull);
+    expect(outcome!.modeId, PracticeModeId.typingRecall);
+    expect(outcome!.correctCount, 1);
+    expect(outcome!.incorrectCount, 1);
+    expect(outcome!.xpAwarded, 5);
   });
 
   testWidgets('Home opens the registry-driven practice hub (MVP_017)',

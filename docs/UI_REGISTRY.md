@@ -426,6 +426,18 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Added in MVP_021 (Typing Recall, DEC-030)
+
+- **`TypingRecallScreen`** (`features/typing/`) — a `primaryContainer` prompt
+  card (instruction label + the large word), a focused text field (autofocus),
+  a Check button, then a colour-coded feedback panel — correct (green
+  `solidCircleCheck`), almost (amber `circleHalfStroke`), incorrect (error
+  `circleXmark`) — that always reveals `Answer: …` + the explanation, with
+  Next/Finish and a keyboard-icon completion + `+XP` pill. Kind, never shaming.
+- Registered via the platform — `keyboard` icon + "Type this" card action added
+  to the `practiceModeIcon` / `practiceCardAction` maps; surfaces in the Hub,
+  Deck Detail, and review manual actions with no screen-specific code.
+
 ### Added in MVP_020 (Account & sync, DEC-029)
 
 - **`AccountScreen`** (`features/account/`, route `/settings/account`) — branded

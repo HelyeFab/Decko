@@ -8,12 +8,15 @@ import '../../domain/learning_item.dart';
 import '../../domain/listening/listening_challenge.dart';
 import '../../domain/listening/listening_challenge_builder.dart';
 import '../../domain/practice/practice_mode.dart';
+import '../../domain/typing/typing_recall.dart';
+import '../../domain/typing/typing_recall_builder.dart';
 import '../../domain/repositories/imported_source_store.dart';
 import '../../domain/sentence_builder/sentence_builder_round.dart';
 import '../../domain/sentence_builder/sentence_builder_source.dart';
 import '../listening/listening_challenge_screen.dart';
 import '../sentence_builder/sentence_builder_loader.dart';
 import '../sentence_builder/sentence_round_service.dart';
+import '../typing/typing_recall_screen.dart';
 import 'practice_outcome_recorder.dart';
 
 /// The single place that maps a [PracticeMode] to its screen (MVP_017+). Deck
@@ -23,6 +26,7 @@ class PracticeLauncher {
   const PracticeLauncher._();
 
   static const ListeningChallengeBuilder _listening = ListeningChallengeBuilder();
+  static const TypingRecallBuilder _typing = TypingRecallBuilder();
 
   /// Launches deck-level practice for [mode] over [deck].
   static void launchDeck(BuildContext context, PracticeMode mode, Deck deck) {
@@ -46,6 +50,14 @@ class PracticeLauncher {
         ));
       case PracticeModeId.listeningChallenge:
         _launchListening(context, deck, mode.title, item: null);
+      case PracticeModeId.typingRecall:
+        final List<TypingRecallRound> rounds = _typing.roundsForDeck(deck);
+        if (rounds.isEmpty) {
+          DeckoSnackbar.showInfo(
+              context, 'Not enough cards for typing recall here yet.');
+          return;
+        }
+        _pushTyping(context, rounds, mode.title);
     }
   }
 
@@ -76,7 +88,27 @@ class PracticeLauncher {
         ));
       case PracticeModeId.listeningChallenge:
         _launchListening(context, deck, mode.title, item: item);
+      case PracticeModeId.typingRecall:
+        final TypingRecallRound? round = _typing.roundForItem(item, deck);
+        if (round == null) {
+          DeckoSnackbar.showInfo(
+              context, 'This card doesn’t have a typing target yet.');
+          return;
+        }
+        _pushTyping(context, <TypingRecallRound>[round], mode.title);
     }
+  }
+
+  static void _pushTyping(
+      BuildContext context, List<TypingRecallRound> rounds, String title) {
+    final onCompleted = practiceOutcomeSink(context);
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (BuildContext context) => TypingRecallScreen(
+        rounds: rounds,
+        title: title,
+        onCompleted: onCompleted,
+      ),
+    ));
   }
 
   /// Loads the deck's preserved source (so sentence translations are used when

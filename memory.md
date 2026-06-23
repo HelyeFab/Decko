@@ -4,7 +4,24 @@
 2026-06-22
 
 ## Current stage
-MVP_020 in review: Auth & Firebase Sync Foundation (DEC-029). Firebase project
+MVP_021 in review: Typing Recall — Decko's THIRD registered practice mode
+(`typing_recall`, DEC-030). Per card the pure sync TypingRecallBuilder emits a
+READING round (show expression → type kana reading, only when reading≠expression)
+and/or a MEANING round (→ type English meaning; comma/slash/semicolon alternatives
+accepted); sessions mix both. TypingRecallChecker grades correct/almost/incorrect:
+SAFE norm (trim, collapse spaces, katakana→hiragana, fullwidth→half, case-fold EN,
+strip outer punct, accepted alts) → correct; loose (drop ALL space+punct) or
+1-char edit on len≥4 → almost; else incorrect (always reveal answer). Long-vowel
+ー kept meaningful; no romaji→kana (reading expects kana). Registered manual+deck,
+reviewPresentation FALSE (scheduled typing deferred — grading risk). One
+PracticeLauncher case (sync, no source). TypingRecallScreen (prompt card, input,
+colour-coded feedback, reveal, completion+XP). PracticeOutcome via
+practiceOutcomeSink → progress+ledger (XP correct 5/almost 2/incorrect 0). NO
+FSRS/review mutation. keyboard icon / "Type this". MVP_017 registry tests made
+Bunburu-specific (3 modes now). 196 tests, analyze clean. NOT committed — awaiting
+verification. NEXT: MVP_022 Matching or MVP_023 Image recall.
+
+## Last completed (MVP_020 — Auth & Firebase Sync Foundation, DEC-029/029a) Firebase project
 decko-7a443 (iOS app registered; firebase_options.dart + GoogleService-Info.plist
 committed = client config, NOT secret; admin SDK key in gitignored secrets/).
 Firebase Auth (anonymous/email-password/Google via google_sign_in 7.x) +

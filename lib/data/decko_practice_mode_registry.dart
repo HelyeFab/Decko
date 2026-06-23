@@ -5,6 +5,7 @@ import '../domain/listening/listening_challenge_builder.dart';
 import '../domain/practice/practice_mode.dart';
 import '../domain/repositories/practice_mode_registry.dart';
 import '../domain/sentence_builder/sentence_builder_mapper.dart';
+import '../domain/typing/typing_recall_builder.dart';
 
 /// Decko's built-in practice-mode registry (MVP_017). Registers Bunburu; future
 /// games register here without any change to Deck Detail / Review / the Hub.
@@ -13,6 +14,7 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
 
   static const SentenceBuilderMapper _mapper = SentenceBuilderMapper();
   static const ListeningChallengeBuilder _listening = ListeningChallengeBuilder();
+  static const TypingRecallBuilder _typing = TypingRecallBuilder();
 
   static const PracticeMode _bunburu = PracticeMode(
     id: PracticeModeId.bunburuSentenceBuilder,
@@ -37,9 +39,21 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
     reviewPresentation: false,
   );
 
+  static const PracticeMode _typingMode = PracticeMode(
+    id: PracticeModeId.typingRecall,
+    title: 'Typing recall',
+    subtitle: 'Type the reading or meaning',
+    description: 'See a word and type its reading or meaning — active recall '
+        'with kind, forgiving feedback.',
+    kind: PracticeModeKind.type,
+    manualLaunch: true,
+    // Review presentation deferred (MVP_021): grading risk — practice only.
+    reviewPresentation: false,
+  );
+
   @override
   List<PracticeMode> get allModes =>
-      const <PracticeMode>[_bunburu, _listeningMode];
+      const <PracticeMode>[_bunburu, _listeningMode, _typingMode];
 
   @override
   List<PracticeMode> availableForCard(LearningItem item,
@@ -47,6 +61,7 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
     return <PracticeMode>[
       if (_mapper.looksCapable(item, note: note)) _bunburu,
       if (_listening.isCapable(item, note: note)) _listeningMode,
+      if (_typing.isCapable(item)) _typingMode,
     ];
   }
 
@@ -55,6 +70,7 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
     return <PracticeMode>[
       if (_deckHasSentences(deck, source)) _bunburu,
       if (_listening.deckIsCapable(deck, source: source)) _listeningMode,
+      if (_typing.deckIsCapable(deck)) _typingMode,
     ];
   }
 

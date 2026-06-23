@@ -34,30 +34,43 @@ void main() {
   group('DeckoPracticeModeRegistry (MVP_017)', () {
     const DeckoPracticeModeRegistry registry = DeckoPracticeModeRegistry();
 
+    bool hasBunburu(List<PracticeMode> modes) =>
+        modes.any((PracticeMode m) =>
+            m.id == PracticeModeId.bunburuSentenceBuilder);
+
     test('Bunburu is available for a sentence-capable card', () {
-      final List<PracticeMode> modes =
-          registry.availableForCard(_item('a', example: 'one two three'));
-      expect(modes, hasLength(1));
-      expect(modes.first.id, PracticeModeId.bunburuSentenceBuilder);
-    });
-
-    test('no modes for a card without a sentence', () {
-      expect(registry.availableForCard(_item('a')), isEmpty);
-    });
-
-    test('availableForDeck reflects whether any card is capable', () {
       expect(
-          registry.availableForDeck(
-              _deck(<LearningItem>[_item('a', example: 'one two')])),
-          hasLength(1));
-      expect(registry.availableForDeck(_deck(<LearningItem>[_item('a')])),
-          isEmpty);
+          hasBunburu(
+              registry.availableForCard(_item('a', example: 'one two three'))),
+          isTrue);
     });
 
-    test('Bunburu is both a manual mode and a review presentation', () {
+    test('Bunburu is not available for a card without a sentence', () {
+      // (Other modes such as typing recall may still apply — this is
+      // Bunburu-specific.)
+      expect(hasBunburu(registry.availableForCard(_item('a'))), isFalse);
+    });
+
+    test('availableForDeck reflects whether any card is sentence-capable', () {
+      expect(
+          hasBunburu(registry.availableForDeck(
+              _deck(<LearningItem>[_item('a', example: 'one two')]))),
+          isTrue);
+      expect(
+          hasBunburu(
+              registry.availableForDeck(_deck(<LearningItem>[_item('a')]))),
+          isFalse);
+    });
+
+    test('Bunburu is the manual + review-presentation sentence mode', () {
       final LearningItem item = _item('a', example: 'one two three');
-      expect(registry.manualModesForCard(item), hasLength(1));
-      expect(registry.reviewPresentationModesForCard(item), hasLength(1));
+      expect(hasBunburu(registry.manualModesForCard(item)), isTrue);
+      // Bunburu is the only review-presentation mode (listening/typing deferred).
+      expect(
+          registry
+              .reviewPresentationModesForCard(item)
+              .map((PracticeMode m) => m.id),
+          <PracticeModeId>[PracticeModeId.bunburuSentenceBuilder]);
     });
   });
 

@@ -804,3 +804,50 @@ sync and a personalised home.
 - First launch now needs network to sign in; subsequent launches are offline-OK.
 - Tests: the harness signs in by default so app tests pass the gate; dedicated
   tests cover the gate (signed-out → SignInScreen) and the salutation.
+
+## DEC-030: Typing Recall answer checking + review-state boundary
+
+Date: 2026-06-23
+Status: Accepted
+
+### Context
+
+MVP_021 adds Decko's third registered practice mode (`typing_recall`) — its first
+productive-input mode (type the answer). Text input needs an answer-checking
+layer that is forgiving enough for language learning but never silently accepts a
+wrong answer, and it must not touch review/FSRS state.
+
+### Decision
+
+- **Registered like any mode.** `typing_recall` joins the `PracticeModeRegistry`;
+  it surfaces in Deck Detail / Hub / review manual actions with one new
+  `PracticeLauncher` case. Manual + deck practice only; **`reviewPresentation =
+  false`** — scheduled-review typing is deferred because mapping typo/almost
+  categories to FSRS grades is a real risk (DEC-030 defers it explicitly).
+- **Two directions, mixed.** Per card the `TypingRecallBuilder` emits a *reading*
+  round (show the expression → type the kana reading, only when the reading
+  differs from the shown form) and/or a *meaning* round (→ type the English
+  meaning; any comma/slash/semicolon-separated alternative is accepted). Sessions
+  mix both. Pure + sync (no source load).
+- **Explainable, conservative checking** (`TypingRecallChecker`), three buckets:
+  - **correct** — matches an accepted answer after *safe* normalisation: trim,
+    collapse spaces, katakana→hiragana, full-width→half-width, case-fold English,
+    strip surrounding punctuation.
+  - **almost** — not correct, but matches after dropping *all* spaces +
+    punctuation, or is a single-character edit on an answer of length ≥ 4.
+  - **incorrect** — otherwise. The expected answer is always revealed.
+  We deliberately do **not** attempt full kana/kanji equivalence or romaji→kana;
+  reading rounds expect kana input. The long-vowel mark ー is treated as
+  meaningful (never stripped).
+- **Motivation only.** Outcomes record a `PracticeOutcome` → activity ledger
+  (XP: correct 5, almost 2, incorrect 0). Manual/deck typing **never** mutates
+  FSRS, review-card state, due dates, daily counters, or sibling burying.
+
+### Consequences
+
+- The platform's claim holds again: a new mode = a builder + a registry entry +
+  one launcher case + a screen. Deck Detail / Review / Hub untouched.
+- Tests cover normalisation, correct/almost/incorrect classification, availability
+  rules, deck-session generation, alternatives, the registry, and the screen flow.
+- Deferred: scheduled-review typing (needs an explicit, tested grade mapping);
+  romaji input; expression/sentence typing targets.
