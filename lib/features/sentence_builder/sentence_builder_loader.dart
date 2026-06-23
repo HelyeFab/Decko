@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../app/decko_app.dart';
 import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/decko_app_bar.dart';
 import '../../domain/sentence_builder/sentence_builder_round.dart';
+import '../practice/practice_outcome_recorder.dart';
 import '../../domain/sentence_builder/sentence_tokenizer.dart';
 import 'sentence_builder_screen.dart';
 
@@ -62,7 +62,7 @@ class _SentenceBuilderLoaderState extends State<SentenceBuilderLoader> {
         return SentenceBuilderScreen(
           rounds: rounds,
           title: widget.title,
-          onCompleted: DeckoApp.progressOf(context).recordPracticeOutcome,
+          onCompleted: practiceOutcomeSink(context),
         );
       },
     );

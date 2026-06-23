@@ -1,3 +1,4 @@
+import 'activity/activity_progress.dart';
 import 'progress_snapshot.dart';
 
 /// The small starter set of achievements (MVP_015, DEC-024).
@@ -37,5 +38,16 @@ List<AchievementStatus> achievementsFor(ProgressSnapshot s, int dailyGoal) {
     AchievementStatus(Achievement.dailyGoal, s.dailyGoalMet(dailyGoal)),
     AchievementStatus(Achievement.threeDayStreak, s.longestStreakDays >= 3),
     AchievementStatus(Achievement.hundredCards, s.totalCardsReviewed >= 100),
+  ];
+}
+
+/// The same starter set, derived from the activity ledger (MVP_019, DEC-028).
+List<AchievementStatus> achievementsForActivity(
+    ActivityProgress p, int dailyGoal) {
+  return <AchievementStatus>[
+    AchievementStatus(Achievement.firstReview, p.totalReviews > 0),
+    AchievementStatus(Achievement.dailyGoal, p.dailyGoalMet(dailyGoal)),
+    AchievementStatus(Achievement.threeDayStreak, p.longestStreakDays >= 3),
+    AchievementStatus(Achievement.hundredCards, p.totalReviews >= 100),
   ];
 }

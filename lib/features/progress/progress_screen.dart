@@ -7,15 +7,16 @@ import '../../core/constants/decko_spacing.dart';
 import '../../core/widgets/achievement_badge.dart';
 import '../../core/widgets/section_header.dart';
 import '../../domain/achievement.dart';
-import '../../domain/progress_snapshot.dart';
-import '../../domain/review_rating.dart';
-import '../../domain/review_session_result.dart';
+import '../../domain/activity/activity_event.dart';
+import '../../domain/activity/activity_progress.dart';
+import '../../domain/activity/activity_progress_calculator.dart';
+import 'widgets/activity_heatmap.dart';
+import 'widgets/recent_activity_list.dart';
 
-/// Decko's progress & light-gamification screen, backed by the
-/// [ProgressRepository] + the motivational daily goal (MVP_015).
-///
-/// Everything here is a presentation layer over recorded progress; it never
-/// drives scheduling. Before any session it shows a warm empty state.
+/// Decko's progress & light-gamification screen, backed by the activity ledger
+/// (MVP_019). XP / streaks / heatmap / recent activity are all derived from the
+/// ledger; this never drives scheduling. A warm empty state precedes any
+/// recorded activity.
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
 
@@ -23,9 +24,10 @@ class ProgressScreen extends StatefulWidget {
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
-typedef _ProgressData = ({ProgressSnapshot snapshot, int goal});
+typedef _ProgressData = ({ActivityProgress progress, int goal, DateTime now});
 
 class _ProgressScreenState extends State<ProgressScreen> {
+  static const ActivityProgressCalculator _calc = ActivityProgressCalculator();
   Future<_ProgressData>? _future;
 
   @override
@@ -36,11 +38,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<_ProgressData> _load() async {
     // Capture before awaiting so we don't use context across the gap.
-    final progressRepo = DeckoApp.progressOf(context);
+    final ledger = DeckoApp.ledgerOf(context);
     final settingsRepo = DeckoApp.settingsOf(context);
-    final ProgressSnapshot snapshot = await progressRepo.getSnapshot();
+    final DateTime now = DateTime.now();
+    final ActivityProgress progress = _calc.calculate(
+      await ledger.allEvents(),
+      now,
+    );
     final int goal = await settingsRepo.getDailyGoal();
-    return (snapshot: snapshot, goal: goal);
+    return (progress: progress, goal: goal, now: now);
   }
 
   @override
@@ -58,9 +64,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
             final _ProgressData d = async.data!;
             return ListView(
               padding: const EdgeInsets.all(DeckoSpacing.pagePadding),
-              children: d.snapshot.hasProgress
-                  ? _progressViews(d.snapshot, d.goal)
-                  : _emptyViews(d.goal),
+              children: d.progress.hasActivity
+                  ? _progressViews(d.progress, d.goal, d.now)
+                  : _emptyViews(d.goal, d.now),
             );
           },
         ),
@@ -68,24 +74,31 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  List<Widget> _progressViews(ProgressSnapshot s, int goal) {
+  List<Widget> _progressViews(ActivityProgress p, int goal, DateTime now) {
     return <Widget>[
-      _DailyGoalCard(reviewed: s.cardsReviewedToday, goal: goal),
+      ActivityHeatmap(days: p.heatmap, today: now),
+      const SizedBox(height: DeckoSpacing.lg),
+      _DailyGoalCard(reviewed: p.activityToday, goal: goal),
       const SizedBox(height: DeckoSpacing.lg),
       _LevelCard(
-          xp: s.combinedXp, level: s.currentLevel, xpIntoLevel: s.xpIntoLevel),
+        xp: p.totalXp,
+        level: p.currentLevel,
+        xpIntoLevel: p.xpIntoLevel,
+        reviewXp: p.reviewXp,
+        practiceXp: p.practiceXp,
+      ),
       const SizedBox(height: DeckoSpacing.lg),
       Row(
         children: <Widget>[
           Expanded(
             child: _StatCard(
               icon: FontAwesomeIcons.fire,
-              value: '${s.currentStreakDays} '
-                  '${s.currentStreakDays == 1 ? 'day' : 'days'}',
+              value: '${p.currentStreakDays} '
+                  '${p.currentStreakDays == 1 ? 'day' : 'days'}',
               label: 'Current streak',
-              footnote: s.currentStreakDays == 0
+              footnote: p.currentStreakDays == 0
                   ? 'Study today to start one'
-                  : s.reviewedToday
+                  : p.reviewedToday || p.practiceRoundsToday > 0
                       ? 'Counted today'
                       : 'Study today to keep it',
             ),
@@ -93,18 +106,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
           const SizedBox(width: DeckoSpacing.md),
           Expanded(
             child: _StatCard(
-              icon: FontAwesomeIcons.listCheck,
-              value: '${s.cardsReviewedToday}',
-              label: 'Reviewed today',
+              icon: FontAwesomeIcons.bolt,
+              value: '${p.xpToday}',
+              label: 'XP today',
             ),
           ),
         ],
       ),
-      if (s.lastSessionResult != null) ...<Widget>[
+      if (p.recent.isNotEmpty) ...<Widget>[
         const SizedBox(height: DeckoSpacing.xxl),
-        const SectionHeader(title: 'Your latest review'),
+        const SectionHeader(title: 'Recent activity'),
         const SizedBox(height: DeckoSpacing.md),
-        _LatestReviewCard(result: s.lastSessionResult!),
+        RecentActivityList(events: p.recent, now: now),
       ],
       const SizedBox(height: DeckoSpacing.xxl),
       const SectionHeader(
@@ -112,15 +125,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
         subtitle: 'Milestones you’ll unlock as you study.',
       ),
       const SizedBox(height: DeckoSpacing.lg),
-      _AchievementsGrid(statuses: achievementsFor(s, goal)),
+      _AchievementsGrid(statuses: achievementsForActivity(p, goal)),
     ];
   }
 
-  List<Widget> _emptyViews(int goal) {
+  List<Widget> _emptyViews(int goal, DateTime now) {
     return <Widget>[
       const _EmptyProgress(),
       const SizedBox(height: DeckoSpacing.lg),
       _DailyGoalCard(reviewed: 0, goal: goal),
+      const SizedBox(height: DeckoSpacing.lg),
+      ActivityHeatmap(
+          days: _calc.calculate(const <ActivityEvent>[], now).heatmap,
+          today: now),
       const SizedBox(height: DeckoSpacing.xxl),
       const SectionHeader(
         title: 'Achievements',
@@ -128,7 +145,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       ),
       const SizedBox(height: DeckoSpacing.lg),
       _AchievementsGrid(
-          statuses: achievementsFor(ProgressSnapshot.empty, goal)),
+          statuses: achievementsForActivity(ActivityProgress.empty, goal)),
     ];
   }
 }
@@ -301,11 +318,15 @@ class _LevelCard extends StatelessWidget {
     required this.xp,
     required this.level,
     required this.xpIntoLevel,
+    required this.reviewXp,
+    required this.practiceXp,
   });
 
   final int xp;
   final int level;
   final int xpIntoLevel;
+  final int reviewXp;
+  final int practiceXp;
 
   double get _progress => xpIntoLevel / 100;
 
@@ -362,11 +383,25 @@ class _LevelCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: DeckoSpacing.sm),
-            Text(
-              '$xpIntoLevel / 100 XP to level ${level + 1}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            Row(
+              children: <Widget>[
+                Flexible(
+                  child: Text(
+                    '$xpIntoLevel / 100 XP to level ${level + 1}',
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: DeckoSpacing.sm),
+                Text(
+                  'Review $reviewXp · Practice $practiceXp',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -430,83 +465,4 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _LatestReviewCard extends StatelessWidget {
-  const _LatestReviewCard({required this.result});
-
-  final ReviewSessionResult result;
-
-  static const Map<ReviewRating, Color> _accents = <ReviewRating, Color>{
-    ReviewRating.again: Color(0xFFE5534B),
-    ReviewRating.hard: Color(0xFFE0883A),
-    ReviewRating.good: Color(0xFF3FA66A),
-    ReviewRating.easy: Color(0xFF3F77E0),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(DeckoSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '${result.totalCards} '
-              '${result.totalCards == 1 ? 'card' : 'cards'} reviewed',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: DeckoSpacing.md),
-            Row(
-              children: <Widget>[
-                for (final ReviewRating rating in ReviewRating.values)
-                  Expanded(
-                    child: _RatingCount(
-                      label: rating.label,
-                      count: result.countFor(rating),
-                      accent: _accents[rating]!,
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RatingCount extends StatelessWidget {
-  const _RatingCount({
-    required this.label,
-    required this.count,
-    required this.accent,
-  });
-
-  final String label;
-  final int count;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      children: <Widget>[
-        Text(
-          '$count',
-          style: theme.textTheme.titleLarge
-              ?.copyWith(fontWeight: FontWeight.w700, color: accent),
-        ),
-        const SizedBox(height: DeckoSpacing.xs),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
 

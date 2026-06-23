@@ -217,6 +217,15 @@ See: `docs/import-progress.md`
   review manual actions (one new `PracticeLauncher` case, no other screen
   touched). Manual + deck practice only (motivational XP); review presentation
   deferred. Proved the MVP_017 platform.
+- ~~Activity ledger, XP, streaks & heatmap~~ DONE (MVP_019, DEC-028): a durable
+  local `ActivityEvent` ledger (file-backed JSON) records review + practice over
+  time; a pure `ActivityProgressCalculator` derives total/review/practice XP, XP
+  today, current + longest streak (from active days), a GitHub-style heatmap, and
+  recent activity. Progress screen is now ledger-backed (heatmap + recent +
+  review-vs-practice XP). Legacy `ProgressSnapshot` preserved + migrated once as a
+  baseline (streak reconstructed, XP kept). Motivation stays separate from
+  FSRS/review scheduling — nothing in the due path changed. Sets up cloud sync
+  (MVP_020 — Auth & Firebase).
 
 ## I5 — FSRS Production Scheduler
 

@@ -426,6 +426,21 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Added in MVP_019 (Activity ledger & heatmap, DEC-028)
+
+- **`ActivityHeatmap`** (`features/progress/widgets/`) — a GitHub-style XP grid:
+  the recent days laid out as week columns of seven rounded cells, intensity by XP
+  (`surfaceContainerHighest` → `primary` in five buckets), today ringed, a
+  Less→More legend, horizontally scrollable (newest on the right). Card surface.
+- **`RecentActivityList`** (`features/progress/widgets/`) — a bordered card of
+  recent ledger rows: mode icon (review `layerGroup` / Bunburu `cubesStacked` /
+  listening `headphones`), a label ("Reviewed N cards" / "Sentence builder" /
+  "Listening challenge"), relative time, and a `+N XP` trailing pill.
+- **Progress screen** is now ledger-backed: daily-goal ring + level card (now
+  with a "Review X · Practice Y" XP breakdown) + streak / XP-today stat cards +
+  heatmap + recent activity + achievements. The old per-session "latest review"
+  card was replaced by recent activity.
+
 ### Added in MVP_018 (Listening Challenge, DEC-027)
 
 - **`ListeningChallengeScreen`** (`features/listening/`) — a big circular

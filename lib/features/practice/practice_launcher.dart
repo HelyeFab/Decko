@@ -14,6 +14,7 @@ import '../../domain/sentence_builder/sentence_builder_source.dart';
 import '../listening/listening_challenge_screen.dart';
 import '../sentence_builder/sentence_builder_loader.dart';
 import '../sentence_builder/sentence_round_service.dart';
+import 'practice_outcome_recorder.dart';
 
 /// The single place that maps a [PracticeMode] to its screen (MVP_017+). Deck
 /// Detail / Review / the Hub call these; adding a future game means one new
@@ -88,7 +89,7 @@ class PracticeLauncher {
     required LearningItem? item,
   }) async {
     final ImportedSourceStore store = DeckoApp.sourceOf(context);
-    final recordOutcome = DeckoApp.progressOf(context).recordPracticeOutcome;
+    final recordOutcome = practiceOutcomeSink(context);
     final ImportedAnkiSource? source = await store.getSourceForDeck(deck.id);
     if (!context.mounted) return;
 

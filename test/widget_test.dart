@@ -46,6 +46,8 @@ import 'package:decko/domain/sentence_builder/cube_token.dart';
 import 'package:decko/domain/sentence_builder/sentence_tokenizer.dart';
 import 'package:decko/domain/repositories/sentence_token_cache.dart';
 import 'package:decko/domain/practice/practice_outcome.dart';
+import 'package:decko/domain/activity/activity_event.dart';
+import 'package:decko/domain/repositories/activity_ledger_repository.dart';
 import 'package:decko/features/deck_library/widgets/study_ribbon.dart';
 
 class _EmptyDeckRepository implements DeckRepository {
@@ -68,6 +70,31 @@ class _FixedDeckRepository implements DeckRepository {
     }
     return null;
   }
+}
+
+/// In-memory activity ledger so tests avoid path_provider.
+class _InMemoryLedger implements ActivityLedgerRepository {
+  final List<ActivityEvent> events = <ActivityEvent>[];
+  void seed(List<ActivityEvent> e) => events.addAll(e);
+  @override
+  Future<void> record(ActivityEvent event) async => events.add(event);
+  @override
+  Future<List<ActivityEvent>> allEvents() async =>
+      List<ActivityEvent>.of(events);
+  @override
+  Future<List<ActivityEvent>> eventsBetween(
+          DateTime start, DateTime end) async =>
+      events
+          .where((ActivityEvent e) =>
+              !e.occurredAt.isBefore(start) && e.occurredAt.isBefore(end))
+          .toList();
+  @override
+  Future<List<ActivityEvent>> recentEvents({int limit = 50}) async =>
+      (List<ActivityEvent>.of(events)
+            ..sort((ActivityEvent a, ActivityEvent b) =>
+                b.occurredAt.compareTo(a.occurredAt)))
+          .take(limit)
+          .toList();
 }
 
 /// A fake tokenizer that splits each line on spaces — deterministic, offline.
@@ -294,6 +321,7 @@ Future<void> _pumpApp(
   ImportedSourceStore? importedSourceStore,
   StudyOptionsRepository? studyOptionsRepository,
   DailyStudyCountsRepository? dailyStudyCountsRepository,
+  ActivityLedgerRepository? activityLedger,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   // Sentence builder uses a fake tokenizer + in-memory cache (no network).
@@ -317,6 +345,7 @@ Future<void> _pumpApp(
           dailyStudyCountsRepository ?? _InMemoryDailyCountsRepository(),
       tokenizer: _SplitTokenizer(),
       sentenceTokenCache: _InMemoryTokenCache(),
+      activityLedger: activityLedger ?? _InMemoryLedger(),
     ),
   );
   await tester.pumpAndSettle();
@@ -428,7 +457,8 @@ void main() {
 
     expect(find.text('Level 1'), findsOneWidget);
     expect(find.text('30 XP earned'), findsOneWidget);
-    expect(find.text('Your latest review'), findsOneWidget);
+    expect(find.text('Recent activity'), findsOneWidget);
+    expect(find.text('Reviewed 3 cards'), findsOneWidget);
   });
 
   testWidgets('Progress screen shows a warm empty state before any session',
@@ -446,26 +476,28 @@ void main() {
     expect(find.text('Achievements'), findsOneWidget);
   });
 
-  testWidgets('Progress screen celebrates a met daily goal (MVP_015)',
-      (WidgetTester tester) async {
-    final _InMemoryProgress progress =
-        _InMemoryProgress(DateTime(2026, 6, 20, 10));
-    progress.snapshot = ProgressSnapshot(
-      totalXp: 1000,
-      currentStreakDays: 3,
-      longestStreakDays: 3,
-      cardsReviewedToday: 20,
-      lastReviewedAt: DateTime(2026, 6, 20, 10),
-      lastSessionResult: const ReviewSessionResult(
-        deckId: 'd',
-        totalCards: 5,
-        againCount: 0,
-        hardCount: 0,
-        goodCount: 5,
-        easyCount: 0,
-      ),
-    );
-    await _pumpApp(tester, progressRepository: progress);
+  testWidgets('Progress derives a met daily goal + streak from the ledger '
+      '(MVP_019)', (WidgetTester tester) async {
+    final _InMemoryLedger ledger = _InMemoryLedger();
+    final DateTime now = DateTime.now();
+    ActivityEvent rev(DateTime when, int cards) => ActivityEvent(
+          id: 'e${when.microsecondsSinceEpoch}',
+          occurredAt: when,
+          source: ActivitySource.review,
+          modeId: ActivityModeIds.standardReview,
+          outcome: ActivityOutcome.completed,
+          xpAwarded: cards * 10,
+          metadata: <String, Object?>{'reviewedCards': cards},
+        );
+    // Three consecutive days → a 3-day streak; 20 cards today → goal met.
+    ledger.seed(<ActivityEvent>[
+      rev(now, 20),
+      rev(now.subtract(const Duration(days: 1)), 10),
+      rev(now.subtract(const Duration(days: 2)), 10),
+    ]);
+
+    await _pumpApp(tester,
+        deckRepository: const _EmptyDeckRepository(), activityLedger: ledger);
     await tester.tap(find.byTooltip('Progress'));
     await tester.pumpAndSettle();
 

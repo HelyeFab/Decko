@@ -25,6 +25,7 @@ import '../../domain/review_scheduling_policy.dart';
 import '../../domain/progress_snapshot.dart';
 import '../../domain/review_session.dart';
 import '../../domain/review_session_result.dart';
+import '../../domain/activity/activity_event.dart';
 import '../../domain/practice/practice_mode.dart';
 import '../../domain/repositories/practice_mode_registry.dart';
 import '../../domain/sentence_builder/sentence_builder_round.dart';
@@ -319,6 +320,16 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   Future<void> _recordProgress(ReviewSessionResult result) async {
     final progressRepo = DeckoApp.progressOf(context);
     final settingsRepo = DeckoApp.settingsOf(context);
+    final ledger = DeckoApp.ledgerOf(context);
+    // Record the review activity to the ledger (MVP_019) — motivational history
+    // only; scheduling/FSRS state is recorded elsewhere and untouched here.
+    if (result.totalCards > 0) {
+      ledger.record(ActivityEvent.review(
+        result,
+        occurredAt: DateTime.now(),
+        xpAwarded: result.totalCards * ProgressSnapshot.xpPerCard,
+      ));
+    }
     await progressRepo.recordSessionResult(result);
     final ProgressSnapshot snap = await progressRepo.getSnapshot();
     final int goal = await settingsRepo.getDailyGoal();

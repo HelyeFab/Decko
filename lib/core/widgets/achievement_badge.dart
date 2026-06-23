@@ -28,16 +28,44 @@ class AchievementBadge extends StatelessWidget {
       label: '$label badge, ${earned ? 'earned' : 'locked'}',
       child: Column(
         children: <Widget>[
-          Container(
-            height: 64,
-            width: 64,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: earned ? scheme.primary : scheme.surfaceContainerHighest,
-              border: Border.all(color: ring, width: 2),
-            ),
-            child: FaIcon(icon, color: fg, size: 26),
+          Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              Container(
+                height: 64,
+                width: 64,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color:
+                      earned ? scheme.primary : scheme.surfaceContainerHighest,
+                  border: Border.all(color: ring, width: 2),
+                ),
+                child: FaIcon(icon,
+                    color: earned ? fg : fg.withValues(alpha: 0.5), size: 26),
+              ),
+              // A corner marker so earned vs not-yet-earned is unmistakable.
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  height: 22,
+                  width: 22,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: earned ? scheme.primary : scheme.surfaceContainerHigh,
+                    border: Border.all(color: scheme.surface, width: 2),
+                  ),
+                  child: FaIcon(
+                    earned ? FontAwesomeIcons.check : FontAwesomeIcons.lock,
+                    size: 9,
+                    color:
+                        earned ? scheme.onPrimary : scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: DeckoSpacing.sm),
           SizedBox(

@@ -665,3 +665,57 @@ MVP_017 built a practice-mode platform (registry + launcher + outcome seam, DEC-
 - The platform's claim holds: a second game = register a `PracticeMode` + a builder + one `PracticeLauncher` case + an availability rule. Deck Detail / Review / Hub were untouched.
 - Tests cover availability (card/deck, with/without audio), choice generation (one correct, no duplicates, fallback), the manual-outcome boundary (XP recorded; review state stays zero), and the play→choose→feedback→complete flow.
 - Deferred: scheduler-routed listening review; richer prompt targets (sentence-meaning vs matching-sentence); typing/transcription (a later MVP).
+
+## DEC-028: An activity ledger separates motivational progress from review scheduling
+
+Date: 2026-06-22
+Status: Accepted
+
+### Context
+
+Through MVP_015–018 motivational progress lived in a single `ProgressSnapshot`
+(XP, streak, today's count). That's a point-in-time summary — it can't answer
+"what did I do over time?", power a heatmap, or split review vs practice. It also
+risked entangling motivation with scheduling.
+
+### Decision
+
+Introduce a durable, local **activity ledger** as the source of truth for
+motivation, kept strictly separate from review/FSRS state.
+
+- **Two layers, clearly split.** `ReviewState`/`ReviewCardState` answer *when is
+  this card due* (FSRS, due queue, Anki parity). `ActivityEvent`/the ledger
+  answer *what did I do, earn, practise* (XP, streaks, heatmap, history).
+  Recording an activity never decides card due state.
+- **`ActivityEvent`** (id, occurredAt, `ActivitySource`, modeId, deck/item,
+  `ActivityOutcome`, xpAwarded, duration, metadata) is appended on review-session
+  completion and on Bunburu/Listening completion. Review XP and practice XP are
+  distinguishable by `source`/`modeId`.
+- **`ActivityLedgerRepository`** with a **file-backed** local store
+  (`<appSupport>/decko_activity/events.json`) — chosen over `shared_preferences`
+  because history grows. Designed to be sync-ready (future Firebase, MVP_020),
+  but local-first defines the model; the cloud only mirrors it.
+- **Derived, not stored.** `ActivityProgressCalculator` (pure) derives total /
+  review / practice XP, XP today, cards reviewed today, practice rounds today,
+  current + longest streak (from active days), the heatmap, and recent activity.
+  Achievements derive from this. The daily goal is **activity-count based**
+  (reviews + practice rounds today), unifying both without rescaling the user's
+  existing "20".
+- **Practice never mutates FSRS.** Manual/deck practice rewards motivation only.
+  A future scheduled review presentation must still grade through
+  `ReviewScheduler` and is recorded with `ActivitySource.scheduledPractice`.
+- **Safe migration.** The legacy `ProgressSnapshot` is preserved and backfilled
+  once (idempotent) into the ledger as legacy baseline events: XP is kept, and
+  the prior streak is reconstructed (the learner genuinely studied those days) so
+  it survives and can continue. No fake per-day heatmap detail is fabricated;
+  legacy events are excluded from the heatmap.
+
+### Consequences
+
+- The Progress screen is now ledger-backed: a heatmap, recent activity, review
+  vs practice XP, current/longest streak, daily goal, achievements.
+- No FSRS / due queue / daily counter / sibling-burying / import semantics
+  changed — review state still updates exactly as before; the ledger is additive.
+- Tests cover event serialization, XP/streak/heatmap derivation, file
+  persistence, and the migration (incl. idempotency).
+- Sets up MVP_020 (Auth & Firebase sync) to mirror a clean local model.

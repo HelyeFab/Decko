@@ -3,8 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import '../config.dart';
 import '../core/constants/decko_strings.dart';
+import '../data/activity_migration.dart';
 import '../data/bunburu_tokenizer.dart';
 import '../data/decko_practice_mode_registry.dart';
+import '../data/local_activity_ledger_repository.dart';
 import '../data/file_imported_source_store.dart';
 import '../data/file_media_store.dart';
 import '../data/file_sentence_token_cache.dart';
@@ -18,6 +20,7 @@ import '../domain/repositories/daily_study_counts_repository.dart';
 import '../domain/repositories/deck_repository.dart';
 import '../domain/repositories/imported_source_store.dart';
 import '../domain/repositories/media_store.dart';
+import '../domain/repositories/activity_ledger_repository.dart';
 import '../domain/repositories/practice_mode_registry.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/review_state_repository.dart';
@@ -55,6 +58,7 @@ class DeckoApp extends StatefulWidget {
     this.tokenizer,
     this.sentenceTokenCache = const FileSentenceTokenCache(),
     this.practiceModeRegistry = const DeckoPracticeModeRegistry(),
+    this.activityLedger = const LocalActivityLedgerRepository(),
   });
 
   final DeckRepository deckRepository;
@@ -71,6 +75,7 @@ class DeckoApp extends StatefulWidget {
   final SentenceTokenizer? tokenizer;
   final SentenceTokenCache sentenceTokenCache;
   final PracticeModeRegistry practiceModeRegistry;
+  final ActivityLedgerRepository activityLedger;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -114,6 +119,9 @@ class DeckoApp extends StatefulWidget {
   static PracticeModeRegistry practiceRegistryOf(BuildContext context) =>
       _scopeOf(context).practiceModeRegistry;
 
+  static ActivityLedgerRepository ledgerOf(BuildContext context) =>
+      _scopeOf(context).activityLedger;
+
   /// A ready-to-use round service (tokenizer + cache) for the sentence builder.
   static SentenceRoundService sentenceRoundsOf(BuildContext context) =>
       SentenceRoundService(
@@ -153,6 +161,9 @@ class _DeckoAppState extends State<DeckoApp> {
           baseUrl: Uri.parse(kBunburuApiUrl),
           appKey: kBunburuAppKey,
         );
+    // One-time backfill of legacy progress into the activity ledger (MVP_019).
+    ActivityMigration.ensureBackfilled(
+        widget.activityLedger, widget.progressRepository);
   }
 
   @override
@@ -179,6 +190,7 @@ class _DeckoAppState extends State<DeckoApp> {
       tokenizer: _tokenizer,
       sentenceTokenCache: widget.sentenceTokenCache,
       practiceModeRegistry: widget.practiceModeRegistry,
+      activityLedger: widget.activityLedger,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -210,6 +222,7 @@ class _DeckoScope extends InheritedWidget {
     required this.tokenizer,
     required this.sentenceTokenCache,
     required this.practiceModeRegistry,
+    required this.activityLedger,
     required super.child,
   });
 
@@ -226,6 +239,7 @@ class _DeckoScope extends InheritedWidget {
   final SentenceTokenizer tokenizer;
   final SentenceTokenCache sentenceTokenCache;
   final PracticeModeRegistry practiceModeRegistry;
+  final ActivityLedgerRepository activityLedger;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -241,5 +255,6 @@ class _DeckoScope extends InheritedWidget {
       settingsRepository != oldWidget.settingsRepository ||
       tokenizer != oldWidget.tokenizer ||
       sentenceTokenCache != oldWidget.sentenceTokenCache ||
-      practiceModeRegistry != oldWidget.practiceModeRegistry;
+      practiceModeRegistry != oldWidget.practiceModeRegistry ||
+      activityLedger != oldWidget.activityLedger;
 }

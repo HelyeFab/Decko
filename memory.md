@@ -4,7 +4,21 @@
 2026-06-22
 
 ## Current stage
-MVP_018 COMPLETE (committed ccf7733): Listening Challenge — the SECOND registered
+MVP_019 in review: Activity Ledger, XP, Streaks & Heatmap (DEC-028). A durable
+local `ActivityEvent` ledger (file-backed JSON at <appSupport>/decko_activity/
+events.json) records review + practice over time. Pure ActivityProgressCalculator
+derives total/review/practice XP, XP today, cards/practice today, current+longest
+streak (from active days), GitHub-style heatmap (84d), recent activity. Progress
+screen REWRITTEN ledger-backed (heatmap + recent + review-vs-practice XP on the
+level card; daily goal now activity-COUNT based = reviews+practice rounds, default
+20). Review session + Bunburu/Listening record ActivityEvents (practiceOutcomeSink
+writes BOTH snapshot + ledger). Legacy ProgressSnapshot PRESERVED + migrated ONCE
+(idempotent, ActivityMigration in DeckoApp.initState) as legacy baseline events (XP
+kept; streak reconstructed so it survives; legacy excluded from heatmap). Review/
+FSRS/due/counters UNTOUCHED. 169 tests, analyze clean. NOT committed — awaiting
+verification. NEXT: MVP_020 Auth & Firebase sync.
+
+## Last completed (MVP_018 — Listening Challenge, DEC-027) committed ccf7733: SECOND registered
 practice mode (`listening_challenge`), proving the MVP_017 platform. Word audio
 (front) → pick meaning; sentence audio (example) → pick the matching sentence (or
 translation when a deck has Sentence-English); reveal shows a meaning context.
