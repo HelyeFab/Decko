@@ -173,6 +173,11 @@ class _InMemorySettings implements SettingsRepository {
   Future<int> getDailyGoal() async => dailyGoal;
   @override
   Future<void> saveDailyGoal(int goal) async => dailyGoal = goal;
+  bool onboarded = true; // tests skip onboarding by default
+  @override
+  Future<bool> getHasCompletedOnboarding() async => onboarded;
+  @override
+  Future<void> saveHasCompletedOnboarding(bool done) async => onboarded = done;
 }
 
 /// In-memory progress with an injectable clock; writes land synchronously.
@@ -350,6 +355,7 @@ Future<void> _pumpApp(
   DailyStudyCountsRepository? dailyStudyCountsRepository,
   ActivityLedgerRepository? activityLedger,
   AuthRepository? authRepository,
+  bool onboardingComplete = true,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   // Sentence builder uses a fake tokenizer + in-memory cache (no network).
@@ -378,6 +384,8 @@ Future<void> _pumpApp(
       // override with a signed-out repository.
       authRepository: authRepository ??
           _SignedInAuth(const DeckoUser(uid: 'test', email: 'tester@decko.app')),
+      // Onboarding done by default so app tests skip the first-run flow (MVP_024).
+      onboardingComplete: onboardingComplete,
     ),
   );
   await tester.pumpAndSettle();
@@ -764,6 +772,45 @@ void main() {
     expect(progress.snapshot.totalXp, 0);
   });
 
+  testWidgets('First-run onboarding renders and Skip reaches the app (MVP_024)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester, onboardingComplete: false);
+
+    expect(find.text('Import your deck'), findsOneWidget); // first page
+    expect(find.text('Skip'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    // Onboarding done → signed-in default reaches Home.
+    expect(find.text('Your decks'), findsOneWidget);
+    expect(find.text('Import your deck'), findsNothing);
+  });
+
+  testWidgets('Completing onboarding reaches the app (MVP_024)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester, onboardingComplete: false);
+
+    // Page through to the end, then "Get started".
+    for (int i = 0; i < 3; i++) {
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Sync across devices'), findsOneWidget); // last page
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your decks'), findsOneWidget);
+  });
+
+  testWidgets('Empty library offers import with a progress-safety note (MVP_024)',
+      (WidgetTester tester) async {
+    await _pumpApp(tester, deckRepository: const _EmptyDeckRepository());
+
+    expect(find.text('Import a deck'), findsOneWidget);
+    expect(find.textContaining('never silently'), findsOneWidget);
+  });
+
   testWidgets('Auth gate blocks the app until signed in (MVP_020.1)',
       (WidgetTester tester) async {
     await _pumpApp(tester, authRepository: const LocalOnlyAuthRepository());
@@ -900,6 +947,7 @@ void main() {
     await tester.pumpWidget(DeckoApp(
       settingsRepository: settings,
       authRepository: _SignedInAuth(const DeckoUser(uid: 'test')),
+      onboardingComplete: true,
     ));
     await tester.pumpAndSettle();
     expect(_appBrightness(tester), Brightness.dark);
@@ -1603,6 +1651,7 @@ void main() {
     await tester.pumpWidget(DeckoApp(
       mediaStore: _InMemoryMediaStore(),
       authRepository: _SignedInAuth(const DeckoUser(uid: 'test')),
+      onboardingComplete: true,
     ));
     await tester.pumpAndSettle();
     expect(find.text('Imported Z'), findsOneWidget);

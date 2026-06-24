@@ -85,6 +85,10 @@ class _ImportScreenState extends State<ImportScreen> {
 
     final DeckStore store = DeckoApp.deckStoreOf(context);
     final ReviewStateRepository reviewState = DeckoApp.reviewStateOf(context);
+    // A brand-new user's first import gets a clear success/next-step state
+    // (MVP_024), even when the import is clean.
+    final bool wasFirstImport =
+        !store.getDecks().any((Deck d) => d.isImported);
     try {
       final Deck deck = await widget.adapter.importDeck(
         bytes,
@@ -103,7 +107,7 @@ class _ImportScreenState extends State<ImportScreen> {
       // Clean imports stay frictionless (snackbar → Home). Imports with notes
       // pause on a calm result so nothing's a surprise (MVP_014).
       final ImportHealth? health = deck.importInfo?.diagnostics?.health;
-      if (health == ImportHealth.usableWithWarnings) {
+      if (health == ImportHealth.usableWithWarnings || wasFirstImport) {
         setState(() {
           _importedDeck = deck;
           _bytes = null;
@@ -207,6 +211,61 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 }
 
+/// Calm, user-facing explanation of how Decko import works (MVP_024).
+class _ImportGuidanceCard extends StatelessWidget {
+  const _ImportGuidanceCard();
+
+  static const List<(FaIconData, String)> _points = <(FaIconData, String)>[
+    (FontAwesomeIcons.boxArchive,
+        'Modern and classic Anki .apkg packages are supported.'),
+    (FontAwesomeIcons.shieldHeart,
+        'Decko reads your progress and asks before keeping or resetting it — '
+            'never silently.'),
+    (FontAwesomeIcons.photoFilm, 'Images and audio come along with your cards.'),
+    (FontAwesomeIcons.fileWaveform,
+        'If something looks off, open the import report for a health summary.'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(DeckoSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(DeckoRadii.lg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('What to expect',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: DeckoSpacing.sm),
+          for (final (FaIconData icon, String text) in _points)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: FaIcon(icon, size: 13, color: scheme.primary),
+                  ),
+                  const SizedBox(width: DeckoSpacing.sm),
+                  Expanded(
+                      child: Text(text, style: theme.textTheme.bodySmall)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _IdleOptions extends StatelessWidget {
   const _IdleOptions({required this.onPickApkg});
 
@@ -260,6 +319,8 @@ class _IdleOptions extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: DeckoSpacing.md),
+        const _ImportGuidanceCard(),
         const SizedBox(height: DeckoSpacing.md),
         for (final String label in const <String>['Import CSV', 'Import JSON'])
           Padding(

@@ -52,6 +52,26 @@ class EmptyLibraryCard extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: DeckoSpacing.md),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: FaIcon(FontAwesomeIcons.shieldHeart,
+                      size: 13, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: DeckoSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'If your deck has progress, Decko asks before keeping or '
+                    'resetting it — never silently.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: DeckoSpacing.xl),
             FilledButton.icon(
               onPressed: onImport,

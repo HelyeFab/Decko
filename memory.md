@@ -4,7 +4,25 @@
 2026-06-22
 
 ## Current stage
-MVP_023 in review: Sync Status, Conflict UX & Account Polish (DEC-032). UX/trust
+MVP_024 in review: First-Run Onboarding, Import Guidance & Empty States (DEC-033).
+UX/shippability — NO engine changes. Local `hasCompletedOnboarding` flag
+(SettingsRepository getHasCompletedOnboarding/save; SharedPrefs key
+decko.settings.onboardingComplete; default false; auth-INDEPENDENT, sign-out never
+resets). OnboardingController(settings, initial:) ChangeNotifier in DeckoApp scope
+(onboardingOf); main.dart AWAITS the flag + passes onboardingComplete so no flash.
+Router redirect: !onboarding.isComplete → /onboarding (PRECEDES the auth gate),
+then signin, then app; refreshListenable = Listenable.merge([authStream,
+onboarding]). OnboardingScreen (features/onboarding/) = skippable 4-page PageView
+(Import / Study / Progress safe / Sync boundary) → controller.complete(). Polish:
+EmptyLibraryCard progress-safety line ("never silently"); import screen
+_ImportGuidanceCard ("What to expect"); first import (wasFirstImport = no imported
+decks yet) always shows _ResultPanel success. Test harness: _pumpApp gained
+onboardingComplete param (default true so app tests skip onboarding); 2 direct
+DeckoApp pumps + the 2 SettingsRepository test fakes updated. 224 tests, analyze
+clean. NOT committed — awaiting verification. NEXT: MVP_025 (Match mode or further
+onboarding polish).
+
+## Last completed (MVP_023 — Sync Status, Conflict UX & Account Polish, DEC-032) committed e1ebab2 UX/trust
 layer over MVP_020/022 — NO new sync behaviour, NO FSRS changes. Pure
 `deriveDeckSyncState` (in lib/domain/sync/deck_sync_status.dart) → DeckSyncState
 notImportedDeck/signedOut/notMatched/matchedUpToDate/localAhead/cloudAhead/
@@ -15,8 +33,7 @@ conflict/offline from per-card merge tallies; `ReviewStateSyncService.deckStatus
 "Apply synced progress?" DeckoConfirmDialog (matches + what will/won't change)
 before any write; calm "kept your local progress" conflict line; offline
 reassurance. Account "what syncs/stays local" copy clarified (+ import-same-deck
-hint). 216 tests, analyze clean. NOT committed — awaiting verification. NEXT:
-MVP_024 (Match mode, or import/sync onboarding polish).
+hint). 216 tests, analyze clean. Committed e1ebab2.
 
 ## Last completed (MVP_022 — Cross-Device Review-State Sync, DEC-031) committed e5c83f6 the HIGH-RISK one
 (writes FSRS/review state), built pure-first + heavily tested. Syncs per-card

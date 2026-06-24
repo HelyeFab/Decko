@@ -20,4 +20,11 @@ abstract class SettingsRepository {
 
   /// Persists the daily card goal.
   Future<void> saveDailyGoal(int goal);
+
+  /// Whether the user has finished (or skipped) first-run onboarding. Local-only
+  /// and not tied to auth — signing out never resets it (MVP_024).
+  Future<bool> getHasCompletedOnboarding();
+
+  /// Persists onboarding completion.
+  Future<void> saveHasCompletedOnboarding(bool done);
 }

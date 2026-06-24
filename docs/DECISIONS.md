@@ -938,3 +938,44 @@ progress could be overwritten silently.
   / sibling-burying behaviour changed.
 - Deferred (later): true pending-upload tracking + a connectivity signal (offline
   is currently inferred from fetch failures).
+
+## DEC-033: First-run onboarding and honest sync boundaries
+
+Date: 2026-06-24
+Status: Accepted
+
+### Context
+
+Decko has the engine (import, FSRS review, practice modes, activity, auth, review-
+state sync). The remaining risk is a first-time user opening an account-first app
+and not understanding what it is, how import works, what happens to their Anki
+progress, or what does/doesn't sync. MVP_024 makes Decko shippable to a stranger
+— UX only, no learning-correctness changes.
+
+### Decision
+
+- **A short, skippable first-run flow** at `/onboarding`, gated by a local
+  `hasCompletedOnboarding` setting (loaded at startup so there's no flash). It
+  precedes the auth gate: onboarding → sign-in → app. Four calm pages: import,
+  study beautifully, progress is safe, and the **honest sync boundary** (account /
+  activity / matching-deck review state sync; deck files + media stay local —
+  import the same deck elsewhere to continue).
+- **Local-first, auth-independent.** The flag lives only in settings; signing out
+  never resets it, and onboarding completion is never tied to an account.
+- **Guidance in the empty/zero states, in plain language.** The empty-library
+  card states progress safety ("never silently"); the import screen carries a
+  "what to expect" card (formats, progress-aware, media, report); a brand-new
+  user's **first import** always shows the success/next-step result (count, media,
+  health, start studying) instead of a silent snackbar.
+- **No engine changes.** Onboarding guides; it must not (and does not) touch FSRS,
+  the scheduler, due queue, daily limits, sibling burying, import parsing, media
+  extraction, imported card ids, fingerprints, or sync semantics.
+
+### Consequences
+
+- A new user can understand Decko and take a clear first action without prior
+  context. The honest sync boundary (set in MVP_022/023) is now explained up
+  front, reducing post-sync confusion.
+- The onboarding flag is the only new persisted state; everything else reuses
+  existing widgets/strings. Tests cover the flag (default/persist/no-reset) and
+  the flow (renders / skip / complete → app) plus the empty-library action.

@@ -115,6 +115,11 @@ class FakeSettings implements SettingsRepository {
   Future<int> getDailyGoal() async => goal;
   @override
   Future<void> saveDailyGoal(int g) async => goal = g;
+  bool onboarded = true;
+  @override
+  Future<bool> getHasCompletedOnboarding() async => onboarded;
+  @override
+  Future<void> saveHasCompletedOnboarding(bool done) async => onboarded = done;
 }
 
 ActivityEvent _ev(String id) => ActivityEvent(

@@ -37,6 +37,7 @@ import '../features/sentence_builder/sentence_round_service.dart';
 import 'deck_store.dart';
 import 'decko_router.dart';
 import 'furigana_controller.dart';
+import 'onboarding_controller.dart';
 import 'theme/app_theme_config.dart';
 import 'theme/theme_controller.dart';
 
@@ -67,6 +68,7 @@ class DeckoApp extends StatefulWidget {
     this.authRepository = const LocalOnlyAuthRepository(),
     this.syncRepository = const LocalOnlySyncRepository(),
     this.reviewStateSync,
+    this.onboardingComplete,
   });
 
   final DeckRepository deckRepository;
@@ -89,6 +91,9 @@ class DeckoApp extends StatefulWidget {
 
   /// Cross-device review-state sync (MVP_022). Null when Firebase is off.
   final ReviewStateSyncService? reviewStateSync;
+
+  /// First-run onboarding state loaded at startup (MVP_024). Null → load async.
+  final bool? onboardingComplete;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -144,6 +149,9 @@ class DeckoApp extends StatefulWidget {
   static ReviewStateSyncService? reviewSyncOf(BuildContext context) =>
       _scopeOf(context).reviewStateSync;
 
+  static OnboardingController onboardingOf(BuildContext context) =>
+      _scopeOf(context).onboardingController;
+
   /// A ready-to-use round service (tokenizer + cache) for the sentence builder.
   static SentenceRoundService sentenceRoundsOf(BuildContext context) =>
       SentenceRoundService(
@@ -167,13 +175,16 @@ class _DeckoAppState extends State<DeckoApp> {
   late final FuriganaController _furiganaController;
   late final DeckStore _deckStore;
   late final SentenceTokenizer _tokenizer;
+  late final OnboardingController _onboardingController;
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
-    // The router gates on auth (MVP_020.1) — built with the auth repository.
-    _router = buildDeckoRouter(widget.authRepository);
+    _onboardingController = OnboardingController(widget.settingsRepository,
+        initial: widget.onboardingComplete);
+    // The router gates on onboarding (MVP_024) + auth (MVP_020.1).
+    _router = buildDeckoRouter(widget.authRepository, _onboardingController);
     _themeController = ThemeController(widget.settingsRepository);
     _themeController.load();
     _furiganaController = FuriganaController(widget.settingsRepository);
@@ -222,6 +233,7 @@ class _DeckoAppState extends State<DeckoApp> {
       authRepository: widget.authRepository,
       syncRepository: widget.syncRepository,
       reviewStateSync: widget.reviewStateSync,
+      onboardingController: _onboardingController,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -257,6 +269,7 @@ class _DeckoScope extends InheritedWidget {
     required this.authRepository,
     required this.syncRepository,
     required this.reviewStateSync,
+    required this.onboardingController,
     required super.child,
   });
 
@@ -277,6 +290,7 @@ class _DeckoScope extends InheritedWidget {
   final AuthRepository authRepository;
   final SyncRepository syncRepository;
   final ReviewStateSyncService? reviewStateSync;
+  final OnboardingController onboardingController;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -296,5 +310,6 @@ class _DeckoScope extends InheritedWidget {
       activityLedger != oldWidget.activityLedger ||
       authRepository != oldWidget.authRepository ||
       syncRepository != oldWidget.syncRepository ||
-      reviewStateSync != oldWidget.reviewStateSync;
+      reviewStateSync != oldWidget.reviewStateSync ||
+      onboardingController != oldWidget.onboardingController;
 }

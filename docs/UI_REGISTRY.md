@@ -426,6 +426,20 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Added in MVP_024 (First-run onboarding & guidance, DEC-033)
+
+- **`OnboardingScreen`** (`features/onboarding/`, route `/onboarding`) — a
+  skippable 4-page `PageView` (large `primaryContainer` icon tile + title + body),
+  animated dot indicator, Skip + Next/"Get started". Pages: Import your deck /
+  Study beautifully / Your progress is safe / Sync across devices (honest
+  boundary). Completing or skipping calls `OnboardingController.complete()` and
+  the router moves on. Gated ahead of the auth gate.
+- **`EmptyLibraryCard`** gained a progress-safety reassurance line (shieldHeart +
+  "never silently").
+- **Import screen** gained an `_ImportGuidanceCard` ("What to expect": formats,
+  progress-aware, media, report); a new user's first import always shows the
+  `_ResultPanel` success/next-step state.
+
 ### Updated in MVP_023 (Sync status & conflict UX, DEC-032)
 
 - **`ReviewSyncBanner`** now renders the full `DeckSyncState` set: a prominent

@@ -12,6 +12,7 @@ class SharedPrefsSettingsRepository implements SettingsRepository {
   static const String _appThemeKey = 'decko.settings.appThemeId';
   static const String _furiganaKey = 'decko.settings.showFurigana';
   static const String _dailyGoalKey = 'decko.settings.dailyGoal';
+  static const String _onboardingKey = 'decko.settings.onboardingComplete';
   static const int _defaultDailyGoal = 20;
 
   @override
@@ -48,5 +49,17 @@ class SharedPrefsSettingsRepository implements SettingsRepository {
   Future<void> saveDailyGoal(int goal) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_dailyGoalKey, goal);
+  }
+
+  @override
+  Future<bool> getHasCompletedOnboarding() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_onboardingKey) ?? false;
+  }
+
+  @override
+  Future<void> saveHasCompletedOnboarding(bool done) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_onboardingKey, done);
   }
 }

@@ -265,6 +265,15 @@ See: `docs/import-progress.md`
   "kept your local progress" conflict line, and offline reassurance. Account
   "what syncs / stays local" copy clarified. Next: MVP_024 (Match mode, or
   import/sync onboarding polish).
+- ~~First-run onboarding, import guidance & empty states~~ DONE (MVP_024,
+  DEC-033): makes Decko shippable to a stranger (UX only — no engine changes). A
+  short, skippable 4-page onboarding at `/onboarding` (gated by a local
+  `hasCompletedOnboarding` flag, loaded at startup; precedes the auth gate)
+  explains import, progress safety, and the honest sync boundary. Empty-library
+  card states progress safety; the import screen gained a "what to expect" card;
+  a new user's first import always shows the success/next-step result. Local-
+  first flag, auth-independent (sign-out never resets it). Next: MVP_025 (Match
+  mode or further onboarding polish).
 
 ## I5 — FSRS Production Scheduler
 

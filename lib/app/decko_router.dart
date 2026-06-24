@@ -7,6 +7,7 @@ import '../domain/auth/auth_repository.dart';
 import '../domain/deck.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/deck_detail/deck_detail_screen.dart';
+import '../features/onboarding/onboarding_screen.dart';
 import '../features/deck_library/deck_library_screen.dart';
 import '../features/deck_options/deck_options_screen.dart';
 import '../features/import/import_report_screen.dart';
@@ -22,6 +23,7 @@ import '../features/account/account_screen.dart';
 import '../features/themes/theme_gallery_screen.dart';
 import 'decko_app.dart';
 import 'decko_shell.dart';
+import 'onboarding_controller.dart';
 
 /// Centralised route helpers so navigation calls stay typo-proof.
 abstract final class DeckoRoutes {
@@ -31,6 +33,9 @@ abstract final class DeckoRoutes {
 
   /// The auth gate — Decko requires a signed-in account (MVP_020.1, DEC-029).
   static const String signIn = '/signin';
+
+  /// First-run onboarding (MVP_024).
+  static const String onboarding = '/onboarding';
 
   /// The Settings tab (a hub).
   static const String settings = '/settings';
@@ -78,21 +83,39 @@ final GlobalKey<NavigatorState> _rootNavigatorKey =
 /// pushed on the **root** navigator so it plays full-screen over the bar.
 /// Deck-scoped routes resolve the [Deck] from the [DeckRepository]; an unknown
 /// id falls back gracefully.
-GoRouter buildDeckoRouter(AuthRepository auth) {
+GoRouter buildDeckoRouter(
+    AuthRepository auth, OnboardingController onboarding) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: DeckoRoutes.home,
-    refreshListenable: GoRouterRefreshStream(auth.authStateChanges()),
+    refreshListenable: Listenable.merge(<Listenable>[
+      GoRouterRefreshStream(auth.authStateChanges()),
+      onboarding,
+    ]),
     redirect: (BuildContext context, GoRouterState state) {
+      final String loc = state.matchedLocation;
+      // 1) First-run onboarding precedes everything (MVP_024).
+      if (!onboarding.isComplete) {
+        return loc == DeckoRoutes.onboarding ? null : DeckoRoutes.onboarding;
+      }
       // A real (non-anonymous) account is required to reach the app.
       final bool signedIn =
           auth.currentUser != null && !auth.currentUser!.isAnonymous;
-      final bool atGate = state.matchedLocation == DeckoRoutes.signIn;
-      if (!signedIn) return atGate ? null : DeckoRoutes.signIn;
-      if (atGate) return DeckoRoutes.home;
+      if (!signedIn) {
+        return loc == DeckoRoutes.signIn ? null : DeckoRoutes.signIn;
+      }
+      // Onboarded + signed in → leave the gate/onboarding routes.
+      if (loc == DeckoRoutes.signIn || loc == DeckoRoutes.onboarding) {
+        return DeckoRoutes.home;
+      }
       return null;
     },
     routes: <RouteBase>[
+      GoRoute(
+        path: DeckoRoutes.onboarding,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, _) => const OnboardingScreen(),
+      ),
       GoRoute(
         path: DeckoRoutes.signIn,
         parentNavigatorKey: _rootNavigatorKey,

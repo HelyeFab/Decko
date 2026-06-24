@@ -23,6 +23,10 @@ Future<void> main() async {
 
   // Cloud is optional: if Firebase can't initialise, Decko runs local-only and
   // stays fully usable offline / signed out (MVP_020, DEC-029).
+  // Load first-run onboarding state before routing so there's no flash (MVP_024).
+  const SharedPrefsSettingsRepository settings = SharedPrefsSettingsRepository();
+  final bool onboarded = await settings.getHasCompletedOnboarding();
+
   AuthRepository auth = const LocalOnlyAuthRepository();
   SyncRepository sync = const LocalOnlySyncRepository();
   ReviewStateSyncService? reviewStateSync;
@@ -34,7 +38,7 @@ Future<void> main() async {
     sync = DeckoSyncRepository(
       auth: firebaseAuth,
       ledger: const LocalActivityLedgerRepository(),
-      settings: const SharedPrefsSettingsRepository(),
+      settings: settings,
       cloudActivity: FirestoreActivitySyncRepository(),
       cloudUser: FirestoreUserSyncRepository(),
     );
@@ -48,8 +52,10 @@ Future<void> main() async {
   }
 
   runApp(DeckoApp(
+    settingsRepository: settings,
     authRepository: auth,
     syncRepository: sync,
     reviewStateSync: reviewStateSync,
+    onboardingComplete: onboarded,
   ));
 }
