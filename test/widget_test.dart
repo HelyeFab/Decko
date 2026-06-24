@@ -49,6 +49,9 @@ import 'package:decko/domain/practice/practice_outcome.dart';
 import 'package:decko/domain/practice/practice_mode.dart';
 import 'package:decko/domain/typing/typing_recall.dart';
 import 'package:decko/features/typing/typing_recall_screen.dart';
+import 'package:decko/domain/match/match_mode.dart';
+import 'package:decko/features/match/match_mode_screen.dart';
+import 'package:decko/features/deck_detail/widgets/sample_item_row.dart';
 import 'package:decko/domain/activity/activity_event.dart';
 import 'package:decko/domain/repositories/activity_ledger_repository.dart';
 import 'package:decko/data/local_only_auth_repository.dart';
@@ -848,6 +851,66 @@ void main() {
     expect(find.text('Cloud sync'), findsOneWidget);
     expect(find.text('What syncs'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('SampleItemRow splits a media-only front so it is not '
+      'right-collapsed', (WidgetTester tester) async {
+    const LearningItem item = LearningItem(
+      id: 'a',
+      front: '[sound:x.mp3] <img src="y.jpg">', // media-only front
+      back: 'それ\nthat, that one', // expression + meaning packed in the back
+    );
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: SizedBox(width: 360, child: SampleItemRow(item: item)),
+      ),
+    ));
+
+    // The meaning is isolated on the right (not the whole back), which means the
+    // expression landed in the left column instead of leaving it blank.
+    expect(find.text('that, that one'), findsOneWidget);
+    expect(find.text('それ\nthat, that one'), findsNothing);
+  });
+
+  testWidgets('Match Mode: pair tiles → complete records practice XP (MVP_025)',
+      (WidgetTester tester) async {
+    PracticeOutcome? outcome;
+    MatchModePair pr(String l, String r) => MatchModePair(
+        left: l, right: r, pairType: MatchPairType.expressionToMeaning, sourceItemId: l);
+    final MatchModeRound round = MatchModeRound(
+      pairType: MatchPairType.expressionToMeaning,
+      pairs: <MatchModePair>[pr('a', 'A'), pr('b', 'B'), pr('c', 'C'), pr('d', 'D')],
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: MatchModeScreen(
+        rounds: <MatchModeRound>[round],
+        title: 'Match',
+        onCompleted: (PracticeOutcome o) => outcome = o,
+      ),
+    ));
+
+    // One wrong attempt: select 'a' (left), tap 'B' (the wrong right).
+    await tester.tap(find.text('a'));
+    await tester.pump();
+    await tester.tap(find.text('B'));
+    await tester.pump(const Duration(milliseconds: 700)); // wrong flash clears
+
+    // Now match all four pairs correctly.
+    for (final String k in <String>['a', 'b', 'c', 'd']) {
+      await tester.tap(find.text(k)); // left
+      await tester.pump();
+      await tester.tap(find.text(k.toUpperCase())); // matching right
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.text('Match complete'), findsOneWidget);
+    expect(find.textContaining('review schedule is unchanged'), findsOneWidget);
+    expect(outcome, isNotNull);
+    expect(outcome!.modeId, PracticeModeId.matchMode);
+    expect(outcome!.correctCount, 4);
+    expect(outcome!.incorrectCount, greaterThanOrEqualTo(1));
+    expect(outcome!.xpAwarded, 8); // 4 pairs × 2
   });
 
   testWidgets('Typing recall: type → feedback → complete records practice XP '

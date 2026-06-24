@@ -4,6 +4,7 @@ import '../domain/learning_item.dart';
 import '../domain/listening/listening_challenge_builder.dart';
 import '../domain/practice/practice_mode.dart';
 import '../domain/repositories/practice_mode_registry.dart';
+import '../domain/match/match_mode_builder.dart';
 import '../domain/sentence_builder/sentence_builder_mapper.dart';
 import '../domain/typing/typing_recall_builder.dart';
 
@@ -15,6 +16,7 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
   static const SentenceBuilderMapper _mapper = SentenceBuilderMapper();
   static const ListeningChallengeBuilder _listening = ListeningChallengeBuilder();
   static const TypingRecallBuilder _typing = TypingRecallBuilder();
+  static const MatchModeBuilder _match = MatchModeBuilder();
 
   static const PracticeMode _bunburu = PracticeMode(
     id: PracticeModeId.bunburuSentenceBuilder,
@@ -51,9 +53,21 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
     reviewPresentation: false,
   );
 
+  static const PracticeMode _matchMode = PracticeMode(
+    id: PracticeModeId.matchMode,
+    title: 'Match Mode',
+    subtitle: 'Pair expressions, readings, and meanings',
+    description: 'Tap to pair words with their meanings or readings — a fast, '
+        'playful way to strengthen recognition.',
+    kind: PracticeModeKind.match,
+    manualLaunch: true,
+    // Deck practice only this MVP (manual single-card deferred); never review.
+    reviewPresentation: false,
+  );
+
   @override
   List<PracticeMode> get allModes =>
-      const <PracticeMode>[_bunburu, _listeningMode, _typingMode];
+      const <PracticeMode>[_bunburu, _listeningMode, _typingMode, _matchMode];
 
   @override
   List<PracticeMode> availableForCard(LearningItem item,
@@ -71,6 +85,7 @@ class DeckoPracticeModeRegistry implements PracticeModeRegistry {
       if (_deckHasSentences(deck, source)) _bunburu,
       if (_listening.deckIsCapable(deck, source: source)) _listeningMode,
       if (_typing.deckIsCapable(deck)) _typingMode,
+      if (_match.deckIsCapable(deck)) _matchMode,
     ];
   }
 

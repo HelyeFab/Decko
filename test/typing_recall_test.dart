@@ -120,6 +120,23 @@ void main() {
       expect(builder.isCapable(_item(back: '', reading: null)), isFalse);
     });
 
+    test('works on a media-only-front card (word + meaning in the back)', () {
+      // Core 2k/6k shape: front is audio/image, back is "expression\nmeaning".
+      const LearningItem item = LearningItem(
+        id: 'm',
+        front: '[sound:x.mp3] <img src="y.jpg">',
+        back: 'それ\nthat, that one',
+      );
+      expect(builder.isCapable(item), isTrue);
+      final TypingRecallRound? r =
+          builder.roundForItem(item, _deck(<LearningItem>[item]),
+              random: Random(1));
+      expect(r, isNotNull);
+      expect(r!.targetKind, TypingTargetKind.meaning);
+      expect(r.promptText, 'それ');
+      expect(r.accepted, contains('that, that one'));
+    });
+
     test('deck capability needs at least four usable cards', () {
       expect(
           builder.deckIsCapable(

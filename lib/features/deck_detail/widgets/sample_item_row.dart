@@ -14,6 +14,24 @@ class SampleItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Most decks: expression on the front, meaning on the back. But some note
+    // types (e.g. listening cards) have a media-only front and pack the
+    // "expression\nmeaning" into the back — without this, the front column is
+    // blank and the row collapses to the right. Fall back to the back's lines.
+    final String frontText = stripMedia(item.front).trim();
+    final String leftBase;
+    final String rightText;
+    if (frontText.isNotEmpty) {
+      leftBase = item.front;
+      rightText = item.back;
+    } else {
+      final List<String> lines = item.back.split('\n');
+      leftBase = lines.first.trim();
+      rightText =
+          lines.length > 1 ? lines.sublist(1).join(' ').trim() : '';
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DeckoSpacing.sm),
       child: Row(
@@ -24,7 +42,7 @@ class SampleItemRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 FuriganaText(
-                  stripMedia(item.front), // compact base text, no media markers
+                  stripMedia(leftBase), // compact base text, no media markers
                   showReadings: false,
                   baseStyle: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w600),
@@ -42,7 +60,7 @@ class SampleItemRow extends StatelessWidget {
           const SizedBox(width: DeckoSpacing.md),
           Flexible(
             child: Text(
-              item.back,
+              rightText,
               textAlign: TextAlign.right,
               style: theme.textTheme.bodyLarge,
             ),

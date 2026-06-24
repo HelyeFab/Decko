@@ -10,6 +10,7 @@ FaIconData practiceModeIcon(PracticeModeId id) => switch (id) {
       PracticeModeId.bunburuSentenceBuilder => FontAwesomeIcons.cubesStacked,
       PracticeModeId.listeningChallenge => FontAwesomeIcons.headphones,
       PracticeModeId.typingRecall => FontAwesomeIcons.keyboard,
+      PracticeModeId.matchMode => FontAwesomeIcons.tableCellsLarge,
     };
 
 /// The action label for launching a mode from a single card (e.g. in review).
@@ -17,6 +18,7 @@ String practiceCardAction(PracticeModeId id) => switch (id) {
       PracticeModeId.bunburuSentenceBuilder => 'Build this sentence',
       PracticeModeId.listeningChallenge => 'Listen & choose',
       PracticeModeId.typingRecall => 'Type this',
+      PracticeModeId.matchMode => 'Match pairs',
     };
 
 /// A tappable practice-mode row (MVP_017). Used by the Practice Hub and Deck

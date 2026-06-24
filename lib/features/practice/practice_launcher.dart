@@ -7,6 +7,8 @@ import '../../domain/import/source/imported_anki_source.dart';
 import '../../domain/learning_item.dart';
 import '../../domain/listening/listening_challenge.dart';
 import '../../domain/listening/listening_challenge_builder.dart';
+import '../../domain/match/match_mode.dart';
+import '../../domain/match/match_mode_builder.dart';
 import '../../domain/practice/practice_mode.dart';
 import '../../domain/typing/typing_recall.dart';
 import '../../domain/typing/typing_recall_builder.dart';
@@ -14,6 +16,7 @@ import '../../domain/repositories/imported_source_store.dart';
 import '../../domain/sentence_builder/sentence_builder_round.dart';
 import '../../domain/sentence_builder/sentence_builder_source.dart';
 import '../listening/listening_challenge_screen.dart';
+import '../match/match_mode_screen.dart';
 import '../sentence_builder/sentence_builder_loader.dart';
 import '../sentence_builder/sentence_round_service.dart';
 import '../typing/typing_recall_screen.dart';
@@ -27,6 +30,7 @@ class PracticeLauncher {
 
   static const ListeningChallengeBuilder _listening = ListeningChallengeBuilder();
   static const TypingRecallBuilder _typing = TypingRecallBuilder();
+  static const MatchModeBuilder _match = MatchModeBuilder();
 
   /// Launches deck-level practice for [mode] over [deck].
   static void launchDeck(BuildContext context, PracticeMode mode, Deck deck) {
@@ -58,6 +62,21 @@ class PracticeLauncher {
           return;
         }
         _pushTyping(context, rounds, mode.title);
+      case PracticeModeId.matchMode:
+        final List<MatchModeRound> rounds = _match.roundsForDeck(deck);
+        if (rounds.isEmpty) {
+          DeckoSnackbar.showInfo(context,
+              'This deck doesn’t have enough vocabulary cards for Match Mode '
+              'yet — try a deck with words, readings, and meanings.');
+          return;
+        }
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (BuildContext context) => MatchModeScreen(
+            rounds: rounds,
+            title: mode.title,
+            onCompleted: practiceOutcomeSink(context),
+          ),
+        ));
     }
   }
 
@@ -96,6 +115,10 @@ class PracticeLauncher {
           return;
         }
         _pushTyping(context, <TypingRecallRound>[round], mode.title);
+      case PracticeModeId.matchMode:
+        // Match Mode is deck-level practice (MVP_025); not a single-card action.
+        DeckoSnackbar.showInfo(
+            context, 'Open Match Mode from the deck’s practice options.');
     }
   }
 

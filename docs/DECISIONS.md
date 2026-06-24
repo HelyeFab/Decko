@@ -979,3 +979,57 @@ progress, or what does/doesn't sync. MVP_024 makes Decko shippable to a stranger
 - The onboarding flag is the only new persisted state; everything else reuses
   existing widgets/strings. Tests cover the flag (default/persist/no-reset) and
   the flow (renders / skip / complete → app) plus the empty-library action.
+
+## DEC-034: Match Mode is manual practice, not review scheduling
+
+Date: 2026-06-24
+Status: Accepted
+
+### Context
+
+MVP_025 adds Decko's fourth registered practice mode — a fast tap-to-pair
+vocabulary game. Like Bunburu / Listening / Typing, it must enrich practice
+without ever touching the FSRS/review path.
+
+### Decision
+
+- **Registered like every mode.** `match_mode` joins the `PracticeModeRegistry`
+  (`PracticeModeKind.match`, manual flag, `reviewPresentation = false`). It
+  surfaces wherever the registry is queried — Deck Detail / Practice Hub — with
+  one `PracticeLauncher` case. **Deck-level only** this MVP (a board needs several
+  neighbouring cards); single-card launch is deferred and the `launchCard` case is
+  a friendly redirect.
+- **Fair boards from a pure builder.** `MatchModeBuilder` derives boards of 4–6
+  pairs of a single pair type — expression→meaning, expression→reading,
+  reading→meaning — from `LearningItem` fields. It only emits a pair when both
+  sides are clean: non-blank, not identical, deduplicated (no repeated left or
+  right value on a board → never ambiguous), and short (vocabulary, not
+  sentences). Ineligible decks get a friendly empty state.
+- **Motivation only.** Completion records a `PracticeOutcome` → activity ledger
+  (correct pairs, incorrect attempts, 2 XP/pair). It **never** mutates FSRS,
+  `ReviewCardState`, due dates, review counters, sibling burying, imported
+  progress, or synced review state — and uses only existing ledger fields (no new
+  sync DTO/Firebase paths).
+- **Accessible gameplay.** Tile feedback uses icon + colour (check / x), not
+  colour alone; readable tap targets; no time pressure (arcade/timed variants
+  deferred).
+
+### Consequences
+
+- The practice platform's claim holds a fourth time: a new game = a builder + a
+  registry entry + one launcher case + a screen. Deck Detail / Review / Hub were
+  untouched.
+- Tests cover pair extraction, dedup/fairness, availability + insufficient-deck,
+  the registry, and the full board → completion → outcome flow.
+- Deferred: single-card launch, sentence-level matching, timed/scored variants.
+
+### Addendum (MVP_025): robust card-field extraction
+
+Some note types (e.g. the Core 2k/6k listening cards) have a **media-only front**
+(`[sound:…] <img>`) and pack the word + meaning into the back as
+`expression\nmeaning`. A shared `cardFieldsOf(LearningItem) → CardFields`
+(expression / meaning / reading) now handles both shapes, so Match Mode and Typing
+Recall work on these decks instead of finding no pairs. `SampleItemRow` was also
+fixed to split such a back (it was leaving the front column blank and collapsing
+the preview to the right). Pure extraction — no change to import parsing or stored
+data.

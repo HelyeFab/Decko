@@ -426,6 +426,19 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Added in MVP_025 (Match Mode, DEC-034)
+
+- **`MatchModeScreen`** (`features/match/`) — a two-column board: left prompt
+  tiles + right answer tiles (independently shuffled). Tap one then its match;
+  tiles show idle / selected (primary border) / correct (green + check) / wrong
+  (error + x — icon **and** colour, not colour alone). Board clears → next board
+  → a `tableCellsLarge` completion with a `+XP` pill ("Extra practice — your
+  review schedule is unchanged."). Registered via the platform (`tableCellsLarge`
+  icon, "Match pairs" action); deck-level practice only.
+- **`SampleItemRow`** fixed: media-only-front cards (word+meaning packed in the
+  back) no longer collapse the preview to the right — the back is split into
+  expression (left) + meaning (right).
+
 ### Added in MVP_024 (First-run onboarding & guidance, DEC-033)
 
 - **`OnboardingScreen`** (`features/onboarding/`, route `/onboarding`) — a

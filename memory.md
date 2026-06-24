@@ -4,7 +4,28 @@
 2026-06-22
 
 ## Current stage
-MVP_024 in review: First-Run Onboarding, Import Guidance & Empty States (DEC-033).
+MVP_025 in review: Match Mode / Vocabulary Pairing Game (DEC-034) — Decko's FOURTH
+registered practice mode. Pure MatchModeBuilder (lib/domain/match/): boards of 4-6
+pairs, single MatchPairType (expressionToMeaning/expressionToReading/
+readingToMeaning); fair (dedup left+right, no blanks, no left==right, len<=40).
+Registered match_mode (PracticeModeKind.match, manual+deck, reviewPresentation
+FALSE). DECK-LEVEL only (manual single-card deferred; launchCard = redirect
+snackbar). PracticeLauncher deck case. MatchModeScreen (features/match/) =
+two-column tap-match (tap left then right; states idle/selected/correct(green+
+check)/wrong(error+x) — icon+colour), board clears→next→completion+XP (2/pair) via
+practiceOutcomeSink → ledger. NO FSRS/review mutation. tableCellsLarge icon /
+"Match pairs".
+
+ALSO (user-flagged, same root cause): the Core 2k/6k deck has a MEDIA-ONLY FRONT
+([sound:][img]) with word+meaning packed in the BACK ("expression\nmeaning"), no
+reading. Fixed: (1) SampleItemRow split the back so the deck-detail preview isn't
+right-collapsed; (2) NEW `cardFieldsOf(LearningItem)→CardFields` (lib/domain/
+card_fields.dart) extracts expression/meaning/reading robustly (front-text OR
+back-split); Match + Typing builders now use it → they WORK on media-front decks
+(previously found no pairs). 237 tests, analyze clean. NOT committed — awaiting
+verification. NEXT: MVP_026 (import recovery / duplicate / re-import polish).
+
+## Last completed (MVP_024 — First-Run Onboarding, Import Guidance & Empty States, DEC-033) committed dd1335f
 UX/shippability — NO engine changes. Local `hasCompletedOnboarding` flag
 (SettingsRepository getHasCompletedOnboarding/save; SharedPrefs key
 decko.settings.onboardingComplete; default false; auth-INDEPENDENT, sign-out never
@@ -19,8 +40,7 @@ _ImportGuidanceCard ("What to expect"); first import (wasFirstImport = no import
 decks yet) always shows _ResultPanel success. Test harness: _pumpApp gained
 onboardingComplete param (default true so app tests skip onboarding); 2 direct
 DeckoApp pumps + the 2 SettingsRepository test fakes updated. 224 tests, analyze
-clean. NOT committed — awaiting verification. NEXT: MVP_025 (Match mode or further
-onboarding polish).
+clean. Committed dd1335f.
 
 ## Last completed (MVP_023 — Sync Status, Conflict UX & Account Polish, DEC-032) committed e1ebab2 UX/trust
 layer over MVP_020/022 — NO new sync behaviour, NO FSRS changes. Pure

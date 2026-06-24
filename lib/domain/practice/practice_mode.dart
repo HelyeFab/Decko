@@ -8,6 +8,9 @@ enum PracticeModeId {
 
   /// Typing recall (prompt → type the reading/meaning) practice.
   typingRecall,
+
+  /// Match mode (pair expressions / readings / meanings) practice.
+  matchMode,
 }
 
 /// Storage helpers for [PracticeModeId].
@@ -17,6 +20,7 @@ extension PracticeModeIdName on PracticeModeId {
     PracticeModeId.bunburuSentenceBuilder => 'bunburu_sentence_builder',
     PracticeModeId.listeningChallenge => 'listening_challenge',
     PracticeModeId.typingRecall => 'typing_recall',
+    PracticeModeId.matchMode => 'match_mode',
   };
 }
 
@@ -25,6 +29,7 @@ PracticeModeId? practiceModeIdFromKey(String key) => switch (key) {
   'bunburu_sentence_builder' => PracticeModeId.bunburuSentenceBuilder,
   'listening_challenge' => PracticeModeId.listeningChallenge,
   'typing_recall' => PracticeModeId.typingRecall,
+  'match_mode' => PracticeModeId.matchMode,
   _ => null,
 };
 

@@ -1,8 +1,8 @@
 import 'dart:math';
 
+import '../card_fields.dart';
 import '../deck.dart';
 import '../learning_item.dart';
-import '../sentence_builder/sentence_text.dart';
 import 'typing_recall.dart';
 
 typedef _Variant = ({
@@ -79,11 +79,12 @@ class TypingRecallBuilder {
 
   List<_Variant> _variantsFor(LearningItem item) {
     final List<_Variant> out = <_Variant>[];
-    final String expr = cleanSentence(item.front);
+    final CardFields f = cardFieldsOf(item);
+    final String expr = f.expression;
     if (expr.isEmpty) return out;
 
-    final String reading = cleanSentence(item.reading ?? '');
-    final String meaning = cleanSentence(item.back);
+    final String reading = f.reading ?? '';
+    final String meaning = f.meaning;
 
     // Reading recall — only when the reading differs from the shown expression
     // (no recall value when the word is already its own reading).

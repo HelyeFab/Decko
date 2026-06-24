@@ -265,6 +265,16 @@ See: `docs/import-progress.md`
   "kept your local progress" conflict line, and offline reassurance. Account
   "what syncs / stays local" copy clarified. Next: MVP_024 (Match mode, or
   import/sync onboarding polish).
+- ~~Match Mode / vocabulary pairing game~~ DONE (MVP_025, DEC-034): Decko's
+  fourth registered practice mode — a fast tap-to-pair game. Pure `MatchModeBuilder`
+  makes fair boards (4–6 pairs, single type: expression→meaning / →reading /
+  reading→meaning; deduped, non-blank, vocab-length). Deck-level practice only
+  (manual single-card deferred); one `PracticeLauncher` case; `MatchModeScreen`
+  two-column tap-match with icon+colour feedback → completion + XP (2/pair) via
+  the activity ledger. No FSRS/review mutation. Also added `cardFieldsOf` so
+  Match + Typing work on media-only-front decks (word+meaning in the back), and
+  fixed `SampleItemRow`'s right-collapsed preview for those decks. Next: MVP_026
+  (import recovery / duplicate import / re-import polish).
 - ~~First-run onboarding, import guidance & empty states~~ DONE (MVP_024,
   DEC-033): makes Decko shippable to a stranger (UX only — no engine changes). A
   short, skippable 4-page onboarding at `/onboarding` (gated by a local
