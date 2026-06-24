@@ -426,6 +426,18 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Added in MVP_022 (Review-state sync, DEC-031)
+
+- **`ReviewSyncBanner`** (`features/deck_detail/widgets/`) — on deck detail, a
+  `primaryContainer` banner when cloud review progress is available ("Synced
+  progress available" + cloud-down icon + an explicit **Apply synced progress**
+  button, with the "never overwritten with older progress" reassurance), or a
+  quiet "Review progress synced" check pill once applied. Renders nothing when
+  signed out / Firebase off / the deck has no stable identity.
+- **Account & sync** "What syncs" gained a line: review progress for matching
+  decks (apply per device); the "stays local" line now says deck files, card
+  content, and media.
+
 ### Added in MVP_021 (Typing Recall, DEC-030)
 
 - **`TypingRecallScreen`** (`features/typing/`) — a `primaryContainer` prompt

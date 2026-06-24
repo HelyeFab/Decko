@@ -4,7 +4,25 @@
 2026-06-22
 
 ## Current stage
-MVP_021 in review: Typing Recall — Decko's THIRD registered practice mode
+MVP_022 in review: Cross-Device Review-State Sync (DEC-031) — the HIGH-RISK one
+(writes FSRS/review state), built pure-first + heavily tested. Syncs per-card
+review state for decks that MATCH across devices; NEVER deck content/media.
+DeckFingerprint (FNV-1a over sorted anki card+note ids + counts + name; null for
+non-imported/non-`anki-card-` decks) is the cloud key /users/{uid}/deckStates/
+{fp.key}/cards/{itemId}; cards match by stable anki-card-<id>. SyncableReviewState
+DTO ⇄ ReviewCardState. ReviewStateMergePolicy (PURE): useCloud only if newer
+lastReviewedAt AND monotonic (cloud reps/lapses >= local); newer-but-regressing =
+CONFLICT (keep local); cloud-no-progress/local-newer = keepLocal; fresh local +
+cloud progress = useCloud. PUSH automatic+additive (incremental after each review
+session via _flush→pushStates; full pushAll on account "Sync now"). APPLY EXPLICIT
+ONLY (user chose) — deck-detail ReviewSyncBanner "Apply synced progress"; never
+auto-writes. ReviewStateSyncService (pushStates/pushDeck/pushAll/availableFor/
+applyToDeck) in DeckoApp scope (reviewSyncOf, NULLABLE — null when Firebase off);
+main.dart builds it. Firestore rules unchanged (/users/{uid}/** covers deckStates).
+NO FSRS math/due/limits/burying changed. 209 tests, analyze clean. NOT committed —
+awaiting verification. NEXT: MVP_023 (sync status/conflict UX/recovery polish).
+
+## Last completed (MVP_021 — Typing Recall, DEC-030) committed d216e71 Decko's THIRD registered practice mode
 (`typing_recall`, DEC-030). Per card the pure sync TypingRecallBuilder emits a
 READING round (show expression → type kana reading, only when reading≠expression)
 and/or a MEANING round (→ type English meaning; comma/slash/semicolon alternatives
@@ -18,8 +36,7 @@ PracticeLauncher case (sync, no source). TypingRecallScreen (prompt card, input,
 colour-coded feedback, reveal, completion+XP). PracticeOutcome via
 practiceOutcomeSink → progress+ledger (XP correct 5/almost 2/incorrect 0). NO
 FSRS/review mutation. keyboard icon / "Type this". MVP_017 registry tests made
-Bunburu-specific (3 modes now). 196 tests, analyze clean. NOT committed — awaiting
-verification. NEXT: MVP_022 Matching or MVP_023 Image recall.
+Bunburu-specific (3 modes now). 196 tests, analyze clean. Committed d216e71.
 
 ## Last completed (MVP_020 — Auth & Firebase Sync Foundation, DEC-029/029a) Firebase project
 decko-7a443 (iOS app registered; firebase_options.dart + GoogleService-Info.plist

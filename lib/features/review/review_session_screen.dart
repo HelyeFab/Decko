@@ -18,6 +18,7 @@ import '../../domain/deck.dart';
 import '../../domain/due_queue.dart';
 import '../../domain/learning_item.dart';
 import '../../domain/repositories/review_scheduler.dart';
+import '../../data/sync/review_state_sync_service.dart';
 import '../../domain/repositories/review_state_repository.dart';
 import '../../domain/review_card_state.dart';
 import '../../domain/review_rating.dart';
@@ -68,6 +69,7 @@ class ReviewSessionScreen extends StatefulWidget {
 
 class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
   ReviewStateRepository? _repo;
+  ReviewStateSyncService? _reviewSync;
   final Map<String, ReviewCardState> _states = <String, ReviewCardState>{};
   final Map<String, ReviewCardState> _changed = <String, ReviewCardState>{};
 
@@ -111,6 +113,7 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     if (!_initialised) {
       _initialised = true;
       _repo = DeckoApp.reviewStateOf(context);
+      _reviewSync = DeckoApp.reviewSyncOf(context);
       _load();
     }
   }
@@ -353,6 +356,9 @@ class _ReviewSessionScreenState extends State<ReviewSessionScreen> {
     final List<ReviewCardState> pending = _changed.values.toList();
     _changed.clear();
     await _repo!.saveStates(pending);
+    // Push just-reviewed cards to the cloud (MVP_022) — additive, never resets;
+    // skipped for non-fingerprintable decks / signed-out users.
+    _reviewSync?.pushStates(widget.deck, pending);
   }
 
   void _restart() {

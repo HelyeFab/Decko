@@ -9,6 +9,7 @@ import '../data/decko_practice_mode_registry.dart';
 import '../data/local_activity_ledger_repository.dart';
 import '../data/local_only_auth_repository.dart';
 import '../data/local_only_sync_repository.dart';
+import '../data/sync/review_state_sync_service.dart';
 import '../data/file_imported_source_store.dart';
 import '../data/file_media_store.dart';
 import '../data/file_sentence_token_cache.dart';
@@ -65,6 +66,7 @@ class DeckoApp extends StatefulWidget {
     this.activityLedger = const LocalActivityLedgerRepository(),
     this.authRepository = const LocalOnlyAuthRepository(),
     this.syncRepository = const LocalOnlySyncRepository(),
+    this.reviewStateSync,
   });
 
   final DeckRepository deckRepository;
@@ -84,6 +86,9 @@ class DeckoApp extends StatefulWidget {
   final ActivityLedgerRepository activityLedger;
   final AuthRepository authRepository;
   final SyncRepository syncRepository;
+
+  /// Cross-device review-state sync (MVP_022). Null when Firebase is off.
+  final ReviewStateSyncService? reviewStateSync;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -135,6 +140,9 @@ class DeckoApp extends StatefulWidget {
 
   static SyncRepository syncOf(BuildContext context) =>
       _scopeOf(context).syncRepository;
+
+  static ReviewStateSyncService? reviewSyncOf(BuildContext context) =>
+      _scopeOf(context).reviewStateSync;
 
   /// A ready-to-use round service (tokenizer + cache) for the sentence builder.
   static SentenceRoundService sentenceRoundsOf(BuildContext context) =>
@@ -213,6 +221,7 @@ class _DeckoAppState extends State<DeckoApp> {
       activityLedger: widget.activityLedger,
       authRepository: widget.authRepository,
       syncRepository: widget.syncRepository,
+      reviewStateSync: widget.reviewStateSync,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -247,6 +256,7 @@ class _DeckoScope extends InheritedWidget {
     required this.activityLedger,
     required this.authRepository,
     required this.syncRepository,
+    required this.reviewStateSync,
     required super.child,
   });
 
@@ -266,6 +276,7 @@ class _DeckoScope extends InheritedWidget {
   final ActivityLedgerRepository activityLedger;
   final AuthRepository authRepository;
   final SyncRepository syncRepository;
+  final ReviewStateSyncService? reviewStateSync;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -284,5 +295,6 @@ class _DeckoScope extends InheritedWidget {
       practiceModeRegistry != oldWidget.practiceModeRegistry ||
       activityLedger != oldWidget.activityLedger ||
       authRepository != oldWidget.authRepository ||
-      syncRepository != oldWidget.syncRepository;
+      syncRepository != oldWidget.syncRepository ||
+      reviewStateSync != oldWidget.reviewStateSync;
 }

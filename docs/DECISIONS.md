@@ -851,3 +851,51 @@ wrong answer, and it must not touch review/FSRS state.
   rules, deck-session generation, alternatives, the registry, and the screen flow.
 - Deferred: scheduled-review typing (needs an explicit, tested grade mapping);
   romaji input; expression/sentence typing targets.
+
+## DEC-031: Sync user review state, not deck content
+
+Date: 2026-06-23
+Status: Accepted
+
+### Context
+
+MVP_020 synced only motivational state (profile, settings, activity). To let a
+learner continue on another device, Decko must sync per-card review/FSRS state —
+but it must never sync deck packages/media, and never silently reset or regress a
+card's progress (the project's oldest rule).
+
+### Decision
+
+- **Sync user state, not deck content.** Review/FSRS state syncs only for cards
+  already present locally that can be *confidently matched*. Deck files, imported
+  source notes, card templates, media, and `.apkg` packages are **never** synced.
+- **Stable identity gates everything.** A deterministic `DeckFingerprint`
+  (FNV-1a over sorted Anki card ids + note ids + counts + name; null for
+  non-imported / non-`anki-card-…` decks) is the cloud key:
+  `/users/{uid}/deckStates/{fingerprint}/cards/{itemId}`. The same `.apkg`
+  imported on two devices produces the same fingerprint, order-independent.
+  Cards match by the existing stable `LearningItem.id = anki-card-<cardId>`.
+- **Push is automatic + additive; apply is explicit.** Reviewed cards push to
+  the cloud after each session (incremental) and on manual "Sync now" — upload
+  never touches local state. Applying cloud → local is **never automatic**: the
+  deck-detail banner surfaces "synced progress available" and only a user tap
+  writes it (honours "never silently reset FSRS").
+- **Conflict-safe merge** (`ReviewStateMergePolicy`, pure): adopt cloud only when
+  it is a strictly safe, newer continuation — newer `lastReviewedAt` AND
+  monotonic (cloud `reps`/`lapses` never below local). A newer-but-regressing
+  cloud state is a **conflict** (kept local, surfaced), never an overwrite.
+  Unmatched cloud states are preserved-but-unapplied; unmatched local cards are
+  left untouched. Cloud DTO (`SyncableReviewState`) is decoupled from local
+  persistence.
+
+### Consequences
+
+- Cross-device "continue where you left off" works without trusting the cloud to
+  define learning state. Firestore rules (`/users/{uid}/**`) already scope it.
+- No FSRS math / due queue / daily limits / sibling burying changed.
+- Tests cover fingerprint determinism + non-collision, DTO round-trip, every
+  merge branch, and the service (push reviewed-only, apply matching-only, never
+  overwrite advanced local, signed-out no-op).
+- Deferred (MVP_023): richer conflict UX, recovery, pending/offline status. A
+  full-deck push runs on manual sync (large decks are heavy) — incremental
+  after-session push keeps the cloud current cheaply.

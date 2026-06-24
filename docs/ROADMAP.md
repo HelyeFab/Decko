@@ -245,6 +245,16 @@ See: `docs/import-progress.md`
   almost). Pure builder + one `PracticeLauncher` case; manual + deck practice
   only (motivational XP — correct 5 / almost 2), review presentation deferred.
   No FSRS/review mutation. Next: MVP_022 (Matching) or MVP_023 (Image recall).
+- ~~Cross-device review-state sync~~ DONE (MVP_022, DEC-031): syncs per-card
+  review/FSRS state for decks that match across devices — never deck content or
+  media. A deterministic `DeckFingerprint` (hash of Anki card/note ids + counts)
+  is the cloud key (`/users/{uid}/deckStates/{fp}/cards/{itemId}`); cards match
+  by the stable `anki-card-<id>`. Reviewed cards push automatically (after each
+  session + manual sync); applying cloud→local is **explicit** (deck-detail
+  "Apply synced progress" banner). A pure, conflict-safe `ReviewStateMergePolicy`
+  adopts cloud only when it's a newer, non-regressing continuation — never
+  silently resets/regresses, conflicts kept local. Next: MVP_023 (sync status /
+  conflict UX / recovery polish).
 
 ## I5 — FSRS Production Scheduler
 

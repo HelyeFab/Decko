@@ -14,6 +14,7 @@ import '../../domain/practice/practice_mode.dart';
 import '../../domain/review_card_state.dart';
 import '../practice/practice_launcher.dart';
 import '../practice/widgets/practice_mode_tile.dart';
+import 'widgets/review_sync_banner.dart';
 import 'widgets/sample_item_row.dart';
 
 /// Detail view for a single [Deck].
@@ -101,6 +102,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
               _ProvenanceCard(info: deck.importInfo!),
             ],
             const SizedBox(height: DeckoSpacing.xl),
+            ReviewSyncBanner(deck: deck, onApplied: _reload),
             _ProgressSummary(deck: deck, statesFuture: _statesFuture),
             const SizedBox(height: DeckoSpacing.xl),
             SectionHeader(

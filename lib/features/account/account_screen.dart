@@ -187,6 +187,11 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Future<void> _syncNow() async {
+    // Push review state for fingerprinted decks too (MVP_022) — additive.
+    final reviewSync = DeckoApp.reviewSyncOf(context);
+    if (reviewSync != null) {
+      reviewSync.pushAll(DeckoApp.deckStoreOf(context).getDecks());
+    }
     final result = await DeckoApp.syncOf(context).syncNow();
     if (!mounted) return;
     if (result.ok) {
@@ -398,10 +403,11 @@ class _WhatSyncsCard extends StatelessWidget {
               'XP, streaks, achievements, and activity history'),
           line(FontAwesomeIcons.check, scheme.primary,
               'App settings — theme, furigana, daily goal'),
+          line(FontAwesomeIcons.check, scheme.primary,
+              'Review progress for matching decks (apply it on each device)'),
           const SizedBox(height: DeckoSpacing.sm),
           line(FontAwesomeIcons.lock, scheme.onSurfaceVariant,
-              'Stays on this device: your decks, media, review schedule, and '
-              'due dates'),
+              'Stays on this device: your deck files, card content, and media'),
         ],
       ),
     );
