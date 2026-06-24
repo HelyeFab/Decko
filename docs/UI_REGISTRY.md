@@ -426,6 +426,17 @@ re-inventing equivalents.
 - Practice completion shows a `+N XP` pill (motivational; review schedule
   unchanged).
 
+### Updated in MVP_023 (Sync status & conflict UX, DEC-032)
+
+- **`ReviewSyncBanner`** now renders the full `DeckSyncState` set: a prominent
+  `cloudAhead` apply banner (→ an explanatory **"Apply synced progress?"**
+  `DeckoConfirmDialog` before any write), and quiet status pills for
+  matchedUpToDate (check), localAhead ("Local progress is newer"), conflict
+  ("Decko kept your local progress"), notMatched, and offline ("studying still
+  works"). Nothing for signed-out / non-imported.
+- **Account & sync**: clearer sync-status copy + offline reassurance ("studying
+  still works…"); "stays local" line now includes the import-the-same-deck hint.
+
 ### Added in MVP_022 (Review-state sync, DEC-031)
 
 - **`ReviewSyncBanner`** (`features/deck_detail/widgets/`) — on deck detail, a

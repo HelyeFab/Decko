@@ -359,7 +359,8 @@ class _SyncCard extends StatelessWidget {
       case SyncStatus.failed:
         return s.message ?? 'Sync failed — your progress is safe locally.';
       case SyncStatus.offline:
-        return 'Offline — Decko will sync when you’re back online.';
+        return 'Offline — studying still works; Decko syncs when you’re back '
+            'online.';
       case SyncStatus.idle:
         return 'Not synced yet. Tap “Sync now” to back up your progress.';
     }
@@ -407,7 +408,9 @@ class _WhatSyncsCard extends StatelessWidget {
               'Review progress for matching decks (apply it on each device)'),
           const SizedBox(height: DeckoSpacing.sm),
           line(FontAwesomeIcons.lock, scheme.onSurfaceVariant,
-              'Stays on this device: your deck files, card content, and media'),
+              'Stays local: deck files, media, and imported Anki content. To '
+              'continue a deck on another device, import the same deck there '
+              'first.'),
         ],
       ),
     );

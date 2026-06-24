@@ -4,7 +4,21 @@
 2026-06-22
 
 ## Current stage
-MVP_022 in review: Cross-Device Review-State Sync (DEC-031) — the HIGH-RISK one
+MVP_023 in review: Sync Status, Conflict UX & Account Polish (DEC-032). UX/trust
+layer over MVP_020/022 — NO new sync behaviour, NO FSRS changes. Pure
+`deriveDeckSyncState` (in lib/domain/sync/deck_sync_status.dart) → DeckSyncState
+notImportedDeck/signedOut/notMatched/matchedUpToDate/localAhead/cloudAhead/
+conflict/offline from per-card merge tallies; `ReviewStateSyncService.deckStatus
+(deck)` computes tallies (replaced the old availableFor/ReviewSyncAvailability).
+`deriveGlobalSyncStatus` (global_sync_status.dart, SyncConnectionState) from auth
++ SyncState. ReviewSyncBanner REWRITTEN with all states + an explanatory
+"Apply synced progress?" DeckoConfirmDialog (matches + what will/won't change)
+before any write; calm "kept your local progress" conflict line; offline
+reassurance. Account "what syncs/stays local" copy clarified (+ import-same-deck
+hint). 216 tests, analyze clean. NOT committed — awaiting verification. NEXT:
+MVP_024 (Match mode, or import/sync onboarding polish).
+
+## Last completed (MVP_022 — Cross-Device Review-State Sync, DEC-031) committed e5c83f6 the HIGH-RISK one
 (writes FSRS/review state), built pure-first + heavily tested. Syncs per-card
 review state for decks that MATCH across devices; NEVER deck content/media.
 DeckFingerprint (FNV-1a over sorted anki card+note ids + counts + name; null for
@@ -19,8 +33,7 @@ ONLY (user chose) — deck-detail ReviewSyncBanner "Apply synced progress"; neve
 auto-writes. ReviewStateSyncService (pushStates/pushDeck/pushAll/availableFor/
 applyToDeck) in DeckoApp scope (reviewSyncOf, NULLABLE — null when Firebase off);
 main.dart builds it. Firestore rules unchanged (/users/{uid}/** covers deckStates).
-NO FSRS math/due/limits/burying changed. 209 tests, analyze clean. NOT committed —
-awaiting verification. NEXT: MVP_023 (sync status/conflict UX/recovery polish).
+NO FSRS math/due/limits/burying changed. 209 tests, analyze clean. Committed e5c83f6.
 
 ## Last completed (MVP_021 — Typing Recall, DEC-030) committed d216e71 Decko's THIRD registered practice mode
 (`typing_recall`, DEC-030). Per card the pure sync TypingRecallBuilder emits a

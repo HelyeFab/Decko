@@ -3,14 +3,16 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../../app/decko_app.dart';
 import '../../../core/constants/decko_spacing.dart';
+import '../../../core/widgets/decko_confirm_dialog.dart';
 import '../../../core/widgets/decko_snackbar.dart';
 import '../../../data/sync/review_state_sync_service.dart';
 import '../../../domain/deck.dart';
+import '../../../domain/sync/deck_sync_status.dart';
 
-/// Surfaces cross-device review-state sync on deck detail (MVP_022): "synced
-/// progress available → Apply" (explicit, never automatic), or a quiet "synced"
-/// indicator. Renders nothing when Firebase is off, the user is signed out, or
-/// the deck has no stable identity.
+/// Deck-detail cross-device sync status (MVP_022/023). Shows the deck's plain-
+/// language sync state and, when cloud progress is available, an explicit (never
+/// automatic) "Apply synced progress" flow with a clear confirmation. Renders
+/// nothing when signed out / Firebase off / the deck has no stable identity.
 class ReviewSyncBanner extends StatefulWidget {
   const ReviewSyncBanner({
     super.key,
@@ -27,17 +29,32 @@ class ReviewSyncBanner extends StatefulWidget {
 
 class _ReviewSyncBannerState extends State<ReviewSyncBanner> {
   ReviewStateSyncService? _sync;
-  Future<ReviewSyncAvailability>? _future;
+  Future<DeckSyncStatus>? _future;
   bool _applying = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _sync ??= DeckoApp.reviewSyncOf(context);
-    _future ??= _sync?.availableFor(widget.deck);
+    _future ??= _sync?.deckStatus(widget.deck);
   }
 
-  Future<void> _apply() async {
+  Future<void> _confirmAndApply(DeckSyncStatus status) async {
+    final bool ok = await DeckoConfirmDialog.show(
+      context,
+      icon: FontAwesomeIcons.cloudArrowDown,
+      title: 'Apply synced progress?',
+      message:
+          'Decko found review progress for ${status.cloudAheadCount} '
+          'card${status.cloudAheadCount == 1 ? '' : 's'} from another device, '
+          'matching ${status.localCardsMatched} of your local cards.\n\n'
+          'This updates review state for matching cards only — never your deck '
+          'content, media, or card text. Local progress that is newer or safer '
+          'will not be overwritten.',
+      confirmLabel: 'Apply',
+    );
+    if (!ok || !mounted) return;
+
     final ReviewStateSyncService? sync = _sync;
     if (sync == null) return;
     setState(() => _applying = true);
@@ -45,46 +62,72 @@ class _ReviewSyncBannerState extends State<ReviewSyncBanner> {
     if (!mounted) return;
     setState(() {
       _applying = false;
-      _future = sync.availableFor(widget.deck); // refresh → now "synced"
+      _future = sync.deckStatus(widget.deck);
     });
     widget.onApplied();
-    final String conflicts = result.conflicts > 0
-        ? ' (${result.conflicts} kept local)'
-        : '';
+    final String kept =
+        result.conflicts > 0 ? ' · ${result.conflicts} kept local' : '';
     DeckoSnackbar.showSuccess(
-        context, 'Applied synced progress to ${result.applied} cards$conflicts.');
+        context, 'Applied progress to ${result.applied} cards$kept.');
   }
 
   @override
   Widget build(BuildContext context) {
     if (_sync == null || _future == null) return const SizedBox.shrink();
-    return FutureBuilder<ReviewSyncAvailability>(
+    return FutureBuilder<DeckSyncStatus>(
       future: _future,
-      builder: (BuildContext context,
-          AsyncSnapshot<ReviewSyncAvailability> snap) {
-        final ReviewSyncAvailability? a = snap.data;
-        if (a == null || !a.fingerprintable) return const SizedBox.shrink();
-        if (a.progressAvailable) {
-          return _AvailableBanner(
-            count: a.applicableCount,
-            applying: _applying,
-            onApply: _apply,
-          );
+      builder: (BuildContext context, AsyncSnapshot<DeckSyncStatus> snap) {
+        final DeckSyncStatus? s = snap.data;
+        if (s == null) return const SizedBox.shrink();
+        switch (s.state) {
+          case DeckSyncState.cloudAhead:
+            return _ApplyBanner(
+              status: s,
+              applying: _applying,
+              onApply: () => _confirmAndApply(s),
+            );
+          case DeckSyncState.matchedUpToDate:
+            return const _Pill(
+                icon: FontAwesomeIcons.solidCircleCheck,
+                text: 'Review progress synced',
+                tone: _Tone.good);
+          case DeckSyncState.localAhead:
+            return const _Pill(
+                icon: FontAwesomeIcons.cloudArrowUp,
+                text: 'Local progress is newer than the cloud',
+                tone: _Tone.muted);
+          case DeckSyncState.conflict:
+            return const _Pill(
+                icon: FontAwesomeIcons.shield,
+                text: 'Decko kept your local progress',
+                tone: _Tone.muted);
+          case DeckSyncState.notMatched:
+            return const _Pill(
+                icon: FontAwesomeIcons.cloud,
+                text: 'Not matched yet — import this deck on another device to '
+                    'sync review progress',
+                tone: _Tone.muted);
+          case DeckSyncState.offline:
+            return const _Pill(
+                icon: FontAwesomeIcons.cloudArrowUp,
+                text: 'Offline — studying still works; Decko will sync later',
+                tone: _Tone.muted);
+          case DeckSyncState.signedOut:
+          case DeckSyncState.notImportedDeck:
+            return const SizedBox.shrink();
         }
-        if (a.hasCloudProgress) return const _SyncedPill();
-        return const SizedBox.shrink();
       },
     );
   }
 }
 
-class _AvailableBanner extends StatelessWidget {
-  const _AvailableBanner({
-    required this.count,
+class _ApplyBanner extends StatelessWidget {
+  const _ApplyBanner({
+    required this.status,
     required this.applying,
     required this.onApply,
   });
-  final int count;
+  final DeckSyncStatus status;
   final bool applying;
   final VoidCallback onApply;
 
@@ -115,9 +158,9 @@ class _AvailableBanner extends StatelessWidget {
           ),
           const SizedBox(height: DeckoSpacing.xs),
           Text(
-            'Review progress for $count card${count == 1 ? '' : 's'} from '
-            'another device. Your local cards are never overwritten with older '
-            'progress.',
+            'This looks like a deck you studied on another device — review '
+            'progress for ${status.cloudAheadCount} '
+            'card${status.cloudAheadCount == 1 ? '' : 's'} can be applied here.',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: scheme.onPrimaryContainer),
           ),
@@ -140,23 +183,35 @@ class _AvailableBanner extends StatelessWidget {
   }
 }
 
-class _SyncedPill extends StatelessWidget {
-  const _SyncedPill();
+enum _Tone { good, muted }
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.icon, required this.text, required this.tone});
+  final FaIconData icon;
+  final String text;
+  final _Tone tone;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: DeckoSpacing.lg),
+    final Color color =
+        tone == _Tone.good ? scheme.primary : scheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DeckoSpacing.lg),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          FaIcon(FontAwesomeIcons.solidCircleCheck,
-              size: 13, color: scheme.primary),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: FaIcon(icon, size: 13, color: color),
+          ),
           const SizedBox(width: DeckoSpacing.sm),
-          Text('Review progress synced',
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant)),
+          Expanded(
+            child: Text(text,
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant)),
+          ),
         ],
       ),
     );

@@ -255,6 +255,16 @@ See: `docs/import-progress.md`
   adopts cloud only when it's a newer, non-regressing continuation — never
   silently resets/regresses, conflicts kept local. Next: MVP_023 (sync status /
   conflict UX / recovery polish).
+- ~~Sync status, conflict UX & account polish~~ DONE (MVP_023, DEC-032): makes
+  the sync layer visible + trustworthy (no new sync behaviour). Pure
+  `deriveDeckSyncState` → a deck headline (notMatched / matchedUpToDate /
+  localAhead / cloudAhead / conflict / offline) from the existing merge tallies
+  via `ReviewStateSyncService.deckStatus`; `deriveGlobalSyncStatus` for the
+  account layer. Deck-detail banner gained the new states + an explanatory
+  "Apply synced progress?" confirmation (what will / won't change), a calm
+  "kept your local progress" conflict line, and offline reassurance. Account
+  "what syncs / stays local" copy clarified. Next: MVP_024 (Match mode, or
+  import/sync onboarding polish).
 
 ## I5 — FSRS Production Scheduler
 

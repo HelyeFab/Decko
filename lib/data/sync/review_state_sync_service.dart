@@ -5,27 +5,9 @@ import '../../domain/repositories/review_state_repository.dart';
 import '../../domain/review_card_state.dart';
 import '../../domain/sync/cloud_review_state_repository.dart';
 import '../../domain/sync/deck_fingerprint.dart';
+import '../../domain/sync/deck_sync_status.dart';
 import '../../domain/sync/review_state_merge_policy.dart';
 import '../../domain/sync/syncable_review_state.dart';
-
-/// What cloud review-state is available for a local deck.
-class ReviewSyncAvailability {
-  const ReviewSyncAvailability({
-    this.fingerprintable = false,
-    this.hasCloudProgress = false,
-    this.matchingCards = 0,
-    this.applicableCount = 0,
-  });
-
-  final bool fingerprintable;
-  final bool hasCloudProgress;
-  final int matchingCards;
-
-  /// Cards whose cloud state the merge policy would safely apply locally.
-  final int applicableCount;
-
-  bool get progressAvailable => applicableCount > 0;
-}
 
 /// The result of applying cloud review-state to a local deck.
 class ReviewApplyResult {
@@ -103,32 +85,84 @@ class ReviewStateSyncService {
     }
   }
 
-  /// What synced progress exists for [deck] (for the badge + apply prompt).
-  Future<ReviewSyncAvailability> availableFor(Deck deck) async {
-    final String? uid = _uid;
+  /// The plain-language sync status for [deck] (drives the deck-detail chip +
+  /// the apply prompt). Pure status read — it never mutates review state.
+  Future<DeckSyncStatus> deckStatus(Deck deck) async {
     final DeckFingerprint? fp = _fingerprinter.fingerprint(deck);
-    if (uid == null || fp == null) return const ReviewSyncAvailability();
+    final bool fingerprintable = fp != null;
+    final bool signedIn = _uid != null;
 
-    final List<SyncableReviewState> cloud = await _cloud.fetchStates(uid, fp);
+    if (!deck.isImported || !fingerprintable) {
+      return DeckSyncStatus(
+        deckId: deck.id,
+        fingerprint: fp?.key,
+        state: deriveDeckSyncState(
+            imported: deck.isImported,
+            signedIn: signedIn,
+            fingerprintable: fingerprintable),
+      );
+    }
+    if (!signedIn) {
+      return DeckSyncStatus(
+          deckId: deck.id, fingerprint: fp.key, state: DeckSyncState.signedOut);
+    }
+
+    List<SyncableReviewState> cloud;
+    try {
+      cloud = await _cloud.fetchStates(_uid!, fp);
+    } catch (_) {
+      return DeckSyncStatus(
+          deckId: deck.id, fingerprint: fp.key, state: DeckSyncState.offline);
+    }
     final Map<String, ReviewCardState> local = await _localMap(deck.id);
 
-    int matching = 0;
-    int applicable = 0;
-    bool hasProgress = false;
+    int matched = 0;
+    int withProgress = 0;
+    int cloudAhead = 0;
+    int conflicts = 0;
+    int localAhead = 0;
     for (final SyncableReviewState c in cloud) {
-      if (c.hasProgress) hasProgress = true;
+      if (c.hasProgress) withProgress++;
       final ReviewCardState? localState = local[c.itemId];
       if (localState == null) continue;
-      matching++;
-      if (_policy.decide(_dto(localState), c) == MergeDecision.useCloud) {
-        applicable++;
+      matched++;
+      final SyncableReviewState localDto = _dto(localState);
+      switch (_policy.decide(localDto, c)) {
+        case MergeDecision.useCloud:
+          cloudAhead++;
+        case MergeDecision.conflict:
+          conflicts++;
+        case MergeDecision.keepLocal:
+          final DateTime? lr = localDto.lastReviewedAt;
+          final DateTime? cr = c.lastReviewedAt;
+          if (c.hasProgress &&
+              localDto.hasProgress &&
+              lr != null &&
+              cr != null &&
+              lr.isAfter(cr)) {
+            localAhead++;
+          }
       }
     }
-    return ReviewSyncAvailability(
-      fingerprintable: true,
-      hasCloudProgress: hasProgress,
-      matchingCards: matching,
-      applicableCount: applicable,
+
+    return DeckSyncStatus(
+      deckId: deck.id,
+      fingerprint: fp.key,
+      state: deriveDeckSyncState(
+        imported: true,
+        signedIn: true,
+        fingerprintable: true,
+        cloudCardsAvailable: cloud.length,
+        cloudAhead: cloudAhead,
+        conflicts: conflicts,
+        localAhead: localAhead,
+      ),
+      cloudCardsAvailable: cloud.length,
+      localCardsMatched: matched,
+      cardsWithCloudProgress: withProgress,
+      cloudAheadCount: cloudAhead,
+      conflictCount: conflicts,
+      localAheadCount: localAhead,
     );
   }
 

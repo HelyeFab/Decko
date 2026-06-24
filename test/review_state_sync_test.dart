@@ -16,6 +16,9 @@ import 'package:decko/domain/repositories/review_state_repository.dart';
 import 'package:decko/domain/review_card_state.dart';
 import 'package:decko/domain/sync/cloud_review_state_repository.dart';
 import 'package:decko/domain/sync/deck_fingerprint.dart';
+import 'package:decko/domain/sync/deck_sync_status.dart';
+import 'package:decko/domain/sync/global_sync_status.dart';
+import 'package:decko/domain/sync/sync_status.dart';
 import 'package:decko/domain/sync/review_state_merge_policy.dart';
 import 'package:decko/domain/sync/syncable_review_state.dart';
 
@@ -332,6 +335,153 @@ void main() {
       ]);
       final ReviewApplyResult r = await svc.applyToDeck(deck);
       expect(r.applied, 0);
+    });
+  });
+
+  group('deck sync status (MVP_023)', () {
+    final Deck deck = _importedDeck('Core', <LearningItem>[
+      _ankiItem(1),
+      _ankiItem(2),
+      _ankiItem(3),
+      _ankiItem(4),
+    ]);
+    const DeckoUser user = DeckoUser(uid: 'u1');
+    final String fpKey = fp.fingerprint(deck)!.key;
+
+    ReviewStateSyncService service(_MemReviewState local, _MemCloud cloud,
+            {DeckoUser? as = user}) =>
+        ReviewStateSyncService(
+            auth: _FakeAuth(as), reviewState: local, cloud: cloud);
+
+    test('cloud-ahead when cloud has progress for fresh local cards', () async {
+      final _MemReviewState local = _MemReviewState()
+        ..byDeck[deck.id] = <String, ReviewCardState>{
+          'anki-card-1': _reviewState(deck.id, 'anki-card-1'),
+        };
+      final _MemCloud cloud = _MemCloud()
+        ..byKey['u1/$fpKey'] = <String, SyncableReviewState>{
+          'anki-card-1':
+              _state(reps: 6, lastReviewed: DateTime(2026, 6, 10)),
+        };
+      final DeckSyncStatus s = await service(local, cloud).deckStatus(deck);
+      expect(s.state, DeckSyncState.cloudAhead);
+      expect(s.cloudAheadCount, 1);
+      expect(s.canApply, isTrue);
+      // Status display must not mutate local state.
+      expect(local.byDeck[deck.id]!['anki-card-1']!.reps, 0);
+    });
+
+    test('local-ahead when local progress is newer than the cloud', () async {
+      final _MemReviewState local = _MemReviewState()
+        ..byDeck[deck.id] = <String, ReviewCardState>{
+          'anki-card-1': _reviewState(deck.id, 'anki-card-1',
+              reps: 20, lastReviewed: DateTime(2026, 6, 20)),
+        };
+      final _MemCloud cloud = _MemCloud()
+        ..byKey['u1/$fpKey'] = <String, SyncableReviewState>{
+          'anki-card-1': _state(reps: 5, lastReviewed: DateTime(2026, 6, 1)),
+        };
+      final DeckSyncStatus s = await service(local, cloud).deckStatus(deck);
+      expect(s.state, DeckSyncState.localAhead);
+    });
+
+    test('not matched when there is no cloud state', () async {
+      final DeckSyncStatus s =
+          await service(_MemReviewState(), _MemCloud()).deckStatus(deck);
+      expect(s.state, DeckSyncState.notMatched);
+    });
+
+    test('signed out → signedOut', () async {
+      final DeckSyncStatus s = await service(_MemReviewState(), _MemCloud(),
+              as: null)
+          .deckStatus(deck);
+      expect(s.state, DeckSyncState.signedOut);
+    });
+  });
+
+  group('deriveDeckSyncState (MVP_023)', () {
+    test('covers each branch', () {
+      expect(
+          deriveDeckSyncState(
+              imported: false, signedIn: true, fingerprintable: false),
+          DeckSyncState.notImportedDeck);
+      expect(
+          deriveDeckSyncState(
+              imported: true, signedIn: false, fingerprintable: true),
+          DeckSyncState.signedOut);
+      expect(
+          deriveDeckSyncState(
+              imported: true,
+              signedIn: true,
+              fingerprintable: true,
+              error: true),
+          DeckSyncState.offline);
+      expect(
+          deriveDeckSyncState(
+              imported: true, signedIn: true, fingerprintable: true),
+          DeckSyncState.notMatched);
+      expect(
+          deriveDeckSyncState(
+              imported: true,
+              signedIn: true,
+              fingerprintable: true,
+              cloudCardsAvailable: 5,
+              cloudAhead: 2),
+          DeckSyncState.cloudAhead);
+      expect(
+          deriveDeckSyncState(
+              imported: true,
+              signedIn: true,
+              fingerprintable: true,
+              cloudCardsAvailable: 5,
+              conflicts: 1),
+          DeckSyncState.conflict);
+      expect(
+          deriveDeckSyncState(
+              imported: true,
+              signedIn: true,
+              fingerprintable: true,
+              cloudCardsAvailable: 5,
+              localAhead: 1),
+          DeckSyncState.localAhead);
+      expect(
+          deriveDeckSyncState(
+              imported: true,
+              signedIn: true,
+              fingerprintable: true,
+              cloudCardsAvailable: 5),
+          DeckSyncState.matchedUpToDate);
+    });
+  });
+
+  group('deriveGlobalSyncStatus (MVP_023)', () {
+    test('signed out', () {
+      expect(
+          deriveGlobalSyncStatus(
+                  signedIn: false, syncState: SyncState.idle)
+              .connectionState,
+          SyncConnectionState.signedOut);
+    });
+
+    test('maps activity sync state to a connection state', () {
+      expect(
+          deriveGlobalSyncStatus(
+                  signedIn: true,
+                  syncState: const SyncState(status: SyncStatus.syncing))
+              .connectionState,
+          SyncConnectionState.syncing);
+      final GlobalSyncStatus synced = deriveGlobalSyncStatus(
+          signedIn: true,
+          syncState:
+              SyncState(status: SyncStatus.synced, lastSyncedAt: DateTime(2026)));
+      expect(synced.connectionState, SyncConnectionState.online);
+      expect(synced.lastSuccessfulSyncAt, DateTime(2026));
+      expect(
+          deriveGlobalSyncStatus(
+                  signedIn: true,
+                  syncState: const SyncState(status: SyncStatus.failed))
+              .connectionState,
+          SyncConnectionState.error);
     });
   });
 }

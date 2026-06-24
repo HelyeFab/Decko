@@ -899,3 +899,42 @@ card's progress (the project's oldest rule).
 - Deferred (MVP_023): richer conflict UX, recovery, pending/offline status. A
   full-deck push runs on manual sync (large decks are heavy) — incremental
   after-session push keeps the cloud current cheaply.
+
+## DEC-032: Sync status visibility + explicit, plain-language review-state apply
+
+Date: 2026-06-23
+Status: Accepted
+
+### Context
+
+MVP_020/022 built the sync machinery; MVP_023 is about *trust*. Users need to see
+what syncs, whether a deck is matched, whether progress is waiting, and what
+"Apply synced progress" will (and won't) do — without ever fearing their study
+progress could be overwritten silently.
+
+### Decision
+
+- **Derived, plain-language status — never new sync behaviour.** A pure
+  `deriveDeckSyncState(...)` turns per-card merge tallies into a single headline:
+  notImportedDeck / signedOut / notMatched / matchedUpToDate / localAhead /
+  cloudAhead / conflict / offline. `ReviewStateSyncService.deckStatus(deck)`
+  computes the tallies from the existing merge policy (Firebase fetch errors →
+  offline). A pure `deriveGlobalSyncStatus(...)` maps auth + activity `SyncState`
+  to a `GlobalSyncStatus`. Status reads never mutate review state.
+- **Explicit apply, now explained.** The deck-detail banner only ever *offers*
+  apply on `cloudAhead`; tapping opens a confirmation that states how many cards
+  match, that only matching cards' review state changes, and that deck content /
+  media / card text are untouched and newer-or-safer local progress is never
+  overwritten. Conflicts surface a calm "Decko kept your local progress."
+- **Calm offline + local-ahead messaging.** Offline reassures that studying still
+  works and Decko will sync later; local-ahead simply notes this device is newer.
+
+### Consequences
+
+- Users can answer "am I synced / matched / cloud-ahead / local-ahead / in
+  conflict / offline?" at a glance, per deck and globally.
+- The MVP_020/022 sync boundary is unchanged: deck content / media / imported
+  source are still never synced; no FSRS / scheduler / due-queue / daily-counter
+  / sibling-burying behaviour changed.
+- Deferred (later): true pending-upload tracking + a connectivity signal (offline
+  is currently inferred from fetch failures).
