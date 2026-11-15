@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../deck.dart';
+import '../repositories/imported_source_store.dart';
 import '../repositories/media_store.dart';
 import 'deck_import_preview.dart';
 
@@ -18,12 +19,14 @@ abstract class DeckImportAdapter {
   ///
   /// When [keepProgress] is true, per-card imported progress is preserved;
   /// otherwise cards are imported as new. When [mediaStore] is provided, the
-  /// package's media is extracted and saved under the new deck's id.
+  /// package's media is extracted and saved under the new deck's id. When
+  /// [sourceStore] is provided, the lossless Anki source is preserved.
   Future<Deck> importDeck(
     Uint8List bytes, {
     required bool keepProgress,
     required DateTime importedAt,
     MediaStore? mediaStore,
+    ImportedSourceStore? sourceStore,
   });
 }
 

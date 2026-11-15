@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/constants/decko_strings.dart';
+import '../data/file_imported_source_store.dart';
 import '../data/file_media_store.dart';
 import '../data/mock_deck_repository.dart';
 import '../data/shared_prefs_progress_repository.dart';
 import '../data/shared_prefs_review_state_repository.dart';
 import '../data/shared_prefs_settings_repository.dart';
 import '../domain/repositories/deck_repository.dart';
+import '../domain/repositories/imported_source_store.dart';
 import '../domain/repositories/media_store.dart';
 import '../domain/repositories/progress_repository.dart';
 import '../domain/repositories/review_state_repository.dart';
@@ -34,6 +36,7 @@ class DeckoApp extends StatefulWidget {
     this.progressRepository = const SharedPrefsProgressRepository(),
     this.reviewStateRepository = const SharedPrefsReviewStateRepository(),
     this.mediaStore = const FileMediaStore(),
+    this.importedSourceStore = const FileImportedSourceStore(),
   });
 
   final DeckRepository deckRepository;
@@ -41,6 +44,7 @@ class DeckoApp extends StatefulWidget {
   final ProgressRepository progressRepository;
   final ReviewStateRepository reviewStateRepository;
   final MediaStore mediaStore;
+  final ImportedSourceStore importedSourceStore;
 
   static ThemeController themeOf(BuildContext context) =>
       _scopeOf(context).controller;
@@ -62,6 +66,9 @@ class DeckoApp extends StatefulWidget {
 
   static MediaStore mediaOf(BuildContext context) =>
       _scopeOf(context).mediaStore;
+
+  static ImportedSourceStore sourceOf(BuildContext context) =>
+      _scopeOf(context).importedSourceStore;
 
   static _DeckoScope _scopeOf(BuildContext context) {
     final _DeckoScope? scope =
@@ -108,6 +115,7 @@ class _DeckoAppState extends State<DeckoApp> {
       progressRepository: widget.progressRepository,
       reviewStateRepository: widget.reviewStateRepository,
       mediaStore: widget.mediaStore,
+      importedSourceStore: widget.importedSourceStore,
       child: ValueListenableBuilder<AppThemeConfig>(
         valueListenable: _themeController,
         builder: (BuildContext context, AppThemeConfig appTheme, _) {
@@ -132,6 +140,7 @@ class _DeckoScope extends InheritedWidget {
     required this.progressRepository,
     required this.reviewStateRepository,
     required this.mediaStore,
+    required this.importedSourceStore,
     required super.child,
   });
 
@@ -141,6 +150,7 @@ class _DeckoScope extends InheritedWidget {
   final ProgressRepository progressRepository;
   final ReviewStateRepository reviewStateRepository;
   final MediaStore mediaStore;
+  final ImportedSourceStore importedSourceStore;
 
   @override
   bool updateShouldNotify(_DeckoScope oldWidget) =>
@@ -149,5 +159,6 @@ class _DeckoScope extends InheritedWidget {
       deckStore != oldWidget.deckStore ||
       progressRepository != oldWidget.progressRepository ||
       reviewStateRepository != oldWidget.reviewStateRepository ||
-      mediaStore != oldWidget.mediaStore;
+      mediaStore != oldWidget.mediaStore ||
+      importedSourceStore != oldWidget.importedSourceStore;
 }
